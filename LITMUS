@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tharua Firm</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+    header {
+      background-color: #2c3e50;
+      color: white;
+      padding: 20px 10px;
+      text-align: center;
+    }
+    nav {
+      background-color: #34495e;
+      padding: 10px;
+      text-align: center;
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin: 0 15px;
+      font-weight: bold;
+    }
+    .container {
+      padding: 20px;
+    }
+    footer {
+      background-color: #2c3e50;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      position: relative;
+      bottom: 0;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tharua Firm</h1>
+    <p>Refreshing Your Day with Quality Soft Drinks</p>
+  </header>
+
+  <nav>
+    <a href="#">Home</a>
+    <a href="#">About Us</a>
+    <a href="#">Products</a>
+    <a href="#">Contact</a>
+  </nav>
+
+  <div class="container">
+    <h2>Welcome to Tharua Firm</h2>
+    <p>We are a private limited company dedicated to providing high-quality soft drinks across Kenya. Our commitment is to deliver refreshment, energy, and health in every sip.</p>
+
+    <h3>Our Products</h3>
+    <ul>
+      <li>Brava Cola</li>
+      <li>Brava Orange</li>
+      <li>Brava Lemon</li>
+    </ul>
+
+    <h3>Why Choose Us</h3>
+    <ul>
+      <li>Reliable distribution network</li>
+      <li>Affordable prices</li>
+      <li>Quality assurance</li>
+    </ul>
+  </div>
+
+  <footer>
+    <p>© 2025 Tharua Firm | Embu, Kenya | Contact: +254 712 345678</p>
+  </footer>
+</body>
+</html>
