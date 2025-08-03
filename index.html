@@ -34,6 +34,7 @@
       text-decoration: none;
       transition: background 0.3s ease;
       font-size: 14px;
+      cursor: pointer;
     }
     .sidebar a i {
       margin-right: 12px;
@@ -46,34 +47,60 @@
       margin-left: 230px;
       padding: 20px;
     }
-    h1 {
-      margin-top: 0;
+    .content-section {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
   <div class="sidebar">
     <h2>THARUA</h2>
-    <a href="#"><i class="fas fa-home"></i> Home</a>
-    <a href="#"><i class="fas fa-users-cog"></i> User Management</a>
-    <a href="#"><i class="fas fa-address-book"></i> Contacts</a>
-    <a href="#"><i class="fas fa-boxes"></i> Products</a>
-    <a href="#"><i class="fas fa-industry"></i> Manufacturing</a>
-    <a href="#"><i class="fas fa-shopping-cart"></i> Purchases</a>
-    <a href="#"><i class="fas fa-cash-register"></i> Sell</a>
-    <a href="#"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
-    <a href="#"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
-    <a href="#"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
-    <a href="#"><i class="fas fa-calculator"></i> Accounting</a>
-    <a href="#"><i class="fas fa-robot"></i> AI Assistance</a>
-    <a href="#"><i class="fas fa-chart-line"></i> Reports</a>
-    <a href="#"><i class="fas fa-envelope"></i> Notification Templates</a>
+    <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
+    <a onclick="clearContent()"><i class="fas fa-users-cog"></i> User Management</a>
+    <a onclick="clearContent()"><i class="fas fa-address-book"></i> Contacts</a>
+    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
+    <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
+    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
+    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
+    <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
+    <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
+    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
+    <a onclick="clearContent()"><i class="fas fa-calculator"></i> Accounting</a>
+    <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
+    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
+    <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
   </div>
 
   <div class="main-content">
-    <h1>Welcome to Tharua Firm</h1>
-    <p>Refreshing Your Day with Quality Soft Drinks</p>
-    <!-- You can include your dashboard widgets here -->
+    <div id="content" class="content-section">
+      <h1>Welcome to Tharua Firm</h1>
+      <p>Click a menu item on the left to view more details.</p>
+    </div>
   </div>
+
+  <script>
+    function showHome() {
+      document.getElementById("content").innerHTML = `
+        <h2>Company Overview</h2>
+        <p><strong>Name:</strong> Tharua Firm</p>
+        <p><strong>Business Type:</strong> Soft Drinks & Distribution</p>
+        <p><strong>Location:</strong> Embu County, Kenya</p>
+        <p><strong>Manager:</strong> Kenneth Muriithi</p>
+        <p><strong>Daily Sales:</strong> KSh 200,000+</p>
+        <p><strong>System:</strong> Africa.PearlBiznaLtd.com</p>
+        <p><strong>Mission:</strong> Refreshing Your Day with Quality Soft Drinks</p>
+      `;
+    }
+
+    function clearContent() {
+      document.getElementById("content").innerHTML = `
+        <h2>Section Under Development</h2>
+        <p>Content will be added soon. Please check back later.</p>
+      `;
+    }
+  </script>
 </body>
 </html>
