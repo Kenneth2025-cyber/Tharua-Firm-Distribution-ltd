@@ -237,7 +237,26 @@
       document.getElementById("content").innerHTML = `
         <h2>Users</h2>
         <p>Manage users of the system here.</p>
+
+        <h3>Create New User</h3>
+        <input type="email" id="email" placeholder="Email" required><br><br>
+        <input type="password" id="password" placeholder="Password" required><br><br>
+        <button onclick="signup()">Sign Up</button>
       `;
+    }
+
+    function signup() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          alert("Account created successfully!");
+          showUsers();
+        })
+        .catch((error) => {
+          alert("Error: " + error.message);
+        });
     }
 
     function showRoles() {
