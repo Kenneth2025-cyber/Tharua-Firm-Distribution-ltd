@@ -94,30 +94,30 @@
       background-color: #34495e;
     }
 
-    .tile {
-      background-color: #ecf0f1;
-      padding: 20px;
-      border-radius: 8px;
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 20px;
       text-align: center;
-      cursor: pointer;
-      transition: transform 0.2s, background-color 0.2s;
     }
 
-    .tile:hover {
-      background-color: #d0d7de;
+    .button-grid div {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .button-grid div:hover {
       transform: scale(1.05);
     }
 
-    .tile i {
+    .button-grid img {
+      width: 50px;
+      height: 50px;
       margin-bottom: 10px;
-      color: #2c3e50;
-    }
-
-    .tile p {
-      margin: 0;
-      font-size: 14px;
-      font-weight: bold;
-      color: #2c3e50;
     }
   </style>
 </head>
@@ -125,7 +125,15 @@
   <div class="sidebar">
     <h2>THARUA</h2>
     <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
-    <a onclick="showUserManagement()"><i class="fas fa-users-cog"></i> User Management</a>
+
+    <div class="dropdown">
+      <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showUsers()">Users</a>
+        <a onclick="showRoles()">Roles</a>
+        <a onclick="showFieldSales()">Field Salespersons</a>
+      </div>
+    </div>
 
     <div class="dropdown">
       <a onclick="toggleContacts()" id="contactsMenu"><i class="fas fa-address-book"></i> Contacts <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
@@ -192,52 +200,18 @@
     function showHome() {
       document.getElementById("content").innerHTML = `
         <h2>Dashboard Overview</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; margin-top: 20px;">
-          <div class="tile" onclick="showUserManagement()">
-            <i class="fas fa-users-cog fa-2x"></i><p>User Management</p>
-          </div>
-          <div class="tile" onclick="showSuppliers()">
-            <i class="fas fa-truck-loading fa-2x"></i><p>Suppliers</p>
-          </div>
-          <div class="tile" onclick="showCustomers()">
-            <i class="fas fa-user-friends fa-2x"></i><p>Customers</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-boxes fa-2x"></i><p>Products</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-industry fa-2x"></i><p>Manufacturing</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-shopping-cart fa-2x"></i><p>Purchases</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-cash-register fa-2x"></i><p>Sell</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-truck-moving fa-2x"></i><p>Stock Transfers</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-balance-scale-left fa-2x"></i><p>Stock Adjustment</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-file-invoice-dollar fa-2x"></i><p>Expenses</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-calculator fa-2x"></i><p>Accounting</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-robot fa-2x"></i><p>AI Assistance</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-chart-line fa-2x"></i><p>Reports</p>
-          </div>
-          <div class="tile" onclick="clearContent()">
-            <i class="fas fa-envelope fa-2x"></i><p>Notifications</p>
-          </div>
-          <div class="tile" onclick="logout()">
-            <i class="fas fa-sign-out-alt fa-2x"></i><p>Logout</p>
-          </div>
+        <div class="button-grid">
+          <div><img src="https://img.icons8.com/color/96/box.png"/><div>Products</div></div>
+          <div><img src="https://img.icons8.com/color/96/factory.png"/><div>Manufacturing</div></div>
+          <div><img src="https://img.icons8.com/color/96/add-shopping-cart.png"/><div>Purchases</div></div>
+          <div><img src="https://img.icons8.com/color/96/cash-register.png"/><div>Sell</div></div>
+          <div><img src="https://img.icons8.com/color/96/delivery.png"/><div>Stock Transfers</div></div>
+          <div><img src="https://img.icons8.com/color/96/scale.png"/><div>Stock Adjustment</div></div>
+          <div><img src="https://img.icons8.com/color/96/bill.png"/><div>Expenses</div></div>
+          <div><img src="https://img.icons8.com/color/96/accounting.png"/><div>Accounting</div></div>
+          <div><img src="https://img.icons8.com/color/96/artificial-intelligence.png"/><div>AI Assistance</div></div>
+          <div><img src="https://img.icons8.com/color/96/combo-chart.png"/><div>Reports</div></div>
+          <div><img src="https://img.icons8.com/color/96/secured-letter.png"/><div>Notifications</div></div>
         </div>
       `;
     }
@@ -249,33 +223,35 @@
       `;
     }
 
-    function showUserManagement() {
-      document.getElementById("content").innerHTML = `
-        <h2>Create User Account</h2>
-        <form onsubmit="event.preventDefault(); alert('User account created successfully!');">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" required />
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" required />
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required />
-          <label for="role">Select Role:</label>
-          <select id="role" name="role" required>
-            <option value="">-- Select Role --</option>
-            <option value="admin">Admin</option>
-            <option value="cashier">Cashier</option>
-            <option value="salesperson">Salesperson</option>
-            <option value="storekeeper">Storekeeper</option>
-          </select>
-          <button type="submit">Create Account</button>
-        </form>
-        <p><small>Each role will have different permissions once login functionality is implemented.</small></p>
-      `;
-    }
-
     function toggleContacts() {
       const submenu = document.getElementById("contactsSubmenu");
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function toggleUserManagement() {
+      const submenu = document.getElementById("userMgmtSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function showUsers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Users</h2>
+        <p>Manage users of the system here.</p>
+      `;
+    }
+
+    function showRoles() {
+      document.getElementById("content").innerHTML = `
+        <h2>Roles</h2>
+        <p>Define and manage user roles and permissions.</p>
+      `;
+    }
+
+    function showFieldSales() {
+      document.getElementById("content").innerHTML = `
+        <h2>Field Salespersons</h2>
+        <p>Assign and track sales agents working in the field.</p>
+      `;
     }
 
     function showSuppliers() {
