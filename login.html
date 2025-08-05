@@ -12,6 +12,7 @@
   <!-- Firebase compat SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -25,14 +26,26 @@
 
     firebase.initializeApp(firebaseConfig);
 
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
     function login() {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
 
-      firebase.auth().signInWithEmailAndPassword(email, password)
-        .then((userCredential) => {
-          alert("Login successful!");
-          window.location.href = "dashboard.html";
+      auth.signInWithEmailAndPassword(email, password)
+        .then(async (userCredential) => {
+          const uid = userCredential.user.uid;
+
+          // Look up user in Firestore
+          const doc = await db.collection("users").doc(uid).get();
+          if (doc.exists && doc.data().approved === true) {
+            alert("Login successful!");
+            window.location.href = "dashboard.html";
+          } else {
+            await auth.signOut();
+            alert("Access denied: You are not approved by the admin.");
+          }
         })
         .catch((error) => {
           alert("Error: " + error.message);
