@@ -6,9 +6,49 @@
   <title>Login</title>
 
   <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
+  <script type="module">
+    // Import Firebase modules (ESM way)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // ✅ Your Firebase config (replace with your own project’s info)
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+    };
+
+    // ✅ Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ✅ Login function
+    window.loginUser = async function () {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+
+        // Check if user is approved in Firestore
+        const userDocRef = doc(db, "users", uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists() && userDoc.data().approved) {
+          window.location.href = "dashboard.html"; // or wherever your dashboard is
+        } else {
+          await signOut(auth);
+          alert("Your account is not approved by admin.");
+        }
+
+      } catch (error) {
+        alert("Login error: " + error.message);
+      }
+    };
+  </script>
 
   <style>
     body {
@@ -48,43 +88,5 @@
     </form>
   </div>
 
-  <script>
-    // ✅ Replace this with your own Firebase config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-    };
-
-    // ✅ Initialize Firebase FIRST
-    firebase.initializeApp(firebaseConfig);
-
-    // ✅ Then assign auth and db
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-
-    // ✅ Only call login AFTER auth is initialized
-    async function loginUser() {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-
-      try {
-        // Step 1: Sign in
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        const uid = userCredential.user.uid;
-
-        // Step 2: Check if user is approved
-        const doc = await db.collection("users").doc(uid).get();
-        if (doc.exists && doc.data().approved) {
-          window.location.href = "dashboard.html"; // or your actual dashboard
-        } else {
-          await auth.signOut();
-          alert("Your account is not approved by admin.");
-        }
-      } catch (error) {
-        alert("Login error: " + error.message);
-      }
-    }
-  </script>
 </body>
 </html>
