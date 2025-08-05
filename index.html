@@ -1,230 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tharua Firm Dashboard</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
+  <title>Welcome to Tharua System</title>
   <style>
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-    }
-
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      height: 100vh;
-      width: 230px;
-      background-color: #2c3e50;
-      color: white;
-      padding-top: 20px;
-      overflow-y: auto;
-    }
-
-    .sidebar h2 {
+      background-color: #f0f4f8;
       text-align: center;
-      margin-bottom: 20px;
+      padding-top: 100px;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    p {
       font-size: 18px;
     }
-
-    .sidebar a {
-      display: flex;
-      align-items: center;
-      padding: 12px 20px;
-      color: white;
-      text-decoration: none;
-      transition: background 0.3s ease;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .sidebar a i {
-      margin-right: 12px;
-      font-size: 16px;
-    }
-
-    .sidebar a:hover {
-      background-color: #34495e;
-    }
-
-    .dropdown a {
-      font-size: 14px;
-      color: white;
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      text-decoration: none;
-      cursor: pointer;
-    }
-
-    .dropdown a:hover {
-      background-color: #34495e;
-    }
-
-    .main-content {
-      margin-left: 230px;
-      padding: 20px;
-    }
-
-    .content-section {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    input, select, button {
-      width: 100%;
-      padding: 8px;
-      margin: 8px 0 16px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-
-    button {
+    a.button {
+      display: inline-block;
+      margin: 20px 10px;
+      padding: 12px 24px;
       background-color: #2c3e50;
       color: white;
-      cursor: pointer;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
     }
-
-    button:hover {
+    a.button:hover {
       background-color: #34495e;
     }
   </style>
 </head>
 <body>
-  <div class="sidebar">
-    <h2>THARUA</h2>
-    <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
-    <a onclick="showUserManagement()"><i class="fas fa-users-cog"></i> User Management</a>
+  <h1>Welcome to Tharua System</h1>
+  <p>Your smart solution for soft drink distribution</p>
 
-    <!-- Contacts Menu with Subitems -->
-    <div class="dropdown">
-      <a onclick="toggleContacts()" id="contactsMenu"><i class="fas fa-address-book"></i> Contacts <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
-      <div id="contactsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
-        <a onclick="showSuppliers()">Suppliers</a>
-        <a onclick="showCustomers()">Customers</a>
-        <a onclick="clearContent()">Customer Groups</a>
-        <a onclick="clearContent()">Import Contacts</a>
-      </div>
-    </div>
-
-    <!-- Static Links -->
-    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
-    <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
-    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
-    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
-    <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
-    <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
-    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
-    <a onclick="clearContent()"><i class="fas fa-calculator"></i> Accounting</a>
-    <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
-    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
-    <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
-    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
-  </div>
-
-  <div class="main-content">
-    <div id="content" class="content-section">
-      <h1>Welcome to Tharua Firm</h1>
-      <p>Click a menu item on the left to view more details.</p>
-    </div>
-  </div>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      appId: "YOUR_APP_ID"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-
-    auth.onAuthStateChanged(user => {
-      if (!user) {
-        window.location.href = "login.html";
-      }
-    });
-
-    function logout() {
-      auth.signOut().then(() => {
-        window.location.href = "login.html";
-      });
-    }
-
-    function showHome() {
-      document.getElementById("content").innerHTML = `
-        <h2>Company Overview</h2>
-        <p><strong>Name:</strong> Tharua Firm</p>
-        <p><strong>Business Type:</strong> Soft Drinks & Distribution</p>
-        <p><strong>Location:</strong> Embu County, Kenya</p>
-        <p><strong>Manager:</strong> Kenneth Muriithi</p>
-        <p><strong>Daily Sales:</strong> KSh 200,000+</p>
-        <p><strong>System:</strong> Africa.PearlBiznaLtd.com</p>
-        <p><strong>Mission:</strong> Refreshing Your Day with Quality Soft Drinks</p>
-      `;
-    }
-
-    function clearContent() {
-      document.getElementById("content").innerHTML = `
-        <h2>Section Under Development</h2>
-        <p>Content will be added soon. Please check back later.</p>
-      `;
-    }
-
-    function showUserManagement() {
-      document.getElementById("content").innerHTML = `
-        <h2>Create User Account</h2>
-        <form onsubmit="event.preventDefault(); alert('User account created successfully!');">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" required />
-
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" required />
-
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required />
-
-          <label for="role">Select Role:</label>
-          <select id="role" name="role" required>
-            <option value="">-- Select Role --</option>
-            <option value="admin">Admin</option>
-            <option value="cashier">Cashier</option>
-            <option value="salesperson">Salesperson</option>
-            <option value="storekeeper">Storekeeper</option>
-          </select>
-
-          <button type="submit">Create Account</button>
-        </form>
-        <p><small>Each role will have different permissions once login functionality is implemented.</small></p>
-      `;
-    }
-
-    function toggleContacts() {
-      const submenu = document.getElementById("contactsSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
-
-    function showSuppliers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Suppliers</h2>
-        <p>List and manage your product suppliers here.</p>
-      `;
-    }
-
-    function showCustomers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Customers</h2>
-        <p>View and manage your customer records here.</p>
-      `;
-    }
-  </script>
+  <a href="login.html" class="button">Login</a>
+  <a href="signup.html" class="button">Sign Up</a>
 </body>
 </html>
