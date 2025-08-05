@@ -33,10 +33,13 @@
 
       firebase.auth().signInWithEmailAndPassword(email, password)
         .then(async (userCredential) => {
-          const doc = await db.collection("users").doc(email).get();
+          const uid = userCredential.user.uid;
+
+          const doc = await db.collection("users").doc(uid).get();
 
           if (!doc.exists) {
-            alert("Access denied: User not found in Firestore.");
+            alert("Access denied: UID not found in Firestore.");
+            firebase.auth().signOut();
             return;
           }
 
