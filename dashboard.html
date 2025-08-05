@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -94,6 +93,32 @@
     button:hover {
       background-color: #34495e;
     }
+
+    .tile {
+      background-color: #ecf0f1;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+    }
+
+    .tile:hover {
+      background-color: #d0d7de;
+      transform: scale(1.05);
+    }
+
+    .tile i {
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+
+    .tile p {
+      margin: 0;
+      font-size: 14px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
   </style>
 </head>
 <body>
@@ -166,14 +191,54 @@
 
     function showHome() {
       document.getElementById("content").innerHTML = `
-        <h2>Company Overview</h2>
-        <p><strong>Name:</strong> Tharua Firm</p>
-        <p><strong>Business Type:</strong> Soft Drinks & Distribution</p>
-        <p><strong>Location:</strong> Embu County, Kenya</p>
-        <p><strong>Manager:</strong> Kenneth Muriithi</p>
-        <p><strong>Daily Sales:</strong> KSh 200,000+</p>
-        <p><strong>System:</strong> Africa.PearlBiznaLtd.com</p>
-        <p><strong>Mission:</strong> Refreshing Your Day with Quality Soft Drinks</p>
+        <h2>Dashboard Overview</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; margin-top: 20px;">
+          <div class="tile" onclick="showUserManagement()">
+            <i class="fas fa-users-cog fa-2x"></i><p>User Management</p>
+          </div>
+          <div class="tile" onclick="showSuppliers()">
+            <i class="fas fa-truck-loading fa-2x"></i><p>Suppliers</p>
+          </div>
+          <div class="tile" onclick="showCustomers()">
+            <i class="fas fa-user-friends fa-2x"></i><p>Customers</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-boxes fa-2x"></i><p>Products</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-industry fa-2x"></i><p>Manufacturing</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-shopping-cart fa-2x"></i><p>Purchases</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-cash-register fa-2x"></i><p>Sell</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-truck-moving fa-2x"></i><p>Stock Transfers</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-balance-scale-left fa-2x"></i><p>Stock Adjustment</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-file-invoice-dollar fa-2x"></i><p>Expenses</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-calculator fa-2x"></i><p>Accounting</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-robot fa-2x"></i><p>AI Assistance</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-chart-line fa-2x"></i><p>Reports</p>
+          </div>
+          <div class="tile" onclick="clearContent()">
+            <i class="fas fa-envelope fa-2x"></i><p>Notifications</p>
+          </div>
+          <div class="tile" onclick="logout()">
+            <i class="fas fa-sign-out-alt fa-2x"></i><p>Logout</p>
+          </div>
+        </div>
       `;
     }
 
@@ -190,13 +255,10 @@
         <form onsubmit="event.preventDefault(); alert('User account created successfully!');">
           <label for="username">Username:</label>
           <input type="text" id="username" name="username" required />
-
           <label for="email">Email:</label>
           <input type="email" id="email" name="email" required />
-
           <label for="password">Password:</label>
           <input type="password" id="password" name="password" required />
-
           <label for="role">Select Role:</label>
           <select id="role" name="role" required>
             <option value="">-- Select Role --</option>
@@ -205,7 +267,6 @@
             <option value="salesperson">Salesperson</option>
             <option value="storekeeper">Storekeeper</option>
           </select>
-
           <button type="submit">Create Account</button>
         </form>
         <p><small>Each role will have different permissions once login functionality is implemented.</small></p>
