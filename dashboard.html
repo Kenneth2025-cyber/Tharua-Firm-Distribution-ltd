@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tharua Dashboard</title>
+</head>
+<body style="display: none;" id="dashboardBody">
+  <h1>Welcome to Tharua System</h1>
+  <p>You are successfully logged in!</p>
+  <button onclick="logout()">Logout</button>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+  <script>
+    // Show that Firebase loaded
+    console.log("Firebase Loaded");
+
+    // Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
+      authDomain: "tharuasystem.firebaseapp.com",
+      projectId: "tharuasystem",
+      storageBucket: "tharuasystem.appspot.com",
+      messagingSenderId: "438210516373",
+      appId: "1:438210516373:web:83c188e315a69165d5129c"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // Check login status
+    firebase.auth().onAuthStateChanged((user) => {
+      console.log("Auth check running...");
+      if (user) {
+        console.log("User is logged in:", user.email);
+        document.getElementById("dashboardBody").style.display = "block";
+      } else {
+        console.log("No user logged in. Redirecting...");
+        window.location.href = "login.html";
+      }
+    });
+
+    // Logout function
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        alert("Logged out successfully.");
+        window.location.href = "login.html";
+      }).catch((error) => {
+        alert("Error logging out: " + error.message);
+      });
+    }
+  </script>
+</body>
+</html>
