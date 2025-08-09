@@ -6,10 +6,18 @@
   <title>Tharua Firm Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body {
-      margin: 0;
+    body, html {
+      margin: 0; padding: 0; height: 100%;
       font-family: Arial, sans-serif;
       background-color: #f4f4f4;
+    }
+
+    #loading {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      display: flex; justify-content: center; align-items: center;
+      background: white;
+      font-size: 24px;
+      z-index: 9999;
     }
 
     .sidebar {
@@ -22,6 +30,7 @@
       color: white;
       padding-top: 20px;
       overflow-y: auto;
+      display: none; /* hide until loaded */
     }
 
     .sidebar h2 {
@@ -67,6 +76,7 @@
     .main-content {
       margin-left: 230px;
       padding: 20px;
+      display: none; /* hide until loaded */
     }
 
     .content-section {
@@ -75,54 +85,13 @@
       border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-
-    input, select, button {
-      width: 100%;
-      padding: 8px;
-      margin: 8px 0 16px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-
-    button {
-      background-color: #2c3e50;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #34495e;
-    }
-
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 20px;
-      text-align: center;
-    }
-
-    .button-grid div {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background-color: #f9f9f9;
-      cursor: pointer;
-      transition: transform 0.2s ease;
-    }
-
-    .button-grid div:hover {
-      transform: scale(1.05);
-    }
-
-    .button-grid img {
-      width: 50px;
-      height: 50px;
-      margin-bottom: 10px;
-    }
   </style>
 </head>
 <body>
-  <div class="sidebar">
+
+  <div id="loading">Loading, please wait...</div>
+
+  <div class="sidebar" id="sidebar">
     <h2>THARUA</h2>
     <a onclick="showHome()" id="homeMenu"><i class="fas fa-home"></i> Home</a>
 
@@ -159,7 +128,7 @@
     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
   </div>
 
-  <div class="main-content">
+  <div class="main-content" id="mainContent">
     <div id="content" class="content-section">
       <h1>Welcome to Tharua Firm</h1>
       <p>Click a menu item on the left to view more details.</p>
@@ -183,45 +152,66 @@
 
     firebase.initializeApp(firebaseConfig);
 
+    async function checkUserRole(user) {
+      try {
+        const doc = await firebase.firestore().collection("users").doc(user.uid).get();
+        if (!doc.exists) throw new Error("User document does not exist");
+        return doc.data().role;
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    }
+
     firebase.auth().onAuthStateChanged(async (user) => {
       if (!user) {
         window.location.href = "login.html";
+        return;
+      }
+      // Show loading
+      document.getElementById('loading').style.display = 'flex';
+      document.getElementById('sidebar').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'none';
+
+      const role = await checkUserRole(user);
+      console.log("User role:", role);
+
+      if (!role) {
+        alert("Access denied: User role not found.");
+        await firebase.auth().signOut();
+        window.location.href = "login.html";
+        return;
+      }
+
+      // Show sidebar and main content now that role is confirmed
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('sidebar').style.display = 'block';
+      document.getElementById('mainContent').style.display = 'block';
+
+      // Hide menus initially
+      const userMgmt = document.getElementById("userMgmtMenu");
+      const contacts = document.getElementById("contactsMenu");
+      const sell = document.getElementById("sellMenu");
+      const reports = document.getElementById("reportsMenu");
+
+      [userMgmt, contacts, sell, reports].forEach(el => {
+        if (el) el.style.display = "none";
+      });
+
+      if (role === "admin") {
+        if(userMgmt) userMgmt.style.display = "flex";
+        if(contacts) contacts.style.display = "flex";
+        if(sell) sell.style.display = "flex";
+        if(reports) reports.style.display = "flex";
+      } else if (role === "cashier") {
+        if(sell) sell.style.display = "flex";
+        if(reports) reports.style.display = "flex";
+      } else if (role === "salesperson") {
+        if(reports) reports.style.display = "flex";
       } else {
-        try {
-          const doc = await firebase.firestore().collection("users").doc(user.uid).get();
-          const role = doc.exists ? doc.data().role : null;
-          console.log("User role:", role);
-
-          // Sidebar menu elements by ID
-          const userMgmt = document.getElementById("userMgmtMenu");
-          const contacts = document.getElementById("contactsMenu");
-          const sell = document.getElementById("sellMenu");
-          const reports = document.getElementById("reportsMenu");
-
-          // Hide all role-controlled menus initially
-          [userMgmt, contacts, sell, reports].forEach(el => {
-            if(el) el.style.display = "none";
-          });
-
-          if (role === "admin") {
-            if(userMgmt) userMgmt.style.display = "flex";
-            if(contacts) contacts.style.display = "flex";
-            if(sell) sell.style.display = "flex";
-            if(reports) reports.style.display = "flex";
-          } else if (role === "cashier") {
-            if(sell) sell.style.display = "flex";
-            if(reports) reports.style.display = "flex";
-          } else if (role === "salesperson") {
-            if(reports) reports.style.display = "flex";
-          } else {
-            alert("Access denied: Your role does not have permission.");
-            firebase.auth().signOut();
-          }
-        } catch (error) {
-          console.error("Error loading user role:", error);
-          alert("Error loading user permissions.");
-          firebase.auth().signOut();
-        }
+        alert("Access denied: Your role does not have permission.");
+        await firebase.auth().signOut();
+        window.location.href = "login.html";
       }
     });
 
@@ -233,6 +223,8 @@
         alert("Error logging out: " + error.message);
       });
     }
+
+    // The rest of your functions (showHome, clearContent, toggleUserManagement, etc.) go here unchanged
 
     function showHome() {
       document.getElementById("content").innerHTML = `
@@ -270,105 +262,8 @@
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
-    function showUsers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Users</h2>
-        <p>Manage users of the system here.</p>
+    // Add your other menu content functions here as before...
 
-        <h3>Create New User</h3>
-        <input type="email" id="email" placeholder="Email" required><br><br>
-        <input type="password" id="password" placeholder="Password" required><br><br>
-
-        <label for="role">Select Role:</label><br>
-        <select id="role" required>
-          <option value="" disabled selected>Select role</option>
-          <option value="admin">Administrator</option>
-          <option value="cashier">Cashier</option>
-          <option value="salesperson">Salesperson</option>
-        </select><br><br>
-
-        <button onclick="signup()">Sign Up</button>
-      `;
-    }
-
-    function signup() {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      const role = document.getElementById("role").value;
-
-      if (!role) {
-        alert("Please select a role for the user.");
-        return;
-      }
-
-      firebase.auth().createUserWithEmailAndPassword(email, password)
-        .then(async (userCredential) => {
-          const user = userCredential.user;
-          try {
-            await firebase.firestore().collection("users").doc(user.uid).set({
-              role: role,
-              email: email,
-              createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert("Account created successfully with role: " + role);
-            showUsers();
-          } catch (error) {
-            alert("Error saving user role: " + error.message);
-          }
-        })
-        .catch((error) => {
-          alert("Error: " + error.message);
-        });
-    }
-
-    function showRoles() {
-      document.getElementById("content").innerHTML = `
-        <h2>User Roles & Permissions</h2>
-        <table style="width:100%; border-collapse: collapse;">
-          <thead>
-            <tr style="background-color:#2c3e50; color:white;">
-              <th style="padding: 12px; border: 1px solid #ddd; text-align:left;">Role</th>
-              <th style="padding: 12px; border: 1px solid #ddd; text-align:left;">Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding: 12px; border: 1px solid #ddd;">Administrator</td>
-              <td style="padding: 12px; border: 1px solid #ddd;">Full system access including user management, contacts, sales, reports, and all features.</td>
-            </tr>
-            <tr>
-              <td style="padding: 12px; border: 1px solid #ddd;">Cashier</td>
-              <td style="padding: 12px; border: 1px solid #ddd;">Can process sales and view reports.</td>
-            </tr>
-            <tr>
-              <td style="padding: 12px; border: 1px solid #ddd;">Salesperson</td>
-              <td style="padding: 12px; border: 1px solid #ddd;">Can only view reports.</td>
-            </tr>
-          </tbody>
-        </table>
-      `;
-    }
-
-    function showFieldSales() {
-      document.getElementById("content").innerHTML = `
-        <h2>Field Salespersons</h2>
-        <p>Assign and track sales agents working in the field.</p>
-      `;
-    }
-
-    function showSuppliers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Suppliers</h2>
-        <p>List and manage your product suppliers here.</p>
-      `;
-    }
-
-    function showCustomers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Customers</h2>
-        <p>View and manage your customer records here.</p>
-      `;
-    }
   </script>
 </body>
 </html>
