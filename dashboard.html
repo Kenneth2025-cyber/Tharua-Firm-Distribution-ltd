@@ -1,81 +1,174 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Tharua Firm System - Dashboard</title>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tharua Firm Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      display: flex;
       margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
     }
+
     .sidebar {
-      width: 220px;
-      background-color: #333;
-      color: white;
+      position: fixed;
+      top: 0;
+      left: 0;
       height: 100vh;
+      width: 230px;
+      background-color: #2c3e50;
+      color: white;
       padding-top: 20px;
-      /* Hide sidebar initially, show only after auth+role check */
-      visibility: hidden;
+      overflow-y: auto;
     }
+
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+
     .sidebar a {
-      display: block;
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
       color: white;
-      padding: 10px;
       text-decoration: none;
-    }
-    .sidebar a:hover {
-      background-color: #575757;
-    }
-    .content {
-      flex: 1;
-      padding: 20px;
-      /* Hide content initially */
-      visibility: hidden;
-    }
-    .logout-btn {
-      background-color: red;
-      color: white;
-      padding: 10px;
-      border: none;
+      transition: background 0.3s ease;
+      font-size: 14px;
       cursor: pointer;
-      margin: 10px;
-      width: 90%;
     }
-    /* Hide admin menu items by default */
-    #userMgmtMenu,
-    #contactsMenu {
-      display: none;
+
+    .sidebar a i {
+      margin-right: 12px;
+      font-size: 16px;
+    }
+
+    .sidebar a:hover {
+      background-color: #34495e;
+    }
+
+    .dropdown a {
+      font-size: 14px;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .dropdown a:hover {
+      background-color: #34495e;
+    }
+
+    .main-content {
+      margin-left: 230px;
+      padding: 20px;
+    }
+
+    .content-section {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 8px;
+      margin: 8px 0 16px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      background-color: #2c3e50;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #34495e;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 20px;
+      text-align: center;
+    }
+
+    .button-grid div {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .button-grid div:hover {
+      transform: scale(1.05);
+    }
+
+    .button-grid img {
+      width: 50px;
+      height: 50px;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
+  <div class="sidebar">
+    <h2>THARUA</h2>
+    <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
 
-  <div class="sidebar" id="sidebar">
-    <h2 style="text-align:center;">Dashboard</h2>
-    <a href="index.html">Home</a>
-    <a href="sales.html">Sales</a>
-    <a href="reports.html">Reports</a>
-    <a href="expenses.html">Expenses</a>
+    <div class="dropdown">
+      <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showUsers()">Users</a>
+        <a onclick="showRoles()">Roles</a>
+        <a onclick="showFieldSales()">Field Salespersons</a>
+      </div>
+    </div>
 
-    <!-- Admin Only -->
-    <a id="userMgmtMenu" href="usermanagement.html">User Management</a>
-    <a id="contactsMenu" href="contacts.html">Contacts</a>
+    <div class="dropdown">
+      <a onclick="toggleContacts()" id="contactsMenu"><i class="fas fa-address-book"></i> Contacts <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="contactsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showSuppliers()">Suppliers</a>
+        <a onclick="showCustomers()">Customers</a>
+        <a onclick="clearContent()">Customer Groups</a>
+        <a onclick="clearContent()">Import Contacts</a>
+      </div>
+    </div>
 
-    <button class="logout-btn" onclick="logout()">Logout</button>
+    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
+    <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
+    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
+    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
+    <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
+    <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
+    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
+    <a onclick="clearContent()"><i class="fas fa-calculator"></i> Accounting</a>
+    <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
+    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
+    <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
+    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
   </div>
 
-  <div class="content" id="content">
-    <h1>Welcome to Tharua Firm System</h1>
-    <p>Select an option from the menu.</p>
+  <div class="main-content">
+    <div id="content" class="content-section">
+      <h1>Welcome to Tharua Firm</h1>
+      <p>Click a menu item on the left to view more details.</p>
+    </div>
   </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -86,70 +179,113 @@
       messagingSenderId: "438210516373",
       appId: "1:438210516373:web:83c188e315a69165d5129c"
     };
+
     firebase.initializeApp(firebaseConfig);
 
-    // Hide UI initially, will show after role check
-    const sidebar = document.getElementById('sidebar');
-    const content = document.getElementById('content');
-    const userMgmtMenu = document.getElementById('userMgmtMenu');
-    const contactsMenu = document.getElementById('contactsMenu');
-
-    // Show error and redirect helper
-    function denyAccess(reason) {
-      console.warn('Access denied:', reason);
-      alert('Access denied: ' + reason);
-      firebase.auth().signOut().then(() => {
-        window.location.href = "login.html";
-      });
-    }
-
-    firebase.auth().onAuthStateChanged(async (user) => {
+    firebase.auth().onAuthStateChanged(user => {
       if (!user) {
-        console.log('No user logged in, redirecting to login page');
         window.location.href = "login.html";
-        return;
-      }
-
-      try {
-        const doc = await firebase.firestore().collection("users").doc(user.uid).get();
-
-        if (!doc.exists) {
-          denyAccess('User role document not found');
-          return;
-        }
-
-        const role = doc.data().role;
-        if (!role) {
-          denyAccess('User role is undefined or empty');
-          return;
-        }
-
-        if (role === 'admin') {
-          userMgmtMenu.style.display = 'block';
-          contactsMenu.style.display = 'block';
-        } else {
-          userMgmtMenu.style.display = 'none';
-          contactsMenu.style.display = 'none';
-        }
-
-        // Now show UI after all checks
-        sidebar.style.visibility = 'visible';
-        content.style.visibility = 'visible';
-
-      } catch (error) {
-        console.error('Error fetching user role:', error);
-        denyAccess('Failed to retrieve user role');
       }
     });
 
     function logout() {
       firebase.auth().signOut().then(() => {
+        alert("Logged out successfully.");
         window.location.href = "login.html";
       }).catch((error) => {
-        console.error("Logout Error:", error);
+        alert("Error logging out: " + error.message);
       });
     }
-  </script>
 
+    function showHome() {
+      document.getElementById("content").innerHTML = `
+        <h2>Dashboard Overview</h2>
+        <div class="button-grid">
+          <div><img src="https://img.icons8.com/color/96/box.png"/><div>Products</div></div>
+          <div><img src="https://img.icons8.com/color/96/factory.png"/><div>Manufacturing</div></div>
+          <div><img src="https://img.icons8.com/color/96/add-shopping-cart.png"/><div>Purchases</div></div>
+          <div><img src="https://img.icons8.com/color/96/cash-register.png"/><div>Sell</div></div>
+          <div><img src="https://img.icons8.com/color/96/delivery.png"/><div>Stock Transfers</div></div>
+          <div><img src="https://img.icons8.com/color/96/scale.png"/><div>Stock Adjustment</div></div>
+          <div><img src="https://img.icons8.com/color/96/bill.png"/><div>Expenses</div></div>
+          <div><img src="https://img.icons8.com/color/96/accounting.png"/><div>Accounting</div></div>
+          <div><img src="https://img.icons8.com/color/96/artificial-intelligence.png"/><div>AI Assistance</div></div>
+          <div><img src="https://img.icons8.com/color/96/combo-chart.png"/><div>Reports</div></div>
+          <div><img src="https://img.icons8.com/color/96/secured-letter.png"/><div>Notifications</div></div>
+        </div>
+      `;
+    }
+
+    function clearContent() {
+      document.getElementById("content").innerHTML = `
+        <h2>Section Under Development</h2>
+        <p>Content will be added soon. Please check back later.</p>
+      `;
+    }
+
+    function toggleContacts() {
+      const submenu = document.getElementById("contactsSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function toggleUserManagement() {
+      const submenu = document.getElementById("userMgmtSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function showUsers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Users</h2>
+        <p>Manage users of the system here.</p>
+
+        <h3>Create New User</h3>
+        <input type="email" id="email" placeholder="Email" required><br><br>
+        <input type="password" id="password" placeholder="Password" required><br><br>
+        <button onclick="signup()">Sign Up</button>
+      `;
+    }
+
+    function signup() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          alert("Account created successfully!");
+          showUsers();
+        })
+        .catch((error) => {
+          alert("Error: " + error.message);
+        });
+    }
+
+    function showRoles() {
+      document.getElementById("content").innerHTML = `
+        <h2>Roles</h2>
+        <p>Define and manage user roles and permissions.</p>
+      `;
+    }
+
+    function showFieldSales() {
+      document.getElementById("content").innerHTML = `
+        <h2>Field Salespersons</h2>
+        <p>Assign and track sales agents working in the field.</p>
+      `;
+    }
+
+    function showSuppliers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Suppliers</h2>
+        <p>List and manage your product suppliers here.</p>
+      `;
+    }
+
+    function showCustomers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Customers</h2>
+        <p>View and manage your customer records here.</p>
+      `;
+    }
+  </script>
 </body>
 </html>
