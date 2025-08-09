@@ -85,6 +85,34 @@
     button:hover {
       background-color: #34495e;
     }
+
+    /* NEW: horizontal layout for home page buttons */
+    .button-grid {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      max-width: 100%;
+    }
+    .button-grid div {
+      flex: 0 0 auto;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.2s ease;
+      min-width: 110px;
+    }
+    .button-grid div:hover {
+      transform: scale(1.05);
+    }
+    .button-grid img {
+      width: 50px;
+      height: 50px;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -180,19 +208,22 @@
       document.getElementById("content").innerHTML = `
         <h2>Dashboard Overview</h2>
         <div class="button-grid">
-          <div><img src="https://img.icons8.com/color/96/box.png"/><div>Products</div></div>
-          <div><img src="https://img.icons8.com/color/96/factory.png"/><div>Manufacturing</div></div>
-          <div><img src="https://img.icons8.com/color/96/add-shopping-cart.png"/><div>Purchases</div></div>
-          <div><img src="https://img.icons8.com/color/96/cash-register.png"/><div>Sell</div></div>
-          <div><img src="https://img.icons8.com/color/96/delivery.png"/><div>Stock Transfers</div></div>
-          <div><img src="https://img.icons8.com/color/96/scale.png"/><div>Stock Adjustment</div></div>
-          <div><img src="https://img.icons8.com/color/96/bill.png"/><div>Expenses</div></div>
-          <div><img src="https://img.icons8.com/color/96/accounting.png"/><div>Accounting</div></div>
-          <div><img src="https://img.icons8.com/color/96/artificial-intelligence.png"/><div>AI Assistance</div></div>
-          <div><img src="https://img.icons8.com/color/96/combo-chart.png"/><div>Reports</div></div>
-          <div><img src="https://img.icons8.com/color/96/secured-letter.png"/><div>Notifications</div></div>
+          <div id="homeProductsBtn"><img src="https://img.icons8.com/color/96/box.png" alt="Products"/><div>Products</div></div>
+          <div><img src="https://img.icons8.com/color/96/factory.png" alt="Manufacturing"/><div>Manufacturing</div></div>
+          <div><img src="https://img.icons8.com/color/96/add-shopping-cart.png" alt="Purchases"/><div>Purchases</div></div>
+          <div><img src="https://img.icons8.com/color/96/cash-register.png" alt="Sell"/><div>Sell</div></div>
+          <div><img src="https://img.icons8.com/color/96/delivery.png" alt="Stock Transfers"/><div>Stock Transfers</div></div>
+          <div><img src="https://img.icons8.com/color/96/scale.png" alt="Stock Adjustment"/><div>Stock Adjustment</div></div>
+          <div><img src="https://img.icons8.com/color/96/bill.png" alt="Expenses"/><div>Expenses</div></div>
+          <div><img src="https://img.icons8.com/color/96/accounting.png" alt="Accounting"/><div>Accounting</div></div>
+          <div><img src="https://img.icons8.com/color/96/artificial-intelligence.png" alt="AI Assistance"/><div>AI Assistance</div></div>
+          <div><img src="https://img.icons8.com/color/96/combo-chart.png" alt="Reports"/><div>Reports</div></div>
+          <div><img src="https://img.icons8.com/color/96/secured-letter.png" alt="Notifications"/><div>Notifications</div></div>
         </div>
       `;
+
+      // Add click shortcut for Products icon
+      document.getElementById("homeProductsBtn").onclick = showProductList;
     }
 
     function clearContent() {
@@ -325,8 +356,38 @@
       }
     }
 
-    // You can later create showProductList(), showUnits(), showCategories(), showBrands() similarly
+    async function showProductList() {
+      document.getElementById("content").innerHTML = `
+        <h2>List of Products</h2>
+        <p>Here you can view all products.</p>
+      `;
+      // You can implement product list loading here later
+    }
 
+    function clearContent() {
+      document.getElementById("content").innerHTML = `
+        <h2>Section Under Development</h2>
+        <p>Content will be added soon. Please check back later.</p>
+      `;
+    }
+
+    function toggleContacts() {
+      const submenu = document.getElementById("contactsSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function toggleUserManagement() {
+      const submenu = document.getElementById("userMgmtSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function toggleProducts() {
+      const submenu = document.getElementById("productsSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    // Call showHome initially so dashboard loads on page open
+    showHome();
   </script>
 </body>
 </html>
