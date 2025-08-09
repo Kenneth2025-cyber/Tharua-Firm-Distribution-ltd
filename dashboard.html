@@ -1,97 +1,112 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tharua System Dashboard</title>
+  <title>Tharua Firm System - Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; }
-    .navbar { background: #333; color: white; padding: 10px; }
-    .navbar a { color: white; margin-right: 15px; cursor: pointer; text-decoration: none; }
-    .section { display: none; padding: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+    }
+    #sidebar {
+      width: 200px;
+      float: left;
+      background: #f4f4f4;
+      height: 100vh;
+      padding: 15px;
+    }
+    #content {
+      margin-left: 220px;
+      padding: 15px;
+    }
+    button {
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
-
-<div id="auth-section">
-  <h2>Loading...</h2>
-</div>
-
-<div id="dashboard" style="display:none;">
-  <div class="navbar">
-    <a onclick="showSection('dashboard')">Dashboard</a>
-    <a onclick="showSection('users')" id="users-menu">Users</a>
-    <a onclick="logout()">Logout</a>
+  <div id="sidebar">
+    <h2>Dashboard</h2>
+    <button onclick="showHome()">Home</button><br>
+    <button onclick="showUsers()">Users</button><br>
+    <button onclick="logout()">Logout</button>
   </div>
 
-  <div id="dashboard-section" class="section">
-    <h2>Welcome to Tharua System</h2>
-    <p>This is the dashboard content.</p>
+  <div id="content">
+    <h2>Welcome to Tharua Firm System</h2>
+    <p>Select an option from the menu.</p>
   </div>
 
-  <div id="users-section" class="section">
-    <h2>Manage Users</h2>
-    <p>User management content here.</p>
-  </div>
-</div>
+  <script>
+    // Firebase configuration
+    var firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
-    authDomain: "tharuasystem.firebaseapp.com",
-    projectId: "tharuasystem",
-    storageBucket: "tharuasystem.appspot.com",
-    messagingSenderId: "438210516373",
-    appId: "1:438210516373:web:83c188e315a69165d5129c"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-
-  // Listen for login state changes
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      const uid = user.uid;
-      db.collection("users").doc(uid).get().then((doc) => {
-        if (doc.exists) {
-          const role = doc.data().role || "";
-
-          document.getElementById("auth-section").style.display = "none";
-          document.getElementById("dashboard").style.display = "block";
-
-          // Role-based menu control
-          if (role.toLowerCase() === "cashier") {
-            document.getElementById("users-menu").style.display = "none";
-          }
-
-          // Load default section
-          showSection("dashboard");
-        } else {
-          alert("No role found. Contact admin.");
-          auth.signOut();
-        }
-      });
-    } else {
-      document.getElementById("auth-section").style.display = "block";
-      document.getElementById("dashboard").style.display = "none";
+    // Show Home
+    function showHome() {
+      document.getElementById("content").innerHTML = `
+        <h2>Welcome to Tharua Firm System</h2>
+        <p>Select an option from the menu.</p>
+      `;
     }
-  });
 
-  function logout() {
-    auth.signOut().then(() => {
-      window.location.href = "login.html";
-    });
-  }
+    // Show Users & Create Form
+    function showUsers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Users</h2>
+        <p>Manage users of the system here.</p>
 
-  function showSection(section) {
-    document.querySelectorAll(".section").forEach(s => s.style.display = "none");
-    document.getElementById(section + "-section").style.display = "block";
-  }
-</script>
+        <h3>Create New User</h3>
+        <input type="email" id="email" placeholder="Email" required><br><br>
+        <input type="password" id="password" placeholder="Password" required><br><br>
+        <select id="role">
+          <option value="admin">Admin</option>
+          <option value="cashier">Cashier</option>
+          <option value="salesperson">Salesperson</option>
+        </select><br><br>
+        <button onclick="signup()">Sign Up</button>
+      `;
+    }
 
+    // Sign up a new user with role
+    function signup() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const role = document.getElementById("role").value.toLowerCase(); // store in lowercase
+
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          const uid = userCredential.user.uid;
+          return db.collection("users").doc(uid).set({
+            email: email,
+            role: role
+          });
+        })
+        .then(() => {
+          alert("Account created successfully with role: " + role);
+          showUsers();
+        })
+        .catch((error) => {
+          alert("Error: " + error.message);
+        });
+    }
+
+    // Logout function
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        alert("Logged out successfully");
+        window.location.href = "login.html";
+      });
+    }
+  </script>
 </body>
 </html>
