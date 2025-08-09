@@ -1,56 +1,97 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tharua Firm System - Dashboard</title>
+  <title>Tharua System Dashboard</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f4f4f4;
-    }
-    header {
-      background: #333;
-      color: #fff;
-      padding: 10px;
-      text-align: center;
-    }
-    nav {
-      background: #444;
-      color: #fff;
-      padding: 10px;
-      display: flex;
-      gap: 10px;
-    }
-    nav a {
-      color: white;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    nav a:hover {
-      text-decoration: underline;
-    }
-    section {
-      padding: 20px;
-    }
-    .hidden {
-      display: none;
-    }
-    button {
-      padding: 5px 10px;
-      cursor: pointer;
-    }
+    body { font-family: Arial, sans-serif; margin: 0; }
+    .navbar { background: #333; color: white; padding: 10px; }
+    .navbar a { color: white; margin-right: 15px; cursor: pointer; text-decoration: none; }
+    .section { display: none; padding: 20px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Tharua Firm System Dashboard</h1>
-  </header>
 
-  <!-- Navigation Menu -->
-  <nav id="menu-bar" class="hidden">
+<div id="auth-section">
+  <h2>Loading...</h2>
+</div>
+
+<div id="dashboard" style="display:none;">
+  <div class="navbar">
     <a onclick="showSection('dashboard')">Dashboard</a>
     <a onclick="showSection('users')" id="users-menu">Users</a>
-    <a onclick="showSec
+    <a onclick="logout()">Logout</a>
+  </div>
+
+  <div id="dashboard-section" class="section">
+    <h2>Welcome to Tharua System</h2>
+    <p>This is the dashboard content.</p>
+  </div>
+
+  <div id="users-section" class="section">
+    <h2>Manage Users</h2>
+    <p>User management content here.</p>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
+    authDomain: "tharuasystem.firebaseapp.com",
+    projectId: "tharuasystem",
+    storageBucket: "tharuasystem.appspot.com",
+    messagingSenderId: "438210516373",
+    appId: "1:438210516373:web:83c188e315a69165d5129c"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // Listen for login state changes
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      const uid = user.uid;
+      db.collection("users").doc(uid).get().then((doc) => {
+        if (doc.exists) {
+          const role = doc.data().role || "";
+
+          document.getElementById("auth-section").style.display = "none";
+          document.getElementById("dashboard").style.display = "block";
+
+          // Role-based menu control
+          if (role.toLowerCase() === "cashier") {
+            document.getElementById("users-menu").style.display = "none";
+          }
+
+          // Load default section
+          showSection("dashboard");
+        } else {
+          alert("No role found. Contact admin.");
+          auth.signOut();
+        }
+      });
+    } else {
+      document.getElementById("auth-section").style.display = "block";
+      document.getElementById("dashboard").style.display = "none";
+    }
+  });
+
+  function logout() {
+    auth.signOut().then(() => {
+      window.location.href = "login.html";
+    });
+  }
+
+  function showSection(section) {
+    document.querySelectorAll(".section").forEach(s => s.style.display = "none");
+    document.getElementById(section + "-section").style.display = "block";
+  }
+</script>
+
+</body>
+</html>
