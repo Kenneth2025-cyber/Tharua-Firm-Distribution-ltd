@@ -364,30 +364,73 @@
       // You can implement product list loading here later
     }
 
-    function clearContent() {
+    // --- NEW: CATEGORIES SECTION ---
+
+    async function showCategories() {
       document.getElementById("content").innerHTML = `
-        <h2>Section Under Development</h2>
-        <p>Content will be added soon. Please check back later.</p>
+        <h2>Categories</h2>
+        <div>
+          <form id="categoryForm">
+            <label for="categoryName">New Category Name:</label>
+            <input type="text" id="categoryName" placeholder="Enter category name" required />
+            <button type="submit">Add Category</button>
+          </form>
+        </div>
+        <h3>Existing Categories</h3>
+        <ul id="categoryList" style="list-style-type:none; padding-left:0;"></ul>
       `;
+
+      const categoryList = document.getElementById("categoryList");
+      const categoryForm = document.getElementById("categoryForm");
+
+      async function loadCategories() {
+        categoryList.innerHTML = "<li>Loading...</li>";
+        try {
+          const snapshot = await db.collection("categories").orderBy("name").get();
+          if (snapshot.empty) {
+            categoryList.innerHTML = "<li>No categories found.</li>";
+            return;
+          }
+          categoryList.innerHTML = "";
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const li = document.createElement("li");
+            li.textContent = data.name || "(Unnamed category)";
+            categoryList.appendChild(li);
+          });
+        } catch (error) {
+          categoryList.innerHTML = "<li>Error loading categories.</li>";
+          console.error("Error loading categories:", error);
+        }
+      }
+
+      categoryForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("categoryName").value.trim();
+        if (!name) {
+          alert("Please enter a category name.");
+          return;
+        }
+
+        try {
+          // Optional: prevent duplicates
+          const existing = await db.collection("categories").where("name", "==", name).get();
+          if (!existing.empty) {
+            alert("Category already exists.");
+            return;
+          }
+
+          await db.collection("categories").add({ name });
+          alert("Category added successfully.");
+          categoryForm.reset();
+          loadCategories();
+        } catch (error) {
+          alert("Error adding category: " + error.message);
+          console.error("Add category error:", error);
+        }
+      };
+
+      loadCategories();
     }
 
-    function toggleContacts() {
-      const submenu = document.getElementById("contactsSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
-
-    function toggleUserManagement() {
-      const submenu = document.getElementById("userMgmtSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
-
-    function toggleProducts() {
-      const submenu = document.getElementById("productsSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
-
-    // Call showHome initially so dashboard loads on page open
-    showHome();
-  </script>
-</body>
-</html>
+    //
