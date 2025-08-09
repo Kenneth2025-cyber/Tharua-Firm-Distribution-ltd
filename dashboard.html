@@ -568,6 +568,47 @@ async function showCategories() {
     window.onload = () => {
       showHome();
     };
+function showAddProduct() {
+  document.getElementById("content").innerHTML = `
+    <h2>Add Product</h2>
+    <form id="addProductForm">
+      <label for="productName">Product Name:</label>
+      <input type="text" id="productName" name="productName" required />
+
+      <label for="price">Price (KSh):</label>
+      <input type="number" id="price" name="price" required />
+
+      <label for="stock">Stock Quantity:</label>
+      <input type="number" id="stock" name="stock" required />
+
+      <button type="submit">Add Product</button>
+    </form>
+  `;
+
+  document.getElementById("addProductForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById("productName").value;
+    const price = parseFloat(document.getElementById("price").value);
+    const stock = parseInt(document.getElementById("stock").value);
+
+    try {
+      const db = firebase.firestore();
+      await db.collection("products").add({
+        name: name,
+        price: price,
+        stock: stock,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert("Product added successfully!");
+      document.getElementById("addProductForm").reset();
+    } catch (error) {
+      alert("Error adding product: " + error.message);
+    }
+  });
+}
+
   </script>
 </body>
 </html>
