@@ -1,43 +1,773 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Welcome to Tharua System</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tharua Firm Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #f0f4f8;
-      text-align: center;
-      padding-top: 100px;
+      background-color: #f4f4f4;
     }
-    h1 {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-    p {
-      font-size: 18px;
-    }
-    a.button {
-      display: inline-block;
-      margin: 10px;
-      padding: 12px 24px;
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 230px;
       background-color: #2c3e50;
       color: white;
+      padding-top: 20px;
+      overflow-y: auto;
+    }
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: white;
       text-decoration: none;
-      border-radius: 6px;
+      transition: background 0.3s ease;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .sidebar a i { margin-right: 12px; font-size: 16px; }
+    .sidebar a:hover { background-color: #34495e; }
+
+    .dropdown a { font-size: 14px; color: white; padding: 10px 20px; display: flex; align-items: center; text-decoration: none; cursor: pointer; }
+    .dropdown a:hover { background-color: #34495e; }
+
+    .main-content { margin-left: 230px; padding: 20px; }
+    .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 900px; }
+
+    input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background-color: #2c3e50; color: white; cursor: pointer; font-size: 16px; }
+    button:hover { background-color: #34495e; }
+
+    .button-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 10px; max-width: 100%; }
+    .button-grid div { flex: 0 0 auto; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; cursor: pointer; text-align: center; transition: transform 0.2s ease; min-width: 110px; }
+    .button-grid div:hover { transform: scale(1.05); }
+    .button-grid img { width: 50px; height: 50px; margin-bottom: 10px; }
+
+    /* Category list styles */
+    .category-list { list-style: none; padding: 0; margin: 0; }
+    .category-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .category-name { font-size: 15px; }
+    .delete-icon { color: #c0392b; cursor: pointer; margin-left: 12px; }
+    .small-btn { display:inline-block; padding:6px 10px; border-radius:6px; background:#ecf0f1; cursor:pointer; }
+
+    /* Message styles for user creation */
+    #message {
+      margin-top: -12px;
+      margin-bottom: 12px;
       font-weight: bold;
     }
-    a.button:hover {
-      background-color: #34495e;
-    }
+    #message.error { color: #c0392b; }
+    #message.success { color: #27ae60; }
   </style>
 </head>
 <body>
-  <h1>Welcome to Tharua System</h1>
-  <p>Choose where you want to go:</p>
+  <div class="sidebar">
+    <h2>THARUA</h2>
+    <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
 
-  <a href="login.html" class="button">Login</a>
-  <a href="signup.html" class="button">Sign Up</a>
-  <a href="reset.html" class="button">Reset Password</a>
-  <a href="dashboard.html" class="button">Dashboard</a>
+    <div class="dropdown">
+      <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showUsers()">Users</a>
+        <a onclick="displayRoles()">Roles</a>
+        <a onclick="showFieldSales()">Field Salespersons</a>
+      </div>
+    </div>
+
+    <div class="dropdown">
+      <a onclick="toggleContacts()" id="contactsMenu"><i class="fas fa-address-book"></i> Contacts <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="contactsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showSuppliers()">Suppliers</a>
+        <a onclick="showCustomers()">Customers</a>
+        <a onclick="clearContent()">Customer Groups</a>
+        <a onclick="clearContent()">Import Contacts</a>
+      </div>
+    </div> 
+	<a onclick="showBusinessLocations()"><i class="fas fa-map-marker-alt"></i> Business Locations</a>
+
+    <div class="dropdown">
+      <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> Products <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showProductList()">List of Products</a>
+        <a onclick="showAddProduct()">Add Product</a>
+        <a onclick="showUnits()">Units</a>
+        <a onclick="showCategories()">Categories</a>
+        <a onclick="showBrands()">Brands</a>
+      </div>
+    </div>
+
+    <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
+    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
+    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
+    <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
+    <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
+    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
+    <a onclick="clearContent()"><i class="fas fa-calculator"></i> Accounting</a>
+    <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
+    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
+    <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
+    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+  </div>
+
+  <div class="main-content">
+    <div id="content" class="content-section">
+      <h1>Welcome to Tharua Firm</h1>
+      <p>Click a menu item on the left to view more details.</p>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>async function showBrands() {
+  document.getElementById("content").innerHTML = `
+    <h2>Brands</h2>
+    <div style="max-width:420px;">
+      <form id="brandForm">
+        <label for="brandName">New Brand Name:</label>
+        <input type="text" id="brandName" placeholder="Enter brand name" required />
+        <button type="submit">Add Brand</button>
+      </form>
+    </div>
+    <h3 style="margin-top:18px;">Existing Brands</h3>
+    <ul id="brandList" class="category-list"></ul>
+  `;
+
+  const brandList = document.getElementById("brandList");
+  const brandForm = document.getElementById("brandForm");
+
+  async function loadBrands() {
+    brandList.innerHTML = "<li class='category-item'>Loading...</li>";
+    try {
+      const snapshot = await db.collection("brands").orderBy("name").get();
+      if (snapshot.empty) {
+        brandList.innerHTML = "<li class='category-item'>No brands found.</li>";
+        return;
+      }
+
+      brandList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement('li');
+        li.className = 'category-item';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'category-name';
+        nameSpan.textContent = data.name || '(Unnamed brand)';
+
+        const rightDiv = document.createElement('div');
+
+        const editBtn = document.createElement('span');
+        editBtn.className = 'small-btn';
+        editBtn.textContent = 'Edit';
+        editBtn.style.marginRight = '8px';
+        editBtn.onclick = () => { alert('Edit brand feature not implemented yet.'); };
+
+        const deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-trash delete-icon';
+        deleteIcon.title = 'Delete brand';
+
+        deleteIcon.onclick = async () => {
+          if (!confirm(`Delete brand "${data.name}"? This action cannot be undone.`)) return;
+          try {
+            await db.collection('brands').doc(doc.id).delete();
+            loadBrands();
+          } catch (err) {
+            alert('Error deleting brand: ' + err.message);
+            console.error('Delete brand error:', err);
+          }
+        };
+
+        rightDiv.appendChild(editBtn);
+        rightDiv.appendChild(deleteIcon);
+        li.appendChild(nameSpan);
+        li.appendChild(rightDiv);
+        brandList.appendChild(li);
+      });
+    } catch (error) {
+      brandList.innerHTML = "<li class='category-item'>Error loading brands.</li>";
+      console.error("Load brands error:", error);
+    }
+  }
+
+  brandForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const newBrandName = document.getElementById("brandName").value.trim();
+    if (!newBrandName) {
+      alert("Please enter a brand name.");
+      return;
+    }
+    try {
+      const query = await db.collection("brands").where("name", "==", newBrandName).get();
+      if (!query.empty) {
+        alert("Brand with this name already exists.");
+        return;
+      }
+
+      await db.collection("brands").add({
+        name: newBrandName,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert("Brand added successfully.");
+      brandForm.reset();
+      loadBrands();
+    } catch (error) {
+      alert("Error adding brand: " + error.message);
+      console.error("Add brand error:", error);
+    }
+  };
+
+  loadBrands();
+}
+
+async function showCategories() {
+  document.getElementById("content").innerHTML = `
+    <h2>Categories</h2>
+    <div style="max-width:420px;">
+      <form id="categoryForm">
+        <label for="categoryName">New Category Name:</label>
+        <input type="text" id="categoryName" placeholder="Enter category name" required />
+        <button type="submit">Add Category</button>
+      </form>
+    </div>
+    <h3 style="margin-top:18px;">Existing Categories</h3>
+    <ul id="categoryList" class="category-list"></ul>
+  `;
+
+  const categoryList = document.getElementById("categoryList");
+  const categoryForm = document.getElementById("categoryForm");
+
+  async function loadCategories() {
+    categoryList.innerHTML = "<li class='category-item'>Loading...</li>";
+    try {
+      const snapshot = await db.collection("categories").orderBy("name").get();
+      if (snapshot.empty) {
+        categoryList.innerHTML = "<li class='category-item'>No categories found.</li>";
+        return;
+      }
+
+      categoryList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement('li');
+        li.className = 'category-item';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'category-name';
+        nameSpan.textContent = data.name || '(Unnamed category)';
+
+        const rightDiv = document.createElement('div');
+
+        const editBtn = document.createElement('span');
+        editBtn.className = 'small-btn';
+        editBtn.textContent = 'Edit';
+        editBtn.style.marginRight = '8px';
+        editBtn.onclick = () => { alert('Edit category feature not implemented yet.'); };
+
+        const deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-trash delete-icon';
+        deleteIcon.title = 'Delete category';
+
+        deleteIcon.onclick = async () => {
+          if (!confirm(`Delete category "${data.name}"? This action cannot be undone.`)) return;
+          try {
+            await db.collection('categories').doc(doc.id).delete();
+            loadCategories();
+          } catch (err) {
+            alert('Error deleting category: ' + err.message);
+            console.error('Delete category error:', err);
+          }
+        };
+
+        rightDiv.appendChild(editBtn);
+        rightDiv.appendChild(deleteIcon);
+        li.appendChild(nameSpan);
+        li.appendChild(rightDiv);
+        categoryList.appendChild(li);
+      });
+    } catch (error) {
+      categoryList.innerHTML = "<li class='category-item'>Error loading categories.</li>";
+      console.error("Load categories error:", error);
+    }
+  }
+
+  categoryForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const newCatName = document.getElementById("categoryName").value.trim();
+    if (!newCatName) {
+      alert("Please enter a category name.");
+      return;
+    }
+    try {
+      const query = await db.collection("categories").where("name", "==", newCatName).get();
+      if (!query.empty) {
+        alert("Category with this name already exists.");
+        return;
+      }
+
+      await db.collection("categories").add({
+        name: newCatName,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert("Category added successfully.");
+      categoryForm.reset();
+      loadCategories();
+    } catch (error) {
+      alert("Error adding category: " + error.message);
+      console.error("Add category error:", error);
+    }
+  };
+
+  loadCategories();
+}
+ 
+    const firebaseConfig = {
+      apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
+      authDomain: "tharuasystem.firebaseapp.com",
+      projectId: "tharuasystem",
+      storageBucket: "tharuasystem.appspot.com",
+      messagingSenderId: "438210516373",
+      appId: "1:438210516373:web:83c188e315a69165d5129c"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    firebase.auth().onAuthStateChanged(user => {
+      if (!user) {
+        window.location.href = "login.html";
+      }
+    });
+
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        alert("Logged out successfully.");
+        window.location.href = "login.html";
+      }).catch((error) => {
+        alert("Error logging out: " + error.message);
+      });
+    }
+
+    function showHome() {
+      document.getElementById("content").innerHTML = `
+        <h2>Dashboard Overview</h2>
+        <div class="button-grid">
+          <div id="homeProductsBtn"><img src="https://img.icons8.com/color/96/box.png" alt="Products"/><div>Products</div></div>
+          <div><img src="https://img.icons8.com/color/96/factory.png" alt="Manufacturing"/><div>Manufacturing</div></div>
+          <div><img src="https://img.icons8.com/color/96/add-shopping-cart.png" alt="Purchases"/><div>Purchases</div></div>
+          <div><img src="https://img.icons8.com/color/96/cash-register.png" alt="Sell"/><div>Sell</div></div>
+          <div><img src="https://img.icons8.com/color/96/delivery.png" alt="Stock Transfers"/><div>Stock Transfers</div></div>
+          <div><img src="https://img.icons8.com/color/96/scale.png" alt="Stock Adjustment"/><div>Stock Adjustment</div></div>
+          <div><img src="https://img.icons8.com/color/96/bill.png" alt="Expenses"/><div>Expenses</div></div>
+          <div><img src="https://img.icons8.com/color/96/accounting.png" alt="Accounting"/><div>Accounting</div></div>
+          <div><img src="https://img.icons8.com/color/96/artificial-intelligence.png" alt="AI Assistance"/><div>AI Assistance</div></div>
+          <div><img src="https://img.icons8.com/color/96/combo-chart.png" alt="Reports"/><div>Reports</div></div>
+          <div><img src="https://img.icons8.com/color/96/secured-letter.png" alt="Notifications"/><div>Notifications</div></div>
+        </div>
+      `;
+
+      const btn = document.getElementById("homeProductsBtn");
+      if (btn) btn.onclick = showProductList;
+    }
+
+    function clearContent() {
+      document.getElementById("content").innerHTML = `
+        <h2>Section Under Development</h2>
+        <p>Content will be added soon. Please check back later.</p>
+      `;
+    }
+
+    function toggleContacts() { 
+      const submenu = document.getElementById("contactsSubmenu"); 
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; 
+    }
+    function toggleUserManagement() { 
+      const submenu = document.getElementById("userMgmtSubmenu"); 
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; 
+    }
+    function toggleProducts() { 
+      const submenu = document.getElementById("productsSubmenu"); 
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; 
+    }
+
+    // --- USERS MANAGEMENT ---
+
+    async function showUsers() {
+      document.getElementById("content").innerHTML = `
+        <h2>User Management</h2>
+        <form id="userForm">
+          <label for="userEmail">Email</label>
+          <input type="email" id="userEmail" placeholder="Enter user email" required />
+
+          <label for="userPassword">Password</label>
+          <input type="password" id="userPassword" placeholder="Enter password (min 6 chars)" required minlength="6" />
+
+          <label for="userRole">Role</label>
+          <select id="userRole" required>
+            <option value="" disabled selected>Select role</option>
+            <option value="admin">Administrator</option>
+            <option value="cashier">Cashier</option>
+            <option value="salesperson">Salesperson</option>
+          </select>
+
+          <button type="submit">Create User</button>
+        </form>
+
+        <div id="message"></div>
+
+        <h3>Existing Users</h3>
+        <ul id="userList">
+          <li>Loading users...</li>
+        </ul>
+      `;
+
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+
+      const userForm = document.getElementById("userForm");
+      const messageDiv = document.getElementById("message");
+      const userList = document.getElementById("userList");
+
+      userForm.onsubmit = async (e) => {
+        e.preventDefault();
+        messageDiv.textContent = "";
+        messageDiv.className = "";
+
+        const email = document.getElementById("userEmail").value.trim();
+        const password = document.getElementById("userPassword").value;
+        const role = document.getElementById("userRole").value;
+
+        if (!email || !password || !role) {
+          messageDiv.textContent = "Please fill all fields.";
+          messageDiv.className = "error";
+          return;
+        }
+
+        try {
+          // Create user
+          const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+          const newUser = userCredential.user;
+
+          // Save role in Firestore
+          await db.collection("users").doc(newUser.uid).set({
+            email,
+            role,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+          messageDiv.textContent = `User "${email}" created successfully!`;
+          messageDiv.className = "success";
+
+          userForm.reset();
+          loadUsers();
+        } catch (error) {
+          messageDiv.textContent = "Error: " + error.message;
+          messageDiv.className = "error";
+        }
+      };
+
+      async function loadUsers() {
+        userList.innerHTML = "<li>Loading users...</li>";
+        try {
+          const snapshot = await db.collection("users").orderBy("createdAt", "desc").get();
+          if (snapshot.empty) {
+            userList.innerHTML = "<li>No users found.</li>";
+            return;
+          }
+
+          userList.innerHTML = "";
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const li = document.createElement("li");
+            li.textContent = `${data.email} — Role: ${data.role}`;
+            userList.appendChild(li);
+          });
+        } catch (err) {
+          userList.innerHTML = "<li>Error loading users.</li>";
+          console.error(err);
+        }
+      }
+
+      loadUsers();
+    }
+
+    // --- Existing placeholders (no changes) ---
+
+    async function showAddProduct() {
+      // Your existing add product code here...
+      document.getElementById("content").innerHTML = `<h2>Add Product (Coming Soon)</h2>`;
+    }
+    async function showProductList() {   document.getElementById("content").innerHTML = `<h2>List of Products</h2><p>Loading products...</p>`;
+  try {
+    const snapshot = await db.collection("products").orderBy("name").get();
+    if (snapshot.empty) {
+      document.getElementById("content").innerHTML = "<h2>List of Products</h2><p>No products found.</p>";
+      return;
+    }
+    let html = `<h2>List of Products</h2><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; max-width: 900px;">
+      <thead>
+        <tr>
+          <th>Name</th><th>Category</th><th>Brand</th><th>Buying Price</th><th>Selling Price</th><th>VAT %</th><th>VAT Type</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+
+      let categoryName = "(unknown)";
+      let brandName = "(unknown)";
+      try {
+        const catDoc = await db.collection("categories").doc(data.categoryId).get();
+        if (catDoc.exists) categoryName = catDoc.data().name || categoryName;
+      } catch {}
+
+      try {
+        const brandDoc = await db.collection("brands").doc(data.brandId).get();
+        if (brandDoc.exists) brandName = brandDoc.data().name || brandName;
+      } catch {}
+
+      html += `<tr>
+        <td>${data.name || ""}</td>
+        <td>${categoryName}</td>
+        <td>${brandName}</td>
+        <td>${data.buyingPrice?.toFixed(2) ?? ""}</td>
+        <td>${data.sellingPrice?.toFixed(2) ?? ""}</td>
+        <td>${data.vatPercent ?? ""}</td>
+        <td>${data.vatType ?? ""}</td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+    document.getElementById("content").innerHTML = html;
+  } catch (error) {
+    document.getElementById("content").innerHTML = `<h2>List of Products</h2><p>Error loading products: ${error.message}</p>`;
+    console.error("Error loading products:", error);
+  }
+
+}
+    function displayRoles() { document.getElementById("content").innerHTML = "<h2>Roles Section</h2><p>Coming soon.</p>"; }
+    function showFieldSales() { document.getElementById("content").innerHTML = "<h2>Field Salespersons Section</h2><p>Coming soon.</p>"; }
+    function showSuppliers() { document.getElementById("content").innerHTML = "<h2>Suppliers Section</h2><p>Coming soon.</p>"; }
+    function showCustomers() { document.getElementById("content").innerHTML = "<h2>Customers Section</h2><p>Coming soon.</p>"; }
+    function showUnits() { document.getElementById("content").innerHTML = "<h2>Units Section</h2><p>Coming soon.</p>"; }
+
+    // Initialize dashboard view on load
+    window.onload = () => {
+      showHome();
+    };
+function showAddProduct() {
+  document.getElementById("content").innerHTML = `
+    <h2>Add Product</h2>
+    <form id="addProductForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-width:800px;">
+      
+      <!-- Product Name -->
+      <div>
+        <label for="productName">Product Name:</label>
+        <input type="text" id="productName" name="productName" required />
+      </div>
+
+      <!-- Category -->
+      <div>
+        <label for="category">Category:</label>
+        <select id="category" name="category" required>
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <!-- Brand -->
+      <div>
+        <label for="brand">Brand:</label>
+        <select id="brand" name="brand" required>
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <!-- VAT -->
+      <div>
+        <label for="vat">VAT:</label>
+        <select id="vat" name="vat" required>
+          <option value="">-- Select VAT Option --</option>
+          <option value="Vatable">Vatable</option>
+          <option value="Not Vatable">Not Vatable</option>
+        </select>
+      </div>
+
+      <!-- VAT Type -->
+      <div>
+        <label for="vatType">VAT Type:</label>
+        <select id="vatType" name="vatType" required>
+          <option value="">-- Select VAT Type --</option>
+          <option value="Inclusive">Inclusive</option>
+          <option value="Exclusive">Exclusive</option>
+        </select>
+      </div>
+
+      <!-- Business Location -->
+      <div>
+        <label for="businessLocation">Business Location:</label>
+        <select id="businessLocation" name="businessLocation" required>
+          <option value="">Loading...</option>
+        </select>
+      </div>
+
+      <!-- Submit Button -->
+      <div style="grid-column: span 2; text-align:right;">
+        <button type="submit" style="padding:10px 20px; background:#2c3e50; color:#fff; border:none; border-radius:5px; cursor:pointer;">
+          Add Product
+        </button>
+      </div>
+    </form>
+  `;
+
+  const db = firebase.firestore();
+
+  // Load categories from Firestore
+  db.collection("categories").get().then(snapshot => {
+    let categorySelect = document.getElementById("category");
+    categorySelect.innerHTML = `<option value="">-- Select Category --</option>`;
+    snapshot.forEach(doc => {
+      categorySelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`;
+    });
+  });
+
+  // Load brands from Firestore
+  db.collection("brands").get().then(snapshot => {
+    let brandSelect = document.getElementById("brand");
+    brandSelect.innerHTML = `<option value="">-- Select Brand --</option>`;
+    snapshot.forEach(doc => {
+      brandSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`;
+    });
+  });
+
+  // Load business locations from Firestore
+  db.collection("businessLocations").get().then(snapshot => {
+    let locationSelect = document.getElementById("businessLocation");
+    locationSelect.innerHTML = `<option value="">-- Select Location --</option>`;
+    snapshot.forEach(doc => {
+      locationSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`;
+    });
+  });
+
+  // Handle form submission
+  document.getElementById("addProductForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById("productName").value;
+    const category = document.getElementById("category").value;
+    const brand = document.getElementById("brand").value;
+    const vat = document.getElementById("vat").value;
+    const vatType = document.getElementById("vatType").value;
+    const businessLocation = document.getElementById("businessLocation").value;
+
+    try {
+      await db.collection("products").add({
+        name: name,
+        category: category,
+        brand: brand,
+        vat: vat,
+        vatType: vatType,
+        businessLocation: businessLocation,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert("Product added successfully!");
+      document.getElementById("addProductForm").reset();
+    } catch (error) {
+      alert("Error adding product: " + error.message);
+    }
+  });
+}
+function showBusinessLocations() {
+  const db = firebase.firestore();
+
+  document.getElementById("content").innerHTML = `
+    <h2>Business Locations</h2>
+    <form id="addLocationForm" style="margin-bottom: 20px;">
+      <label for="locationName">Location Name:</label>
+      <input type="text" id="locationName" required />
+      <button type="submit">Add Location</button>
+    </form>
+
+    <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th>Location Name</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="locationsTable"></tbody>
+    </table>
+  `;
+
+  const locationsTable = document.getElementById("locationsTable");
+
+  // Load locations from Firestore in real-time
+  function loadLocations() {
+    db.collection("businessLocations").onSnapshot(snapshot => {
+      locationsTable.innerHTML = "";
+      snapshot.forEach(doc => {
+        let loc = doc.data();
+        let status = loc.active ? "Active" : "Inactive";
+        locationsTable.innerHTML += `
+          <tr>
+            <td>${loc.name}</td>
+            <td>${status}</td>
+            <td>
+              <button onclick="toggleLocationStatus('${doc.id}', ${loc.active})">${loc.active ? "Deactivate" : "Activate"}</button>
+              <button onclick="deleteLocation('${doc.id}')">Delete</button>
+            </td>
+          </tr>
+        `;
+      });
+    });
+  }
+  loadLocations();
+
+  // Add location to Firestore
+  document.getElementById("addLocationForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("locationName").value.trim();
+    if (!name) return;
+
+    await db.collection("businessLocations").add({
+      name: name,
+      active: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    document.getElementById("locationName").value = "";
+  });
+
+  // Functions for location actions
+  window.toggleLocationStatus = async (id, currentStatus) => {
+    await db.collection("businessLocations").doc(id).update({
+      active: !currentStatus
+    });
+  };
+
+  window.deleteLocation = async (id) => {
+    if (confirm("Are you sure you want to delete this location?")) {
+      await db.collection("businessLocations").doc(id).delete();
+    }
+  };
+}
+
+
+  </script>
 </body>
 </html>
