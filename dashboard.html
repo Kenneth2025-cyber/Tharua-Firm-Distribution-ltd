@@ -6,7 +6,6 @@
   <title>Tharua Firm Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Your existing styles... */
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -38,81 +37,30 @@
       font-size: 14px;
       cursor: pointer;
     }
-    .sidebar a i {
-      margin-right: 12px;
-      font-size: 16px;
-    }
-    .sidebar a:hover {
-      background-color: #34495e;
-    }
-    .dropdown a {
-      font-size: 14px;
-      color: white;
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    .dropdown a:hover {
-      background-color: #34495e;
-    }
-    .main-content {
-      margin-left: 230px;
-      padding: 20px;
-    }
-    .content-section {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      max-width: 600px;
-    }
-    input, select, button {
-      width: 100%;
-      padding: 8px;
-      margin: 8px 0 16px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    button {
-      background-color: #2c3e50;
-      color: white;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background-color: #34495e;
-    }
+    .sidebar a i { margin-right: 12px; font-size: 16px; }
+    .sidebar a:hover { background-color: #34495e; }
 
-    /* NEW: horizontal layout for home page buttons */
-    .button-grid {
-      display: flex;
-      gap: 20px;
-      overflow-x: auto;
-      padding-bottom: 10px;
-      max-width: 100%;
-    }
-    .button-grid div {
-      flex: 0 0 auto;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background-color: #f9f9f9;
-      cursor: pointer;
-      text-align: center;
-      transition: transform 0.2s ease;
-      min-width: 110px;
-    }
-    .button-grid div:hover {
-      transform: scale(1.05);
-    }
-    .button-grid img {
-      width: 50px;
-      height: 50px;
-      margin-bottom: 10px;
-    }
+    .dropdown a { font-size: 14px; color: white; padding: 10px 20px; display: flex; align-items: center; text-decoration: none; cursor: pointer; }
+    .dropdown a:hover { background-color: #34495e; }
+
+    .main-content { margin-left: 230px; padding: 20px; }
+    .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 900px; }
+
+    input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background-color: #2c3e50; color: white; cursor: pointer; font-size: 16px; }
+    button:hover { background-color: #34495e; }
+
+    .button-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 10px; max-width: 100%; }
+    .button-grid div { flex: 0 0 auto; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; cursor: pointer; text-align: center; transition: transform 0.2s ease; min-width: 110px; }
+    .button-grid div:hover { transform: scale(1.05); }
+    .button-grid img { width: 50px; height: 50px; margin-bottom: 10px; }
+
+    /* Category list styles */
+    .category-list { list-style: none; padding: 0; margin: 0; }
+    .category-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .category-name { font-size: 15px; }
+    .delete-icon { color: #c0392b; cursor: pointer; margin-left: 12px; }
+    .small-btn { display:inline-block; padding:6px 10px; border-radius:6px; background:#ecf0f1; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -186,9 +134,9 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-
     const db = firebase.firestore();
 
+    // Basic auth check
     firebase.auth().onAuthStateChanged(user => {
       if (!user) {
         window.location.href = "login.html";
@@ -223,7 +171,8 @@
       `;
 
       // Add click shortcut for Products icon
-      document.getElementById("homeProductsBtn").onclick = showProductList;
+      const btn = document.getElementById("homeProductsBtn");
+      if (btn) btn.onclick = showProductList;
     }
 
     function clearContent() {
@@ -233,23 +182,11 @@
       `;
     }
 
-    function toggleContacts() {
-      const submenu = document.getElementById("contactsSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
-
-    function toggleUserManagement() {
-      const submenu = document.getElementById("userMgmtSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
-
-    function toggleProducts() {
-      const submenu = document.getElementById("productsSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
-    }
+    function toggleContacts() { const submenu = document.getElementById("contactsSubmenu"); submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; }
+    function toggleUserManagement() { const submenu = document.getElementById("userMgmtSubmenu"); submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; }
+    function toggleProducts() { const submenu = document.getElementById("productsSubmenu"); submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; }
 
     // --- PRODUCTS ---
-
     async function showAddProduct() {
       document.getElementById("content").innerHTML = `
         <h2>Add Product</h2>
@@ -287,12 +224,11 @@
         </form>
       `;
 
-      // Load categories from Firestore
       const categorySelect = document.getElementById("category");
       const brandSelect = document.getElementById("brand");
 
       try {
-        const categoriesSnapshot = await db.collection("categories").get();
+        const categoriesSnapshot = await db.collection("categories").orderBy("name").get();
         categorySelect.innerHTML = '<option value="" disabled selected>Select category</option>';
         categoriesSnapshot.forEach(doc => {
           const data = doc.data();
@@ -303,9 +239,8 @@
         console.error("Error loading categories:", error);
       }
 
-      // Load brands from Firestore
       try {
-        const brandsSnapshot = await db.collection("brands").get();
+        const brandsSnapshot = await db.collection("brands").orderBy("name").get();
         brandSelect.innerHTML = '<option value="" disabled selected>Select brand</option>';
         brandsSnapshot.forEach(doc => {
           const data = doc.data();
@@ -316,7 +251,6 @@
         console.error("Error loading brands:", error);
       }
 
-      // Handle form submit
       document.getElementById("productForm").onsubmit = async (e) => {
         e.preventDefault();
         await addProductToFirestore();
@@ -349,7 +283,7 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         alert("Product added successfully!");
-        showAddProduct(); // Reset form
+        showAddProduct();
       } catch (error) {
         alert("Error adding product: " + error.message);
         console.error("Add product error:", error);
@@ -359,74 +293,99 @@
     async function showProductList() {
       document.getElementById("content").innerHTML = `
         <h2>List of Products</h2>
-        <p>Here you can view all products.</p>
+        <p>Here you can view all products. (Coming soon)</p>
       `;
-      // You can implement product list loading here later
     }
 
-    // --- NEW: CATEGORIES SECTION ---
-
+    // --- CATEGORIES SECTION (with delete) ---
     async function showCategories() {
       document.getElementById("content").innerHTML = `
         <h2>Categories</h2>
-        <div>
+        <div style="max-width:420px;">
           <form id="categoryForm">
             <label for="categoryName">New Category Name:</label>
             <input type="text" id="categoryName" placeholder="Enter category name" required />
             <button type="submit">Add Category</button>
           </form>
         </div>
-        <h3>Existing Categories</h3>
-        <ul id="categoryList" style="list-style-type:none; padding-left:0;"></ul>
+        <h3 style="margin-top:18px;">Existing Categories</h3>
+        <ul id="categoryList" class="category-list"></ul>
       `;
 
       const categoryList = document.getElementById("categoryList");
       const categoryForm = document.getElementById("categoryForm");
 
       async function loadCategories() {
-        categoryList.innerHTML = "<li>Loading...</li>";
+        categoryList.innerHTML = "<li class='category-item'>Loading...</li>";
         try {
           const snapshot = await db.collection("categories").orderBy("name").get();
           if (snapshot.empty) {
-            categoryList.innerHTML = "<li>No categories found.</li>";
+            categoryList.innerHTML = "<li class='category-item'>No categories found.</li>";
             return;
           }
+
           categoryList.innerHTML = "";
           snapshot.forEach(doc => {
             const data = doc.data();
-            const li = document.createElement("li");
-            li.textContent = data.name || "(Unnamed category)";
+            const li = document.createElement('li');
+            li.className = 'category-item';
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'category-name';
+            nameSpan.textContent = data.name || '(Unnamed category)';
+
+            const rightDiv = document.createElement('div');
+
+            // Optional: Edit button (future)
+            const editBtn = document.createElement('span');
+            editBtn.className = 'small-btn';
+            editBtn.textContent = 'Edit';
+            editBtn.style.marginRight = '8px';
+            editBtn.onclick = () => { alert('Edit category feature not implemented yet.'); };
+
+            const deleteIcon = document.createElement('i');
+            deleteIcon.className = 'fas fa-trash delete-icon';
+            deleteIcon.title = 'Delete category';
+
+            deleteIcon.onclick = async () => {
+              if (!confirm(`Delete category "${data.name}"? This action cannot be undone.`)) return;
+              try {
+                await db.collection('categories').doc(doc.id).delete();
+                loadCategories();
+              } catch (err) {
+                alert('Error deleting category: ' + err.message);
+                console.error('Delete category error:', err);
+              }
+            };
+
+            rightDiv.appendChild(editBtn);
+            rightDiv.appendChild(deleteIcon);
+
+            li.appendChild(nameSpan);
+            li.appendChild(rightDiv);
             categoryList.appendChild(li);
           });
         } catch (error) {
-          categoryList.innerHTML = "<li>Error loading categories.</li>";
-          console.error("Error loading categories:", error);
+          categoryList.innerHTML = "<li class='category-item'>Error loading categories.</li>";
+          console.error('Error loading categories:', error);
         }
       }
 
       categoryForm.onsubmit = async (e) => {
         e.preventDefault();
-        const name = document.getElementById("categoryName").value.trim();
-        if (!name) {
-          alert("Please enter a category name.");
-          return;
-        }
+        const name = document.getElementById('categoryName').value.trim();
+        if (!name) { alert('Please enter a category name.'); return; }
 
         try {
-          // Optional: prevent duplicates
-          const existing = await db.collection("categories").where("name", "==", name).get();
-          if (!existing.empty) {
-            alert("Category already exists.");
-            return;
-          }
+          const existing = await db.collection('categories').where('name', '==', name).get();
+          if (!existing.empty) { alert('Category already exists.'); return; }
 
-          await db.collection("categories").add({ name });
-          alert("Category added successfully.");
+          await db.collection('categories').add({ name });
           categoryForm.reset();
           loadCategories();
-        } catch (error) {
-          alert("Error adding category: " + error.message);
-          console.error("Add category error:", error);
+        } catch (err) {
+          alert('Error adding category: ' + err.message);
+          console.error('Add category error:', err);
         }
       };
 
