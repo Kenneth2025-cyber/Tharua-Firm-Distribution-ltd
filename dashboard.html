@@ -132,7 +132,108 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-  <script>async function showCategories() {
+  <script>async function showBrands() {
+  document.getElementById("content").innerHTML = `
+    <h2>Brands</h2>
+    <div style="max-width:420px;">
+      <form id="brandForm">
+        <label for="brandName">New Brand Name:</label>
+        <input type="text" id="brandName" placeholder="Enter brand name" required />
+        <button type="submit">Add Brand</button>
+      </form>
+    </div>
+    <h3 style="margin-top:18px;">Existing Brands</h3>
+    <ul id="brandList" class="category-list"></ul>
+  `;
+
+  const brandList = document.getElementById("brandList");
+  const brandForm = document.getElementById("brandForm");
+
+  async function loadBrands() {
+    brandList.innerHTML = "<li class='category-item'>Loading...</li>";
+    try {
+      const snapshot = await db.collection("brands").orderBy("name").get();
+      if (snapshot.empty) {
+        brandList.innerHTML = "<li class='category-item'>No brands found.</li>";
+        return;
+      }
+
+      brandList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement('li');
+        li.className = 'category-item';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'category-name';
+        nameSpan.textContent = data.name || '(Unnamed brand)';
+
+        const rightDiv = document.createElement('div');
+
+        const editBtn = document.createElement('span');
+        editBtn.className = 'small-btn';
+        editBtn.textContent = 'Edit';
+        editBtn.style.marginRight = '8px';
+        editBtn.onclick = () => { alert('Edit brand feature not implemented yet.'); };
+
+        const deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-trash delete-icon';
+        deleteIcon.title = 'Delete brand';
+
+        deleteIcon.onclick = async () => {
+          if (!confirm(`Delete brand "${data.name}"? This action cannot be undone.`)) return;
+          try {
+            await db.collection('brands').doc(doc.id).delete();
+            loadBrands();
+          } catch (err) {
+            alert('Error deleting brand: ' + err.message);
+            console.error('Delete brand error:', err);
+          }
+        };
+
+        rightDiv.appendChild(editBtn);
+        rightDiv.appendChild(deleteIcon);
+        li.appendChild(nameSpan);
+        li.appendChild(rightDiv);
+        brandList.appendChild(li);
+      });
+    } catch (error) {
+      brandList.innerHTML = "<li class='category-item'>Error loading brands.</li>";
+      console.error("Load brands error:", error);
+    }
+  }
+
+  brandForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const newBrandName = document.getElementById("brandName").value.trim();
+    if (!newBrandName) {
+      alert("Please enter a brand name.");
+      return;
+    }
+    try {
+      const query = await db.collection("brands").where("name", "==", newBrandName).get();
+      if (!query.empty) {
+        alert("Brand with this name already exists.");
+        return;
+      }
+
+      await db.collection("brands").add({
+        name: newBrandName,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert("Brand added successfully.");
+      brandForm.reset();
+      loadBrands();
+    } catch (error) {
+      alert("Error adding brand: " + error.message);
+      console.error("Add brand error:", error);
+    }
+  };
+
+  loadBrands();
+}
+
+async function showCategories() {
   document.getElementById("content").innerHTML = `
     <h2>Categories</h2>
     <div style="max-width:420px;">
