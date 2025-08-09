@@ -132,7 +132,107 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-  <script>
+  <script>async function showCategories() {
+  document.getElementById("content").innerHTML = `
+    <h2>Categories</h2>
+    <div style="max-width:420px;">
+      <form id="categoryForm">
+        <label for="categoryName">New Category Name:</label>
+        <input type="text" id="categoryName" placeholder="Enter category name" required />
+        <button type="submit">Add Category</button>
+      </form>
+    </div>
+    <h3 style="margin-top:18px;">Existing Categories</h3>
+    <ul id="categoryList" class="category-list"></ul>
+  `;
+
+  const categoryList = document.getElementById("categoryList");
+  const categoryForm = document.getElementById("categoryForm");
+
+  async function loadCategories() {
+    categoryList.innerHTML = "<li class='category-item'>Loading...</li>";
+    try {
+      const snapshot = await db.collection("categories").orderBy("name").get();
+      if (snapshot.empty) {
+        categoryList.innerHTML = "<li class='category-item'>No categories found.</li>";
+        return;
+      }
+
+      categoryList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement('li');
+        li.className = 'category-item';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'category-name';
+        nameSpan.textContent = data.name || '(Unnamed category)';
+
+        const rightDiv = document.createElement('div');
+
+        const editBtn = document.createElement('span');
+        editBtn.className = 'small-btn';
+        editBtn.textContent = 'Edit';
+        editBtn.style.marginRight = '8px';
+        editBtn.onclick = () => { alert('Edit category feature not implemented yet.'); };
+
+        const deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-trash delete-icon';
+        deleteIcon.title = 'Delete category';
+
+        deleteIcon.onclick = async () => {
+          if (!confirm(`Delete category "${data.name}"? This action cannot be undone.`)) return;
+          try {
+            await db.collection('categories').doc(doc.id).delete();
+            loadCategories();
+          } catch (err) {
+            alert('Error deleting category: ' + err.message);
+            console.error('Delete category error:', err);
+          }
+        };
+
+        rightDiv.appendChild(editBtn);
+        rightDiv.appendChild(deleteIcon);
+        li.appendChild(nameSpan);
+        li.appendChild(rightDiv);
+        categoryList.appendChild(li);
+      });
+    } catch (error) {
+      categoryList.innerHTML = "<li class='category-item'>Error loading categories.</li>";
+      console.error("Load categories error:", error);
+    }
+  }
+
+  categoryForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const newCatName = document.getElementById("categoryName").value.trim();
+    if (!newCatName) {
+      alert("Please enter a category name.");
+      return;
+    }
+    try {
+      const query = await db.collection("categories").where("name", "==", newCatName).get();
+      if (!query.empty) {
+        alert("Category with this name already exists.");
+        return;
+      }
+
+      await db.collection("categories").add({
+        name: newCatName,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      alert("Category added successfully.");
+      categoryForm.reset();
+      loadCategories();
+    } catch (error) {
+      alert("Error adding category: " + error.message);
+      console.error("Add category error:", error);
+    }
+  };
+
+  loadCategories();
+}
+ 
     const firebaseConfig = {
       apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
       authDomain: "tharuasystem.firebaseapp.com",
