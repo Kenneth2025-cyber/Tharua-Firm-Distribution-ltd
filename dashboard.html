@@ -173,7 +173,7 @@
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
+      apiKey: "AIzaSyCLRiUG0ePdP68nbjtb5pbY34ohiUP30",
       authDomain: "tharuasystem.firebaseapp.com",
       projectId: "tharuasystem",
       storageBucket: "tharuasystem.appspot.com",
@@ -183,9 +183,48 @@
 
     firebase.initializeApp(firebaseConfig);
 
-    firebase.auth().onAuthStateChanged(user => {
+    firebase.auth().onAuthStateChanged(async (user) => {
       if (!user) {
         window.location.href = "login.html";
+      } else {
+        try {
+          const doc = await firebase.firestore().collection("users").doc(user.uid).get();
+          const role = doc.exists ? doc.data().role : null;
+
+          // Get sidebar menu items
+          const userMgmt = document.getElementById("userMgmtMenu");
+          const contacts = document.getElementById("contactsMenu");
+          const sellMenu = [...document.querySelectorAll('.sidebar a')].find(a => a.textContent.trim() === "Sell");
+          const reportsMenu = [...document.querySelectorAll('.sidebar a')].find(a => a.textContent.trim() === "Reports");
+
+          // Hide all optional menus by default
+          if (userMgmt) userMgmt.style.display = "none";
+          if (contacts) contacts.style.display = "none";
+          if (sellMenu) sellMenu.style.display = "none";
+          if (reportsMenu) reportsMenu.style.display = "none";
+
+          if (role === "admin") {
+            // Show all menus for admin
+            if (userMgmt) userMgmt.style.display = "flex";
+            if (contacts) contacts.style.display = "flex";
+            if (sellMenu) sellMenu.style.display = "flex";
+            if (reportsMenu) reportsMenu.style.display = "flex";
+          } else if (role === "cashier") {
+            // Cashier can process sales and view reports
+            if (sellMenu) sellMenu.style.display = "flex";
+            if (reportsMenu) reportsMenu.style.display = "flex";
+          } else if (role === "salesperson") {
+            // Salesperson can only view reports
+            if (reportsMenu) reportsMenu.style.display = "flex";
+          } else {
+            alert("Access denied: Your role does not have permission to access this system.");
+            firebase.auth().signOut();
+          }
+        } catch (error) {
+          console.error("Error loading user role:", error);
+          alert("Error loading user permissions.");
+          firebase.auth().signOut();
+        }
       }
     });
 
@@ -234,7 +273,6 @@
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
-    // Updated showUsers with role selection
     function showUsers() {
       document.getElementById("content").innerHTML = `
         <h2>Users</h2>
@@ -256,7 +294,6 @@
       `;
     }
 
-    // Updated signup to save role to Firestore
     function signup() {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -289,8 +326,29 @@
 
     function showRoles() {
       document.getElementById("content").innerHTML = `
-        <h2>Roles</h2>
-        <p>Define and manage user roles and permissions.</p>
+        <h2>User Roles & Permissions</h2>
+        <table style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color:#2c3e50; color:white;">
+              <th style="padding: 12px; border: 1px solid #ddd; text-align:left;">Role</th>
+              <th style="padding: 12px; border: 1px solid #ddd; text-align:left;">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #ddd;">Administrator</td>
+              <td style="padding: 12px; border: 1px solid #ddd;">Full system access including user management, contacts, sales, reports, and all features.</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #ddd;">Cashier</td>
+              <td style="padding: 12px; border: 1px solid #ddd;">Can process sales and view reports.</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px; border: 1px solid #ddd;">Salesperson</td>
+              <td style="padding: 12px; border: 1px solid #ddd;">Can only view reports.</td>
+            </tr>
+          </tbody>
+        </table>
       `;
     }
 
