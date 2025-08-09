@@ -309,9 +309,54 @@
       // Your existing add product code here...
       document.getElementById("content").innerHTML = `<h2>Add Product (Coming Soon)</h2>`;
     }
-    async function showProductList() {
-      document.getElementById("content").innerHTML = `<h2>List of Products (Coming Soon)</h2>`;
+    async function showProductList() {   document.getElementById("content").innerHTML = `<h2>List of Products</h2><p>Loading products...</p>`;
+  try {
+    const snapshot = await db.collection("products").orderBy("name").get();
+    if (snapshot.empty) {
+      document.getElementById("content").innerHTML = "<h2>List of Products</h2><p>No products found.</p>";
+      return;
     }
+    let html = `<h2>List of Products</h2><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; max-width: 900px;">
+      <thead>
+        <tr>
+          <th>Name</th><th>Category</th><th>Brand</th><th>Buying Price</th><th>Selling Price</th><th>VAT %</th><th>VAT Type</th>
+        </tr>
+      </thead>
+      <tbody>
+    `;
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+
+      let categoryName = "(unknown)";
+      let brandName = "(unknown)";
+      try {
+        const catDoc = await db.collection("categories").doc(data.categoryId).get();
+        if (catDoc.exists) categoryName = catDoc.data().name || categoryName;
+      } catch {}
+
+      try {
+        const brandDoc = await db.collection("brands").doc(data.brandId).get();
+        if (brandDoc.exists) brandName = brandDoc.data().name || brandName;
+      } catch {}
+
+      html += `<tr>
+        <td>${data.name || ""}</td>
+        <td>${categoryName}</td>
+        <td>${brandName}</td>
+        <td>${data.buyingPrice?.toFixed(2) ?? ""}</td>
+        <td>${data.sellingPrice?.toFixed(2) ?? ""}</td>
+        <td>${data.vatPercent ?? ""}</td>
+        <td>${data.vatType ?? ""}</td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+    document.getElementById("content").innerHTML = html;
+  } catch (error) {
+    document.getElementById("content").innerHTML = `<h2>List of Products</h2><p>Error loading products: ${error.message}</p>`;
+    console.error("Error loading products:", error);
+  }
+
+}
     function displayRoles() { document.getElementById("content").innerHTML = "<h2>Roles Section</h2><p>Coming soon.</p>"; }
     function showFieldSales() { document.getElementById("content").innerHTML = "<h2>Field Salespersons Section</h2><p>Coming soon.</p>"; }
     function showSuppliers() { document.getElementById("content").innerHTML = "<h2>Suppliers Section</h2><p>Coming soon.</p>"; }
