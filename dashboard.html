@@ -183,9 +183,29 @@
 
     firebase.initializeApp(firebaseConfig);
 
-    firebase.auth().onAuthStateChanged(user => {
+    // Global variable to hold current user's role
+    let currentUserRole = null;
+
+    async function getUserRole(uid) {
+      try {
+        const userDoc = await firebase.firestore().collection("users").doc(uid).get();
+        if (userDoc.exists) {
+          return userDoc.data().role || null;
+        }
+        return null;
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        return null;
+      }
+    }
+
+    firebase.auth().onAuthStateChanged(async user => {
       if (!user) {
         window.location.href = "login.html";
+      } else {
+        currentUserRole = await getUserRole(user.uid);
+        setupUIByRole(currentUserRole);
+        showHome();  // Show dashboard after login
       }
     });
 
@@ -195,6 +215,48 @@
         window.location.href = "login.html";
       }).catch((error) => {
         alert("Error logging out: " + error.message);
+      });
+    }
+
+    // Hide/show sidebar menu items based on role
+    function setupUIByRole(role) {
+      // User Management only for admin
+      if (role !== "admin") {
+        document.getElementById("userMgmtMenu").style.display = "none";
+        document.getElementById("userMgmtSubmenu").style.display = "none";
+      }
+
+      // Cashier restrictions example
+      if (role === "cashier") {
+        hideMenuItems(["Manufacturing", "Purchases"]);
+      }
+
+      // Salesperson restrictions - show only Home, Sell, Reports
+      if (role === "salesperson") {
+        hideMenuItems([
+          "User Management",
+          "Contacts",
+          "Products",
+          "Manufacturing",
+          "Purchases",
+          "Stock Transfers",
+          "Stock Adjustment",
+          "Expenses",
+          "Accounting",
+          "AI Assistance",
+          "Notification Templates"
+        ]);
+      }
+    }
+
+    function hideMenuItems(names) {
+      names.forEach(name => {
+        const links = [...document.querySelectorAll(".sidebar a, .sidebar .dropdown a")];
+        links.forEach(link => {
+          if (link.textContent.trim().includes(name)) {
+            link.style.display = "none";
+          }
+        });
       });
     }
 
@@ -234,8 +296,38 @@
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
-    // Display roles from Firestore
+    // Restrict access to Users page for admin only
+    function showUsers() {
+      if (currentUserRole !== "admin") {
+        alert("Access denied. Admins only.");
+        return;
+      }
+      document.getElementById("content").innerHTML = `
+        <h2>Users</h2>
+        <p>Manage users of the system here.</p>
+
+        <h3>Create New User</h3>
+        <input type="email" id="email" placeholder="Email" required><br><br>
+        <input type="password" id="password" placeholder="Password" required><br><br>
+
+        <label for="role">Select Role:</label><br>
+        <select id="role" required>
+          <option value="" disabled selected>Select role</option>
+          <option value="admin">Admin</option>
+          <option value="cashier">Cashier</option>
+          <option value="salesperson">Salesperson</option>
+        </select><br><br>
+
+        <button onclick="signup()">Sign Up</button>
+      `;
+    }
+
+    // Restrict access to Roles page for admin only
     async function displayRoles() {
+      if (currentUserRole !== "admin") {
+        alert("Access denied. Admins only.");
+        return;
+      }
       const content = document.getElementById("content");
       content.innerHTML = `<h2>Roles</h2><ul id="rolesList">Loading roles...</ul>`;
 
@@ -260,26 +352,24 @@
       }
     }
 
-    // Keep your existing showUsers() and other functions below...
-
-    function showUsers() {
+    function showFieldSales() {
       document.getElementById("content").innerHTML = `
-        <h2>Users</h2>
-        <p>Manage users of the system here.</p>
+        <h2>Field Salespersons</h2>
+        <p>Assign and track sales agents working in the field.</p>
+      `;
+    }
 
-        <h3>Create New User</h3>
-        <input type="email" id="email" placeholder="Email" required><br><br>
-        <input type="password" id="password" placeholder="Password" required><br><br>
+    function showSuppliers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Suppliers</h2>
+        <p>List and manage your product suppliers here.</p>
+      `;
+    }
 
-        <label for="role">Select Role:</label><br>
-        <select id="role" required>
-          <option value="" disabled selected>Select role</option>
-          <option value="admin">Admin</option>
-          <option value="cashier">Cashier</option>
-          <option value="salesperson">Salesperson</option>
-        </select><br><br>
-
-        <button onclick="signup()">Sign Up</button>
+    function showCustomers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Customers</h2>
+        <p>View and manage your customer records here.</p>
       `;
     }
 
@@ -311,27 +401,6 @@
         .catch((error) => {
           alert("Error: " + error.message);
         });
-    }
-
-    function showFieldSales() {
-      document.getElementById("content").innerHTML = `
-        <h2>Field Salespersons</h2>
-        <p>Assign and track sales agents working in the field.</p>
-      `;
-    }
-
-    function showSuppliers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Suppliers</h2>
-        <p>List and manage your product suppliers here.</p>
-      `;
-    }
-
-    function showCustomers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Customers</h2>
-        <p>View and manage your customer records here.</p>
-      `;
     }
   </script>
 </body>
