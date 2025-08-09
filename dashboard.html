@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Tharua Firm Dashboard</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
     body {
       margin: 0;
@@ -180,11 +180,153 @@
       `;
     }
 
-    function toggleContacts() { const submenu = document.getElementById("contactsSubmenu"); submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; }
-    function toggleUserManagement() { const submenu = document.getElementById("userMgmtSubmenu"); submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; }
-    function toggleProducts() { const submenu = document.getElementById("productsSubmenu"); submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; }
+    function toggleContacts() { 
+      const submenu = document.getElementById("contactsSubmenu"); 
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; 
+    }
+    function toggleUserManagement() { 
+      const submenu = document.getElementById("userMgmtSubmenu"); 
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; 
+    }
+    function toggleProducts() { 
+      const submenu = document.getElementById("productsSubmenu"); 
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none"; 
+    }
 
-    // --- PRODUCTS ---
+    // --- PRODUCTS LIST with search and location filter ---
+    async function showProductList() {
+      document.getElementById("content").innerHTML = `
+        <h2>List of Products</h2>
+        <div style="max-width: 900px; margin-bottom: 10px;">
+          <input type="text" id="productSearch" placeholder="Search by product name (first 3 letters)" style="width: 300px; padding: 8px; font-size: 14px;" />
+          <select id="locationFilter" style="width: 200px; padding: 8px; font-size: 14px; margin-left: 10px;">
+            <option value="">All Locations</option>
+          </select>
+        </div>
+        <table id="productsTable" border="1" cellspacing="0" cellpadding="8" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <thead style="background-color: #2c3e50; color: white;">
+            <tr>
+              <th>Name</th>
+              <th>Buying Price</th>
+              <th>Selling Price</th>
+              <th>Category</th>
+              <th>Brand</th>
+              <th>Stock Balance</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody id="productsTableBody">
+            <tr><td colspan="7">Loading products...</td></tr>
+          </tbody>
+        </table>
+      `;
+
+      const productSearch = document.getElementById("productSearch");
+      const locationFilter = document.getElementById("locationFilter");
+      const productsTableBody = document.getElementById("productsTableBody");
+
+      // Load locations for filter dropdown
+      let locationsMap = {};
+      try {
+        const locSnapshot = await db.collection("locations").orderBy("name").get();
+        locSnapshot.forEach(doc => {
+          locationsMap[doc.id] = doc.data().name || "(Unnamed Location)";
+          const option = document.createElement("option");
+          option.value = doc.id;
+          option.textContent = locationsMap[doc.id];
+          locationFilter.appendChild(option);
+        });
+      } catch (error) {
+        console.error("Error loading locations:", error);
+      }
+
+      // Load categories and brands for lookup maps
+      let categoriesMap = {};
+      let brandsMap = {};
+
+      try {
+        const catSnapshot = await db.collection("categories").get();
+        catSnapshot.forEach(doc => {
+          categoriesMap[doc.id] = doc.data().name || "(Unnamed Category)";
+        });
+      } catch (error) {
+        console.error("Error loading categories:", error);
+      }
+
+      try {
+        const brandSnapshot = await db.collection("brands").get();
+        brandSnapshot.forEach(doc => {
+          brandsMap[doc.id] = doc.data().name || "(Unnamed Brand)";
+        });
+      } catch (error) {
+        console.error("Error loading brands:", error);
+      }
+
+      // Load all products and store locally for filtering
+      let allProducts = [];
+
+      async function loadProducts() {
+        productsTableBody.innerHTML = `<tr><td colspan="7">Loading products...</td></tr>`;
+        try {
+          const productSnapshot = await db.collection("products").orderBy("name").get();
+          allProducts = [];
+          productSnapshot.forEach(doc => {
+            const data = doc.data();
+            allProducts.push({
+              id: doc.id,
+              name: data.name || "",
+              buyingPrice: data.buyingPrice || 0,
+              sellingPrice: data.sellingPrice || 0,
+              categoryId: data.categoryId || "",
+              brandId: data.brandId || "",
+              stockBalance: data.stockBalance !== undefined ? data.stockBalance : "N/A",
+              locationId: data.locationId || ""
+            });
+          });
+          renderProductsTable();
+        } catch (error) {
+          productsTableBody.innerHTML = `<tr><td colspan="7">Error loading products.</td></tr>`;
+          console.error("Error loading products:", error);
+        }
+      }
+
+      function renderProductsTable() {
+        const searchText = productSearch.value.trim().toLowerCase();
+        const selectedLocation = locationFilter.value;
+
+        let filtered = allProducts.filter(p => {
+          const matchesSearch = p.name.toLowerCase().startsWith(searchText);
+          const matchesLocation = selectedLocation === "" || p.locationId === selectedLocation;
+          return matchesSearch && matchesLocation;
+        });
+
+        if (filtered.length === 0) {
+          productsTableBody.innerHTML = `<tr><td colspan="7">No products found.</td></tr>`;
+          return;
+        }
+
+        filtered.sort((a,b) => a.name.localeCompare(b.name));
+
+        productsTableBody.innerHTML = filtered.map(p => `
+          <tr>
+            <td>${p.name}</td>
+            <td>${p.buyingPrice.toFixed(2)}</td>
+            <td>${p.sellingPrice.toFixed(2)}</td>
+            <td>${categoriesMap[p.categoryId] || "(Unknown Category)"}</td>
+            <td>${brandsMap[p.brandId] || "(Unknown Brand)"}</td>
+            <td>${p.stockBalance}</td>
+            <td>${locationsMap[p.locationId] || "(Unknown Location)"}</td>
+          </tr>
+        `).join("");
+      }
+
+      productSearch.addEventListener("input", renderProductsTable);
+      locationFilter.addEventListener("change", renderProductsTable);
+
+      loadProducts();
+    }
+
+    // --- ADD PRODUCT (existing code) ---
     async function showAddProduct() {
       document.getElementById("content").innerHTML = `
         <h2>Add Product</h2>
@@ -218,304 +360,124 @@
             <option value="exclusive">Exclusive</option>
           </select>
 
+          <label for="unit">Unit:</label>
+          <select id="unit" required>
+            <option value="">Loading units...</option>
+          </select>
+
+          <label for="stockBalance">Stock Balance:</label>
+          <input type="number" id="stockBalance" placeholder="Enter stock balance" required />
+
+          <label for="location">Location:</label>
+          <select id="location" required>
+            <option value="">Loading locations...</option>
+          </select>
+
           <button type="submit">Add Product</button>
         </form>
+        <div id="message"></div>
       `;
 
+      // Load categories, brands, units, locations similarly as in showProductList for dropdowns
       const categorySelect = document.getElementById("category");
       const brandSelect = document.getElementById("brand");
+      const unitSelect = document.getElementById("unit");
+      const locationSelect = document.getElementById("location");
+      const messageDiv = document.getElementById("message");
 
       try {
-        const categoriesSnapshot = await db.collection("categories").orderBy("name").get();
-        categorySelect.innerHTML = '<option value="" disabled selected>Select category</option>';
-        categoriesSnapshot.forEach(doc => {
-          const data = doc.data();
-          categorySelect.innerHTML += `<option value="${doc.id}">${data.name || doc.id}</option>`;
+        // Categories
+        const catSnapshot = await db.collection("categories").get();
+        categorySelect.innerHTML = '<option value="">Select Category</option>';
+        catSnapshot.forEach(doc => {
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = doc.data().name || "(Unnamed Category)";
+          categorySelect.appendChild(opt);
         });
-      } catch (error) {
-        categorySelect.innerHTML = '<option value="">Error loading categories</option>';
-        console.error("Error loading categories:", error);
-      }
+      } catch (e) { categorySelect.innerHTML = '<option value="">Error loading categories</option>'; }
 
       try {
-        const brandsSnapshot = await db.collection("brands").orderBy("name").get();
-        brandSelect.innerHTML = '<option value="" disabled selected>Select brand</option>';
-        brandsSnapshot.forEach(doc => {
-          const data = doc.data();
-          brandSelect.innerHTML += `<option value="${doc.id}">${data.name || doc.id}</option>`;
+        // Brands
+        const brandSnapshot = await db.collection("brands").get();
+        brandSelect.innerHTML = '<option value="">Select Brand</option>';
+        brandSnapshot.forEach(doc => {
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = doc.data().name || "(Unnamed Brand)";
+          brandSelect.appendChild(opt);
         });
-      } catch (error) {
-        brandSelect.innerHTML = '<option value="">Error loading brands</option>';
-        console.error("Error loading brands:", error);
-      }
+      } catch (e) { brandSelect.innerHTML = '<option value="">Error loading brands</option>'; }
 
-      document.getElementById("productForm").onsubmit = async (e) => {
+      try {
+        // Units
+        const unitSnapshot = await db.collection("units").get();
+        unitSelect.innerHTML = '<option value="">Select Unit</option>';
+        unitSnapshot.forEach(doc => {
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = doc.data().name || "(Unnamed Unit)";
+          unitSelect.appendChild(opt);
+        });
+      } catch (e) { unitSelect.innerHTML = '<option value="">Error loading units</option>'; }
+
+      try {
+        // Locations
+        const locSnapshot = await db.collection("locations").orderBy("name").get();
+        locationSelect.innerHTML = '<option value="">Select Location</option>';
+        locSnapshot.forEach(doc => {
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = doc.data().name || "(Unnamed Location)";
+          locationSelect.appendChild(opt);
+        });
+      } catch (e) { locationSelect.innerHTML = '<option value="">Error loading locations</option>'; }
+
+      document.getElementById("productForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        await addProductToFirestore();
-      }
-    }
 
-    async function addProductToFirestore() {
-      const productName = document.getElementById("productName").value.trim();
-      const category = document.getElementById("category").value;
-      const brand = document.getElementById("brand").value;
-      const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
-      const sellingPrice = parseFloat(document.getElementById("sellingPrice").value);
-      const vatPercent = parseFloat(document.getElementById("vatPercent").value);
-      const vatType = document.getElementById("vatType").value;
+        const newProduct = {
+          name: document.getElementById("productName").value.trim(),
+          categoryId: categorySelect.value,
+          brandId: brandSelect.value,
+          buyingPrice: parseFloat(document.getElementById("buyingPrice").value),
+          sellingPrice: parseFloat(document.getElementById("sellingPrice").value),
+          vatPercent: parseFloat(document.getElementById("vatPercent").value),
+          vatType: document.getElementById("vatType").value,
+          unitId: unitSelect.value,
+          stockBalance: parseInt(document.getElementById("stockBalance").value, 10),
+          locationId: locationSelect.value
+        };
 
-      if (!productName || !category || !brand || isNaN(buyingPrice) || isNaN(sellingPrice) || isNaN(vatPercent) || !vatType) {
-        alert("Please fill out all fields correctly.");
-        return;
-      }
-
-      try {
-        await db.collection("products").add({
-          name: productName,
-          categoryId: category,
-          brandId: brand,
-          buyingPrice: buyingPrice,
-          sellingPrice: sellingPrice,
-          vatPercent: vatPercent,
-          vatType: vatType,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        alert("Product added successfully!");
-        showAddProduct();
-      } catch (error) {
-        alert("Error adding product: " + error.message);
-        console.error("Add product error:", error);
-      }
-    }
-
-    async function showProductList() {
-      document.getElementById("content").innerHTML = `
-        <h2>List of Products</h2>
-        <p>Here you can view all products. (Coming soon)</p>
-      `;
-    }
-
-    // --- CATEGORIES SECTION (with delete) ---
-    async function showCategories() {
-      document.getElementById("content").innerHTML = `
-        <h2>Categories</h2>
-        <div style="max-width:420px;">
-          <form id="categoryForm">
-            <label for="categoryName">New Category Name:</label>
-            <input type="text" id="categoryName" placeholder="Enter category name" required />
-            <button type="submit">Add Category</button>
-          </form>
-        </div>
-        <h3 style="margin-top:18px;">Existing Categories</h3>
-        <ul id="categoryList" class="category-list"></ul>
-      `;
-
-      const categoryList = document.getElementById("categoryList");
-      const categoryForm = document.getElementById("categoryForm");
-
-      async function loadCategories() {
-        categoryList.innerHTML = "<li class='category-item'>Loading...</li>";
-        try {
-          const snapshot = await db.collection("categories").orderBy("name").get();
-          if (snapshot.empty) {
-            categoryList.innerHTML = "<li class='category-item'>No categories found.</li>";
-            return;
-          }
-
-          categoryList.innerHTML = "";
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            const li = document.createElement('li');
-            li.className = 'category-item';
-
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'category-name';
-            nameSpan.textContent = data.name || '(Unnamed category)';
-
-            const rightDiv = document.createElement('div');
-
-            const editBtn = document.createElement('span');
-            editBtn.className = 'small-btn';
-            editBtn.textContent = 'Edit';
-            editBtn.style.marginRight = '8px';
-            editBtn.onclick = () => { alert('Edit category feature not implemented yet.'); };
-
-            const deleteIcon = document.createElement('i');
-            deleteIcon.className = 'fas fa-trash delete-icon';
-            deleteIcon.title = 'Delete category';
-
-            deleteIcon.onclick = async () => {
-              if (!confirm(`Delete category "${data.name}"? This action cannot be undone.`)) return;
-              try {
-                await db.collection('categories').doc(doc.id).delete();
-                loadCategories();
-              } catch (err) {
-                alert('Error deleting category: ' + err.message);
-                console.error('Delete category error:', err);
-              }
-            };
-
-            rightDiv.appendChild(editBtn);
-            rightDiv.appendChild(deleteIcon);
-                        li.appendChild(nameSpan);
-            li.appendChild(rightDiv);
-            categoryList.appendChild(li);
-          });
-        } catch (error) {
-          categoryList.innerHTML = "<li class='category-item'>Error loading categories.</li>";
-          console.error("Load categories error:", error);
-        }
-      }
-
-      categoryForm.onsubmit = async (e) => {
-        e.preventDefault();
-        const newCatName = document.getElementById("categoryName").value.trim();
-        if (!newCatName) {
-          alert("Please enter a category name.");
+        if (!newProduct.name || !newProduct.categoryId || !newProduct.brandId || isNaN(newProduct.buyingPrice) || isNaN(newProduct.sellingPrice) || isNaN(newProduct.vatPercent) || !newProduct.vatType || !newProduct.unitId || isNaN(newProduct.stockBalance) || !newProduct.locationId) {
+          messageDiv.textContent = "Please fill in all fields correctly.";
+          messageDiv.style.color = "red";
           return;
         }
+
         try {
-          // Check for duplicates (optional)
-          const query = await db.collection("categories").where("name", "==", newCatName).get();
-          if (!query.empty) {
-            alert("Category with this name already exists.");
-            return;
-          }
-
-          await db.collection("categories").add({
-            name: newCatName,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          alert("Category added successfully.");
-          categoryForm.reset();
-          loadCategories();
+          await db.collection("products").add(newProduct);
+          messageDiv.textContent = "Product added successfully!";
+          messageDiv.style.color = "green";
+          e.target.reset();
         } catch (error) {
-          alert("Error adding category: " + error.message);
-          console.error("Add category error:", error);
+          messageDiv.textContent = "Error adding product: " + error.message;
+          messageDiv.style.color = "red";
         }
-      };
-
-      loadCategories();
+      });
     }
 
-    // --- BRANDS SECTION (with delete) ---
-    async function showBrands() {
-      document.getElementById("content").innerHTML = `
-        <h2>Brands</h2>
-        <div style="max-width:420px;">
-          <form id="brandForm">
-            <label for="brandName">New Brand Name:</label>
-            <input type="text" id="brandName" placeholder="Enter brand name" required />
-            <button type="submit">Add Brand</button>
-          </form>
-        </div>
-        <h3 style="margin-top:18px;">Existing Brands</h3>
-        <ul id="brandList" class="category-list"></ul>
-      `;
+    // Placeholder functions
+    function showUsers() { clearContent(); }
+    function displayRoles() { clearContent(); }
+    function showFieldSales() { clearContent(); }
+    function showSuppliers() { clearContent(); }
+    function showCustomers() { clearContent(); }
+    function showUnits() { clearContent(); }
+    function showCategories() { clearContent(); }
+    function showBrands() { clearContent(); }
 
-      const brandList = document.getElementById("brandList");
-      const brandForm = document.getElementById("brandForm");
-
-      async function loadBrands() {
-        brandList.innerHTML = "<li class='category-item'>Loading...</li>";
-        try {
-          const snapshot = await db.collection("brands").orderBy("name").get();
-          if (snapshot.empty) {
-            brandList.innerHTML = "<li class='category-item'>No brands found.</li>";
-            return;
-          }
-
-          brandList.innerHTML = "";
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            const li = document.createElement('li');
-            li.className = 'category-item';
-
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'category-name';
-            nameSpan.textContent = data.name || '(Unnamed brand)';
-
-            const rightDiv = document.createElement('div');
-
-            const editBtn = document.createElement('span');
-            editBtn.className = 'small-btn';
-            editBtn.textContent = 'Edit';
-            editBtn.style.marginRight = '8px';
-            editBtn.onclick = () => { alert('Edit brand feature not implemented yet.'); };
-
-            const deleteIcon = document.createElement('i');
-            deleteIcon.className = 'fas fa-trash delete-icon';
-            deleteIcon.title = 'Delete brand';
-
-            deleteIcon.onclick = async () => {
-              if (!confirm(`Delete brand "${data.name}"? This action cannot be undone.`)) return;
-              try {
-                await db.collection('brands').doc(doc.id).delete();
-                loadBrands();
-              } catch (err) {
-                alert('Error deleting brand: ' + err.message);
-                console.error('Delete brand error:', err);
-              }
-            };
-
-            rightDiv.appendChild(editBtn);
-            rightDiv.appendChild(deleteIcon);
-
-            li.appendChild(nameSpan);
-            li.appendChild(rightDiv);
-            brandList.appendChild(li);
-          });
-        } catch (error) {
-          brandList.innerHTML = "<li class='category-item'>Error loading brands.</li>";
-          console.error("Load brands error:", error);
-        }
-      }
-
-      brandForm.onsubmit = async (e) => {
-        e.preventDefault();
-        const newBrandName = document.getElementById("brandName").value.trim();
-        if (!newBrandName) {
-          alert("Please enter a brand name.");
-          return;
-        }
-        try {
-          // Optional duplicate check
-          const query = await db.collection("brands").where("name", "==", newBrandName).get();
-          if (!query.empty) {
-            alert("Brand with this name already exists.");
-            return;
-          }
-
-          await db.collection("brands").add({
-            name: newBrandName,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          alert("Brand added successfully.");
-          brandForm.reset();
-          loadBrands();
-        } catch (error) {
-          alert("Error adding brand: " + error.message);
-          console.error("Add brand error:", error);
-        }
-      };
-
-      loadBrands();
-    }
-
-    // Dummy placeholders for other menu functions (to prevent errors)
-    function showUsers() { document.getElementById("content").innerHTML = "<h2>Users Section</h2><p>Coming soon.</p>"; }
-    function displayRoles() { document.getElementById("content").innerHTML = "<h2>Roles Section</h2><p>Coming soon.</p>"; }
-    function showFieldSales() { document.getElementById("content").innerHTML = "<h2>Field Salespersons Section</h2><p>Coming soon.</p>"; }
-    function showSuppliers() { document.getElementById("content").innerHTML = "<h2>Suppliers Section</h2><p>Coming soon.</p>"; }
-    function showCustomers() { document.getElementById("content").innerHTML = "<h2>Customers Section</h2><p>Coming soon.</p>"; }
-    function showUnits() { document.getElementById("content").innerHTML = "<h2>Units Section</h2><p>Coming soon.</p>"; }
-
-    // Initialize dashboard view on load
-    window.onload = () => {
-      showHome();
-    };
+    window.onload = showHome;
   </script>
 </body>
 </html>
-
-
