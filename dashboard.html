@@ -574,37 +574,29 @@ function showAddProduct() {
     <form id="addProductForm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-width:800px;">
       
       <!-- Product Name -->
-      <div style="display:flex; flex-direction:column;">
+      <div>
         <label for="productName">Product Name:</label>
         <input type="text" id="productName" name="productName" required />
       </div>
 
       <!-- Category -->
-      <div style="display:flex; flex-direction:column;">
+      <div>
         <label for="category">Category:</label>
         <select id="category" name="category" required>
-          <option value="">-- Select Category --</option>
-          <option value="Soft Drinks">Soft Drinks</option>
-          <option value="Energy Drinks">Energy Drinks</option>
-          <option value="Juices">Juices</option>
-          <option value="Water">Water</option>
+          <option value="">Loading...</option>
         </select>
       </div>
 
       <!-- Brand -->
-      <div style="display:flex; flex-direction:column;">
+      <div>
         <label for="brand">Brand:</label>
         <select id="brand" name="brand" required>
-          <option value="">-- Select Brand --</option>
-          <option value="Brava">Brava</option>
-          <option value="Tutti">Tutti</option>
-          <option value="Bravado">Bravado</option>
-          <option value="Tropical">Tropical</option>
+          <option value="">Loading...</option>
         </select>
       </div>
 
       <!-- VAT -->
-      <div style="display:flex; flex-direction:column;">
+      <div>
         <label for="vat">VAT:</label>
         <select id="vat" name="vat" required>
           <option value="">-- Select VAT Option --</option>
@@ -614,7 +606,7 @@ function showAddProduct() {
       </div>
 
       <!-- VAT Type -->
-      <div style="display:flex; flex-direction:column;">
+      <div>
         <label for="vatType">VAT Type:</label>
         <select id="vatType" name="vatType" required>
           <option value="">-- Select VAT Type --</option>
@@ -624,13 +616,10 @@ function showAddProduct() {
       </div>
 
       <!-- Business Location -->
-      <div style="display:flex; flex-direction:column;">
+      <div>
         <label for="businessLocation">Business Location:</label>
         <select id="businessLocation" name="businessLocation" required>
-          <option value="">-- Select Location --</option>
-          <option value="Embu">Embu</option>
-          <option value="Nairobi">Nairobi</option>
-          <option value="Meru">Meru</option>
+          <option value="">Loading...</option>
         </select>
       </div>
 
@@ -643,6 +632,36 @@ function showAddProduct() {
     </form>
   `;
 
+  const db = firebase.firestore();
+
+  // Load categories from Firestore
+  db.collection("categories").get().then(snapshot => {
+    let categorySelect = document.getElementById("category");
+    categorySelect.innerHTML = `<option value="">-- Select Category --</option>`;
+    snapshot.forEach(doc => {
+      categorySelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`;
+    });
+  });
+
+  // Load brands from Firestore
+  db.collection("brands").get().then(snapshot => {
+    let brandSelect = document.getElementById("brand");
+    brandSelect.innerHTML = `<option value="">-- Select Brand --</option>`;
+    snapshot.forEach(doc => {
+      brandSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`;
+    });
+  });
+
+  // Load business locations from Firestore
+  db.collection("businessLocations").get().then(snapshot => {
+    let locationSelect = document.getElementById("businessLocation");
+    locationSelect.innerHTML = `<option value="">-- Select Location --</option>`;
+    snapshot.forEach(doc => {
+      locationSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`;
+    });
+  });
+
+  // Handle form submission
   document.getElementById("addProductForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -654,7 +673,6 @@ function showAddProduct() {
     const businessLocation = document.getElementById("businessLocation").value;
 
     try {
-      const db = firebase.firestore();
       await db.collection("products").add({
         name: name,
         category: category,
