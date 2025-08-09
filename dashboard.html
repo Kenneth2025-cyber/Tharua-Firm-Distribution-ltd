@@ -124,7 +124,7 @@
 <body>
   <div class="sidebar">
     <h2>THARUA</h2>
-    <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
+    <a onclick="showHome()" id="homeMenu"><i class="fas fa-home"></i> Home</a>
 
     <div class="dropdown">
       <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
@@ -145,17 +145,17 @@
       </div>
     </div>
 
-    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
-    <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
-    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
-    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
-    <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
-    <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
-    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
-    <a onclick="clearContent()"><i class="fas fa-calculator"></i> Accounting</a>
-    <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
-    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
-    <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
+    <a onclick="clearContent()" id="productsMenu"><i class="fas fa-boxes"></i> Products</a>
+    <a onclick="clearContent()" id="manufacturingMenu"><i class="fas fa-industry"></i> Manufacturing</a>
+    <a onclick="clearContent()" id="purchasesMenu"><i class="fas fa-shopping-cart"></i> Purchases</a>
+    <a onclick="clearContent()" id="sellMenu"><i class="fas fa-cash-register"></i> Sell</a>
+    <a onclick="clearContent()" id="stockTransfersMenu"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
+    <a onclick="clearContent()" id="stockAdjustmentMenu"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
+    <a onclick="clearContent()" id="expensesMenu"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
+    <a onclick="clearContent()" id="accountingMenu"><i class="fas fa-calculator"></i> Accounting</a>
+    <a onclick="clearContent()" id="aiMenu"><i class="fas fa-robot"></i> AI Assistance</a>
+    <a onclick="clearContent()" id="reportsMenu"><i class="fas fa-chart-line"></i> Reports</a>
+    <a onclick="clearContent()" id="notificationMenu"><i class="fas fa-envelope"></i> Notification Templates</a>
     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
   </div>
 
@@ -190,34 +190,31 @@
         try {
           const doc = await firebase.firestore().collection("users").doc(user.uid).get();
           const role = doc.exists ? doc.data().role : null;
+          console.log("User role:", role);
 
-          // Get sidebar menu items
+          // Sidebar menu elements by ID
           const userMgmt = document.getElementById("userMgmtMenu");
           const contacts = document.getElementById("contactsMenu");
-          const sellMenu = [...document.querySelectorAll('.sidebar a')].find(a => a.textContent.trim() === "Sell");
-          const reportsMenu = [...document.querySelectorAll('.sidebar a')].find(a => a.textContent.trim() === "Reports");
+          const sell = document.getElementById("sellMenu");
+          const reports = document.getElementById("reportsMenu");
 
-          // Hide all optional menus by default
-          if (userMgmt) userMgmt.style.display = "none";
-          if (contacts) contacts.style.display = "none";
-          if (sellMenu) sellMenu.style.display = "none";
-          if (reportsMenu) reportsMenu.style.display = "none";
+          // Hide all role-controlled menus initially
+          [userMgmt, contacts, sell, reports].forEach(el => {
+            if(el) el.style.display = "none";
+          });
 
           if (role === "admin") {
-            // Show all menus for admin
-            if (userMgmt) userMgmt.style.display = "flex";
-            if (contacts) contacts.style.display = "flex";
-            if (sellMenu) sellMenu.style.display = "flex";
-            if (reportsMenu) reportsMenu.style.display = "flex";
+            if(userMgmt) userMgmt.style.display = "flex";
+            if(contacts) contacts.style.display = "flex";
+            if(sell) sell.style.display = "flex";
+            if(reports) reports.style.display = "flex";
           } else if (role === "cashier") {
-            // Cashier can process sales and view reports
-            if (sellMenu) sellMenu.style.display = "flex";
-            if (reportsMenu) reportsMenu.style.display = "flex";
+            if(sell) sell.style.display = "flex";
+            if(reports) reports.style.display = "flex";
           } else if (role === "salesperson") {
-            // Salesperson can only view reports
-            if (reportsMenu) reportsMenu.style.display = "flex";
+            if(reports) reports.style.display = "flex";
           } else {
-            alert("Access denied: Your role does not have permission to access this system.");
+            alert("Access denied: Your role does not have permission.");
             firebase.auth().signOut();
           }
         } catch (error) {
@@ -285,7 +282,7 @@
         <label for="role">Select Role:</label><br>
         <select id="role" required>
           <option value="" disabled selected>Select role</option>
-          <option value="admin">Admin</option>
+          <option value="admin">Administrator</option>
           <option value="cashier">Cashier</option>
           <option value="salesperson">Salesperson</option>
         </select><br><br>
