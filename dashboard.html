@@ -130,7 +130,7 @@
       <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
       <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
         <a onclick="showUsers()">Users</a>
-        <a onclick="showRoles()">Roles</a>
+        <a onclick="displayRoles()">Roles</a>
         <a onclick="showFieldSales()">Field Salespersons</a>
       </div>
     </div>
@@ -234,7 +234,34 @@
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
-    // Updated showUsers with role selection
+    // Display roles from Firestore
+    async function displayRoles() {
+      const content = document.getElementById("content");
+      content.innerHTML = `<h2>Roles</h2><ul id="rolesList">Loading roles...</ul>`;
+
+      try {
+        const rolesSnapshot = await firebase.firestore().collection("roles").get();
+        const rolesList = document.getElementById("rolesList");
+
+        if (rolesSnapshot.empty) {
+          rolesList.innerHTML = "<li>No roles found.</li>";
+          return;
+        }
+
+        rolesList.innerHTML = "";
+        rolesSnapshot.forEach(doc => {
+          const role = doc.data();
+          const li = document.createElement("li");
+          li.textContent = role.name || "(Unnamed Role)";
+          rolesList.appendChild(li);
+        });
+      } catch (error) {
+        document.getElementById("rolesList").innerHTML = "Error loading roles: " + error.message;
+      }
+    }
+
+    // Keep your existing showUsers() and other functions below...
+
     function showUsers() {
       document.getElementById("content").innerHTML = `
         <h2>Users</h2>
@@ -256,7 +283,6 @@
       `;
     }
 
-    // Updated signup to save role to Firestore
     function signup() {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -285,13 +311,6 @@
         .catch((error) => {
           alert("Error: " + error.message);
         });
-    }
-
-    function showRoles() {
-      document.getElementById("content").innerHTML = `
-        <h2>Roles</h2>
-        <p>Define and manage user roles and permissions.</p>
-      `;
     }
 
     function showFieldSales() {
