@@ -145,7 +145,17 @@
       </div>
     </div>
 
-    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
+    <div class="dropdown">
+      <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> Products <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showProductList()">List of Products</a>
+        <a onclick="showAddProduct()">Add Product</a>
+        <a onclick="showUnits()">Units</a>
+        <a onclick="showCategories()">Categories</a>
+        <a onclick="showBrands()">Brands</a>
+      </div>
+    </div>
+
     <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
     <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
@@ -183,29 +193,9 @@
 
     firebase.initializeApp(firebaseConfig);
 
-    // Global variable to hold current user's role
-    let currentUserRole = null;
-
-    async function getUserRole(uid) {
-      try {
-        const userDoc = await firebase.firestore().collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          return userDoc.data().role || null;
-        }
-        return null;
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-        return null;
-      }
-    }
-
-    firebase.auth().onAuthStateChanged(async user => {
+    firebase.auth().onAuthStateChanged(user => {
       if (!user) {
         window.location.href = "login.html";
-      } else {
-        currentUserRole = await getUserRole(user.uid);
-        setupUIByRole(currentUserRole);
-        showHome();  // Show dashboard after login
       }
     });
 
@@ -215,48 +205,6 @@
         window.location.href = "login.html";
       }).catch((error) => {
         alert("Error logging out: " + error.message);
-      });
-    }
-
-    // Hide/show sidebar menu items based on role
-    function setupUIByRole(role) {
-      // User Management only for admin
-      if (role !== "admin") {
-        document.getElementById("userMgmtMenu").style.display = "none";
-        document.getElementById("userMgmtSubmenu").style.display = "none";
-      }
-
-      // Cashier restrictions example
-      if (role === "cashier") {
-        hideMenuItems(["Manufacturing", "Purchases"]);
-      }
-
-      // Salesperson restrictions - show only Home, Sell, Reports
-      if (role === "salesperson") {
-        hideMenuItems([
-          "User Management",
-          "Contacts",
-          "Products",
-          "Manufacturing",
-          "Purchases",
-          "Stock Transfers",
-          "Stock Adjustment",
-          "Expenses",
-          "Accounting",
-          "AI Assistance",
-          "Notification Templates"
-        ]);
-      }
-    }
-
-    function hideMenuItems(names) {
-      names.forEach(name => {
-        const links = [...document.querySelectorAll(".sidebar a, .sidebar .dropdown a")];
-        links.forEach(link => {
-          if (link.textContent.trim().includes(name)) {
-            link.style.display = "none";
-          }
-        });
       });
     }
 
@@ -296,38 +244,13 @@
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
-    // Restrict access to Users page for admin only
-    function showUsers() {
-      if (currentUserRole !== "admin") {
-        alert("Access denied. Admins only.");
-        return;
-      }
-      document.getElementById("content").innerHTML = `
-        <h2>Users</h2>
-        <p>Manage users of the system here.</p>
-
-        <h3>Create New User</h3>
-        <input type="email" id="email" placeholder="Email" required><br><br>
-        <input type="password" id="password" placeholder="Password" required><br><br>
-
-        <label for="role">Select Role:</label><br>
-        <select id="role" required>
-          <option value="" disabled selected>Select role</option>
-          <option value="admin">Admin</option>
-          <option value="cashier">Cashier</option>
-          <option value="salesperson">Salesperson</option>
-        </select><br><br>
-
-        <button onclick="signup()">Sign Up</button>
-      `;
+    function toggleProducts() {
+      const submenu = document.getElementById("productsSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
-    // Restrict access to Roles page for admin only
+    // Display roles from Firestore
     async function displayRoles() {
-      if (currentUserRole !== "admin") {
-        alert("Access denied. Admins only.");
-        return;
-      }
       const content = document.getElementById("content");
       content.innerHTML = `<h2>Roles</h2><ul id="rolesList">Loading roles...</ul>`;
 
@@ -352,24 +275,24 @@
       }
     }
 
-    function showFieldSales() {
+    function showUsers() {
       document.getElementById("content").innerHTML = `
-        <h2>Field Salespersons</h2>
-        <p>Assign and track sales agents working in the field.</p>
-      `;
-    }
+        <h2>Users</h2>
+        <p>Manage users of the system here.</p>
 
-    function showSuppliers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Suppliers</h2>
-        <p>List and manage your product suppliers here.</p>
-      `;
-    }
+        <h3>Create New User</h3>
+        <input type="email" id="email" placeholder="Email" required><br><br>
+        <input type="password" id="password" placeholder="Password" required><br><br>
 
-    function showCustomers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Customers</h2>
-        <p>View and manage your customer records here.</p>
+        <label for="role">Select Role:</label><br>
+        <select id="role" required>
+          <option value="" disabled selected>Select role</option>
+          <option value="admin">Admin</option>
+          <option value="cashier">Cashier</option>
+          <option value="salesperson">Salesperson</option>
+        </select><br><br>
+
+        <button onclick="signup()">Sign Up</button>
       `;
     }
 
@@ -401,6 +324,63 @@
         .catch((error) => {
           alert("Error: " + error.message);
         });
+    }
+
+    function showFieldSales() {
+      document.getElementById("content").innerHTML = `
+        <h2>Field Salespersons</h2>
+        <p>Assign and track sales agents working in the field.</p>
+      `;
+    }
+
+    function showSuppliers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Suppliers</h2>
+        <p>List and manage your product suppliers here.</p>
+      `;
+    }
+
+    function showCustomers() {
+      document.getElementById("content").innerHTML = `
+        <h2>Customers</h2>
+        <p>View and manage your customer records here.</p>
+      `;
+    }
+
+    // Products submenu functions
+    function showProductList() {
+      document.getElementById("content").innerHTML = `
+        <h2>List of Products</h2>
+        <p>Here you can view all products.</p>
+      `;
+    }
+
+    function showAddProduct() {
+      document.getElementById("content").innerHTML = `
+        <h2>Add Product</h2>
+        <p>Form to add new product will go here.</p>
+      `;
+    }
+
+    function showUnits() {
+      document.getElementById("content").innerHTML = `
+        <h2>Units</h2>
+        <p>Manage measurement units here.</p>
+      `;
+    }
+
+    function showCategories() {
+      document.getElementById("content").innerHTML = `
+        <h2>Categories</h2>
+        <p>Manage product categories here.</p>
+      `;
+    }
+
+    function showBrands() {
+      document.getElementById("content").innerHTML = `
+        <h2>Brands</h2>
+        <p>Manage product brands here.</p>
+      `;
     }
   </script>
 </body>
