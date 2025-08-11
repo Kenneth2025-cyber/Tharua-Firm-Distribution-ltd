@@ -301,7 +301,7 @@ function createUser() {
   }
 
   // Call Cloud Function (to be created)
-  fetch("https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/createUser", {
+ fetch("https://us-central1-tharuasystem.cloudfunctions.net/createUser", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password, role })
@@ -322,7 +322,7 @@ function createUser() {
 function deleteUser(userId) {
   if (!confirm("Are you sure you want to delete this user?")) return;
 
-  fetch("https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/deleteUser", {
+  fetch("https://us-central1-tharuasystem.cloudfunctions.net/deleteUser", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId })
