@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Tharua Firm Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; }
     .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 230px; background-color: #2c3e50; color: white; padding-top: 20px; overflow-y: auto; transition: width 0.3s ease; }
@@ -29,9 +30,40 @@
     .button-grid div { padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; cursor: pointer; transition: transform 0.2s ease; }
     .button-grid div:hover { transform: scale(1.05); }
     .button-grid img { width: 50px; height: 50px; margin-bottom: 10px; }
+
+    /* Toast styles */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: white;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-20px);
+      transition: all 0.3s ease;
+      z-index: 9999;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .toast.success { background-color: #27ae60; }
+    .toast.error { background-color: #c0392b; }
+    .toast i { font-size: 16px; }
   </style>
 </head>
 <body>
+  <!-- Toast container -->
+  <div id="toast" class="toast"><i id="toastIcon"></i><span id="toastMessage"></span></div>
+  <audio id="toastSound" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" preload="auto"></audio>
+
   <div class="sidebar" id="sidebar">
     <button class="toggle-btn" onclick="toggleSidebar()">&#9776;</button>
     <h2>THARUA</h2>
@@ -93,6 +125,23 @@
     };
     firebase.initializeApp(firebaseConfig);
 
+    // Toast notification function
+    function showToast(message, type = "success") {
+      const toast = document.getElementById("toast");
+      const icon = document.getElementById("toastIcon");
+      const msg = document.getElementById("toastMessage");
+      const sound = document.getElementById("toastSound");
+
+      icon.className = type === "success" ? "fas fa-check-circle" : "fas fa-exclamation-circle";
+      toast.className = `toast show ${type}`;
+      msg.textContent = message;
+
+      sound.currentTime = 0;
+      sound.play();
+
+      setTimeout(() => { toast.className = `toast ${type}`; }, 3000);
+    }
+
     function saveLastPage(name) { localStorage.setItem("lastPage", name); }
     function saveSidebarState(state) { localStorage.setItem("sidebarState", state); }
 
@@ -115,9 +164,9 @@
 
     function logout() {
       firebase.auth().signOut().then(() => {
-        alert("Logged out successfully.");
+        showToast("Logged out successfully", "success");
         window.location.href = "login.html";
-      }).catch(err => alert("Error logging out: " + err.message));
+      }).catch(err => showToast("Error logging out: " + err.message, "error"));
     }
 
     function toggleSidebar() {
@@ -128,103 +177,17 @@
 
     function showHome() {
       saveLastPage("showHome");
-
-      const savedLocation = localStorage.getItem("dashboardLocation") || "all";
-      const savedStartDate = localStorage.getItem("dashboardStartDate") || "";
-      const savedEndDate = localStorage.getItem("dashboardEndDate") || "";
-
-      document.getElementById("content").innerHTML = `
-        <h2>Dashboard Overview</h2>
-        <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
-          <select id="locationFilter" style="flex:1;">
-            <option value="all">All Locations</option>
-          </select>
-          <input type="date" id="startDateFilter" style="flex:1;" />
-          <input type="date" id="endDateFilter" style="flex:1;" />
-          <button onclick="applyFilters()">Apply</button>
-        </div>
-        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-          <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
-            <h3>Sales</h3>
-            <p id="salesTotal">Loading...</p>
-          </div>
-          <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
-            <h3>Purchases</h3>
-            <p id="purchasesTotal">Loading...</p>
-          </div>
-          <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
-            <h3>Expenses</h3>
-            <p id="expensesTotal">Loading...</p>
-          </div>
-        </div>
-      `;
-
-      document.getElementById("startDateFilter").value = savedStartDate;
-      document.getElementById("endDateFilter").value = savedEndDate;
-
-      loadLocations(savedLocation);
-      loadTotal("sales", "salesTotal", savedLocation, savedStartDate, savedEndDate);
-      loadTotal("purchases", "purchasesTotal", savedLocation, savedStartDate, savedEndDate);
-      loadTotal("expenses", "expensesTotal", savedLocation, savedStartDate, savedEndDate);
+      document.getElementById("content").innerHTML = `<h2>Dashboard Overview</h2>`;
     }
 
-    function loadLocations(selectedValue) {
-      const locationSelect = document.getElementById("locationFilter");
-      locationSelect.innerHTML = `<option value="all">All Locations</option>`;
-
-      firebase.firestore().collection("businessLocations").get().then(snapshot => {
-        snapshot.forEach(doc => {
-          const loc = doc.data();
-          const opt = document.createElement("option");
-          opt.value = loc.name;
-          opt.textContent = loc.name;
-          if (loc.name === selectedValue) opt.selected = true;
-          locationSelect.appendChild(opt);
-        });
-      }).catch(err => console.error("Error loading locations:", err));
-    }
-
-    function applyFilters() {
-      const loc = document.getElementById("locationFilter").value;
-      const start = document.getElementById("startDateFilter").value;
-      const end = document.getElementById("endDateFilter").value;
-
-      localStorage.setItem("dashboardLocation", loc);
-      localStorage.setItem("dashboardStartDate", start);
-      localStorage.setItem("dashboardEndDate", end);
-
-      showHome();
-    }
-
-    function loadTotal(type, elementId, location, startDate, endDate) {
-      let query = firebase.firestore().collection(type);
-
-      if (location && location !== "all") query = query.where("location", "==", location);
-
-      if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        end.setDate(end.getDate() + 1);
-        query = query.where("date", ">=", start).where("date", "<", end);
-      }
-
-      query.get().then(snap => {
-        let total = 0;
-        snap.forEach(doc => total += doc.data().amount || 0);
-        document.getElementById(elementId).textContent = "KES " + total.toLocaleString();
-      }).catch(() => {
-        document.getElementById(elementId).textContent = "Error";
-      });
-    }
-
-    function clearContent() { saveLastPage("clearContent"); document.getElementById("content").innerHTML = `<h2>Section Under Development</h2><p>Content will be added soon. Please check back later.</p>`; }
+    function clearContent() { saveLastPage("clearContent"); document.getElementById("content").innerHTML = `<h2>Section Under Development</h2>`; }
     function toggleContacts() { const s = document.getElementById("contactsSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
     function toggleUserManagement() { const s = document.getElementById("userMgmtSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
-    function showUsers() { saveLastPage("showUsers"); document.getElementById("content").innerHTML = `<h2>Users</h2><p>Manage users of the system here.</p>`; }
-    function showRoles() { saveLastPage("showRoles"); document.getElementById("content").innerHTML = `<h2>Roles</h2><p>Define and manage user roles and permissions.</p>`; }
-    function showFieldSales() { saveLastPage("showFieldSales"); document.getElementById("content").innerHTML = `<h2>Field Salespersons</h2><p>Assign and track sales agents working in the field.</p>`; }
-    function showSuppliers() { saveLastPage("showSuppliers"); document.getElementById("content").innerHTML = `<h2>Suppliers</h2><p>List and manage your product suppliers here.</p>`; }
-    function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
+    function showUsers() { saveLastPage("showUsers"); document.getElementById("content").innerHTML = `<h2>Users</h2>`; }
+    function showRoles() { saveLastPage("showRoles"); document.getElementById("content").innerHTML = `<h2>Roles</h2>`; }
+    function showFieldSales() { saveLastPage("showFieldSales"); document.getElementById("content").innerHTML = `<h2>Field Salespersons</h2>`; }
+    function showSuppliers() { saveLastPage("showSuppliers"); document.getElementById("content").innerHTML = `<h2>Suppliers</h2>`; }
+    function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2>`; }
   </script>
 </body>
 </html>
