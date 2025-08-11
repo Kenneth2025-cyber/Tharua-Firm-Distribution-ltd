@@ -204,6 +204,66 @@
      const submenu = document.getElementById("productsSubmenu");
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
+function showAddProduct() {
+  document.getElementById("content").innerHTML = `
+    <h2>Add Product</h2>
+    <form onsubmit="event.preventDefault(); saveProduct();">
+      <label>Product Name:</label>
+      <input type="text" id="productName" required>
+
+      <label>Category:</label>
+      <select id="productCategory">
+        <option value="">Select Category</option>
+      </select>
+
+      <label>Buying Price:</label>
+      <input type="number" id="buyingPrice" required>
+
+      <label>Selling Price:</label>
+      <input type="number" id="sellingPrice" required>
+
+      <label>VAT Percentage:</label>
+      <input type="number" id="vatPercentage" value="16">
+
+      <label>VAT Type:</label>
+      <select id="vatType">
+        <option value="inclusive">Inclusive</option>
+        <option value="exclusive">Exclusive</option>
+      </select>
+
+      <button type="submit">Save Product</button>
+    </form>
+  `;
+
+  const db = firebase.firestore();
+  db.collection("categories").get().then(snapshot => {
+    const select = document.getElementById("productCategory");
+    snapshot.forEach(doc => {
+      const opt = document.createElement("option");
+      opt.value = doc.id;
+      opt.textContent = doc.data().name;
+      select.appendChild(opt);
+    });
+  });
+}
+
+function saveProduct() {
+  const db = firebase.firestore();
+  db.collection("products").add({
+    name: document.getElementById("productName").value,
+    category: document.getElementById("productCategory").value,
+    buyingPrice: parseFloat(document.getElementById("buyingPrice").value),
+    sellingPrice: parseFloat(document.getElementById("sellingPrice").value),
+    vatPercentage: parseFloat(document.getElementById("vatPercentage").value),
+    vatType: document.getElementById("vatType").value,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    alert("Product added successfully!");
+    showAddProduct();
+  }).catch(err => {
+    alert("Error: " + err.message);
+  });
+}
 
     function showSuppliers() {
       document.getElementById("content").innerHTML = `
