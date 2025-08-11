@@ -282,6 +282,10 @@ function showAddProduct() {
       <select id="productBrand" required>
         <option value="">Select Brand</option>
       </select>
+     <label>Business Location:</label>
+     <select id="productLocation">
+        <option value="">Select Location</option>
+      </select>
 
       <label>Buying Price:</label>
       <input type="number" id="buyingPrice" required>
@@ -332,6 +336,7 @@ function saveProduct() {
   db.collection("products").add({
     name: document.getElementById("productName").value,
     category: document.getElementById("productCategory").value,
+    location: document.getElementById("productLocation").value,
     brand: document.getElementById("productBrand").value,
     buyingPrice: parseFloat(document.getElementById("buyingPrice").value),
     sellingPrice: parseFloat(document.getElementById("sellingPrice").value),
@@ -376,6 +381,60 @@ function saveBrand() {
     alert("Error: " + err.message);
   });
 }
+// Load business locations from Firebase
+db.collection("business_locations").get().then(snapshot => {
+  const select = document.getElementById("productLocation");
+  snapshot.forEach(doc => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.data().name;
+    select.appendChild(opt);
+  });
+});
+function showBusinessLocations() {
+  document.getElementById("content").innerHTML = `
+    <h2>Business Locations</h2>
+    <form onsubmit="event.preventDefault(); saveBusinessLocation();">
+      <label>Location Name:</label>
+      <input type="text" id="locationName" required>
+      <button type="submit">Add Location</button>
+    </form>
+    <h3>Existing Locations</h3>
+    <ul id="locationList"></ul>
+  `;
+
+  loadBusinessLocations();
+}
+
+function saveBusinessLocation() {
+  const name = document.getElementById("locationName").value;
+  if (!name) return alert("Enter a location name");
+
+  const db = firebase.firestore();
+  db.collection("business_locations").add({
+    name: name,
+    active: true,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    alert("Location added!");
+    showBusinessLocations();
+  }).catch(err => alert(err.message));
+}
+
+function loadBusinessLocations() {
+  const db = firebase.firestore();
+  db.collection("business_locations").get().then(snapshot => {
+    const list = document.getElementById("locationList");
+    list.innerHTML = "";
+    snapshot.forEach(doc => {
+      const li = document.createElement("li");
+      li.textContent = doc.data().name + (doc.data().active ? " (Active)" : " (Inactive)");
+      list.appendChild(li);
+    });
+  });
+}
+
+
 
     function showSuppliers() {
       document.getElementById("content").innerHTML = `
