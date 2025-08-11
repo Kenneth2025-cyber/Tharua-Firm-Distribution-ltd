@@ -6,62 +6,59 @@
   <title>Tharua Login Page</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      box-sizing: border-box;
-      font-family: 'Poppins', sans-serif;
-    }
+    * { box-sizing: border-box; font-family: 'Poppins', sans-serif; }
     body {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background: #f4f4f4 no-repeat center center/cover;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      transition: background-image 1s ease-in-out;
+      display: flex; justify-content: center; align-items: center;
+      height: 100vh; transition: background-image 1s ease-in-out;
     }
     .login-box {
-      background: rgba(255, 255, 255, 0.9);
-      padding: 40px;
-      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.85);
+      padding: 40px; border-radius: 10px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-      width: 100%;
-      max-width: 400px;
+      width: 100%; max-width: 400px;
     }
     .login-box h2 {
-      text-align: center;
-      margin-bottom: 25px;
-      color: #333;
+      text-align: center; margin-bottom: 25px; color: #333;
     }
-    input[type="email"],
-    input[type="password"] {
-      width: 100%;
-      padding: 12px;
-      margin-bottom: 20px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 15px;
+    input[type="email"], input[type="password"] {
+      width: 100%; padding: 12px; margin-bottom: 20px;
+      border: 1px solid #ccc; border-radius: 6px; font-size: 15px;
     }
     button {
-      width: 100%;
-      padding: 12px;
-      background-color: #00695c;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
+      width: 100%; padding: 12px;
+      background-color: #00695c; color: white;
+      border: none; border-radius: 6px; font-size: 16px;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #004d40;
-    }
+    button:hover { background-color: #004d40; }
     .footer-note {
-      margin-top: 15px;
-      text-align: center;
-      font-size: 13px;
-      color: #666;
+      margin-top: 15px; text-align: center; font-size: 13px; color: #666;
     }
+
+    /* Toast notification styles */
+    .toast {
+      position: fixed;
+      top: 20px; left: 20px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in forwards;
+      animation-delay: 0s, 2.7s;
+      z-index: 9999;
+    }
+    .toast.success { background-color: #28a745; }
+    .toast.error { background-color: #dc3545; }
+    .toast i { font-size: 18px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
   </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
   <div class="login-box">
@@ -74,12 +71,15 @@
     <div class="footer-note">Authorized users only</div>
   </div>
 
+  <!-- Success sound -->
+  <audio id="successSound" src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3"></audio>
+  <audio id="errorSound" src="https://assets.mixkit.co/sfx/preview/mixkit-click-error-1110.mp3"></audio>
+
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
       authDomain: "tharuasystem.firebaseapp.com",
@@ -90,32 +90,40 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // Bing wallpaper fetch
+    // Bing daily wallpaper
     fetch("https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US")
       .then(res => res.json())
       .then(data => {
         const imgUrl = "https://www.bing.com" + data.images[0].url;
         document.body.style.backgroundImage = `url('${imgUrl}')`;
       })
-      .catch(err => console.error("Error fetching Bing wallpaper:", err));
+      .catch(err => console.error("Wallpaper fetch error:", err));
 
-    // Login function
+    function showToast(message, type) {
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${message}`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+
+      if (type === "success") document.getElementById("successSound").play();
+      if (type === "error") document.getElementById("errorSound").play();
+    }
+
     function login() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
-
       if (!email || !password) {
-        alert("Please enter both email and password.");
+        showToast("Please enter both email and password", "error");
         return;
       }
-
       firebase.auth().signInWithEmailAndPassword(email, password)
         .then(() => {
-          alert("Login successful!");
-          window.location.href = "dashboard.html";
+          showToast("Login successful!", "success");
+          setTimeout(() => window.location.href = "dashboard.html", 1500);
         })
         .catch(error => {
-          alert("Error: " + error.message);
+          showToast(error.message, "error");
         });
     }
   </script>
