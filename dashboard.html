@@ -111,22 +111,24 @@
         <a onclick="clearContent()">Import Contacts</a>
       </div>
     </div>
-
-    <!-- Static Links -->
-    <div class="dropdown">
+   
+  <!-- PRODUCTS MENU -->
+<div class="dropdown">
   <a onclick="toggleProducts()" id="productsMenu">
     <i class="fas fa-boxes"></i> Products
     <i class="fas fa-caret-down" style="margin-left:auto;"></i>
   </a>
   <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
     <a onclick="showAddProduct()">Add Product</a>
+    <a onclick="showAddBrand()">Add Brand</a>
     <a onclick="showProductList()">List of Products</a>
     <a onclick="showCategories()">Category</a>
-    <a onclick="showBrands()">Brand</a>
+    <a onclick="showBrands()">Brand List</a>
     <a onclick="showBusinessLocations()">Business Location</a>
   </div>
 </div>
 
+    <!-- Static Links -->
     <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
     <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
@@ -260,6 +262,116 @@ function saveProduct() {
   }).then(() => {
     alert("Product added successfully!");
     showAddProduct();
+  }).catch(err => {
+    alert("Error: " + err.message);
+  });
+}
+function showAddProduct() {
+  document.getElementById("content").innerHTML = `
+    <h2>Add Product</h2>
+    <form onsubmit="event.preventDefault(); saveProduct();">
+      <label>Product Name:</label>
+      <input type="text" id="productName" required>
+
+      <label>Category:</label>
+      <select id="productCategory" required>
+        <option value="">Select Category</option>
+      </select>
+
+      <label>Brand:</label>
+      <select id="productBrand" required>
+        <option value="">Select Brand</option>
+      </select>
+
+      <label>Buying Price:</label>
+      <input type="number" id="buyingPrice" required>
+
+      <label>Selling Price:</label>
+      <input type="number" id="sellingPrice" required>
+
+      <label>VAT Percentage:</label>
+      <input type="number" id="vatPercentage" value="16">
+
+      <label>VAT Type:</label>
+      <select id="vatType">
+        <option value="inclusive">Inclusive</option>
+        <option value="exclusive">Exclusive</option>
+      </select>
+
+      <button type="submit">Save Product</button>
+    </form>
+  `;
+
+  const db = firebase.firestore();
+
+  // Load categories from Firebase
+  db.collection("categories").get().then(snapshot => {
+    const categorySelect = document.getElementById("productCategory");
+    snapshot.forEach(doc => {
+      const opt = document.createElement("option");
+      opt.value = doc.id;
+      opt.textContent = doc.data().name;
+      categorySelect.appendChild(opt);
+    });
+  });
+
+  // Load brands from Firebase
+  db.collection("brands").get().then(snapshot => {
+    const brandSelect = document.getElementById("productBrand");
+    snapshot.forEach(doc => {
+      const opt = document.createElement("option");
+      opt.value = doc.id;
+      opt.textContent = doc.data().name;
+      brandSelect.appendChild(opt);
+    });
+  });
+}
+
+function saveProduct() {
+  const db = firebase.firestore();
+  db.collection("products").add({
+    name: document.getElementById("productName").value,
+    category: document.getElementById("productCategory").value,
+    brand: document.getElementById("productBrand").value,
+    buyingPrice: parseFloat(document.getElementById("buyingPrice").value),
+    sellingPrice: parseFloat(document.getElementById("sellingPrice").value),
+    vatPercentage: parseFloat(document.getElementById("vatPercentage").value),
+    vatType: document.getElementById("vatType").value,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    alert("Product added successfully!");
+    showAddProduct();
+  }).catch(err => {
+    alert("Error: " + err.message);
+  });
+}
+
+function showAddBrand() {
+  document.getElementById("content").innerHTML = `
+    <h2>Add Brand</h2>
+    <form onsubmit="event.preventDefault(); saveBrand();">
+      <label>Brand Name:</label>
+      <input type="text" id="brandName" required>
+      <button type="submit">Save Brand</button>
+    </form>
+  `;
+}
+
+function saveBrand() {
+  const db = firebase.firestore();
+  const brandName = document.getElementById("brandName").value;
+
+  if (!brandName.trim()) {
+    alert("Please enter a brand name.");
+    return;
+  }
+
+  db.collection("brands").add({
+    name: brandName,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => {
+    alert("Brand added successfully!");
+    showAddBrand();
   }).catch(err => {
     alert("Error: " + err.message);
   });
