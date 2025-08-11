@@ -6,112 +6,29 @@
   <title>Tharua Firm Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-    }
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      height: 100vh;
-      width: 230px;
-      background-color: #2c3e50;
-      color: white;
-      padding-top: 20px;
-      overflow-y: auto;
-      transition: width 0.3s ease;
-    }
+    body { margin: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; }
+    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 230px; background-color: #2c3e50; color: white; padding-top: 20px; overflow-y: auto; transition: width 0.3s ease; }
     .sidebar.collapsed { width: 60px; }
-    .sidebar h2 {
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 18px;
-      transition: opacity 0.3s ease;
-    }
+    .sidebar h2 { text-align: center; margin-bottom: 20px; font-size: 18px; transition: opacity 0.3s ease; }
     .sidebar.collapsed h2 { opacity: 0; }
-    .sidebar a {
-      display: flex;
-      align-items: center;
-      padding: 12px 20px;
-      color: white;
-      text-decoration: none;
-      transition: background 0.3s ease;
-      font-size: 14px;
-      cursor: pointer;
-    }
+    .sidebar a { display: flex; align-items: center; padding: 12px 20px; color: white; text-decoration: none; transition: background 0.3s ease; font-size: 14px; cursor: pointer; }
     .sidebar a i { margin-right: 12px; font-size: 16px; }
     .sidebar a span { transition: opacity 0.3s ease; }
     .sidebar.collapsed a span { opacity: 0; pointer-events: none; }
     .sidebar a:hover { background-color: #34495e; }
-    .dropdown a {
-      font-size: 14px;
-      color: white;
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      text-decoration: none;
-      cursor: pointer;
-    }
+    .dropdown a { font-size: 14px; color: white; padding: 10px 20px; display: flex; align-items: center; text-decoration: none; cursor: pointer; }
     .dropdown a:hover { background-color: #34495e; }
-    .main-content {
-      margin-left: 230px;
-      padding: 20px;
-      transition: margin-left 0.3s ease;
-    }
+    .main-content { margin-left: 230px; padding: 20px; transition: margin-left 0.3s ease; }
     .main-content.collapsed { margin-left: 60px; }
-    .toggle-btn {
-      position: absolute;
-      top: 10px;
-      right: -15px;
-      background-color: #2c3e50;
-      color: white;
-      border-radius: 50%;
-      padding: 5px 7px;
-      cursor: pointer;
-      border: none;
-      font-size: 14px;
-    }
-    .content-section {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    input, select, button {
-      width: 100%;
-      padding: 8px;
-      margin: 8px 0 16px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      background-color: #2c3e50;
-      color: white;
-      cursor: pointer;
-    }
+    .toggle-btn { position: absolute; top: 10px; right: -15px; background-color: #2c3e50; color: white; border-radius: 50%; padding: 5px 7px; cursor: pointer; border: none; font-size: 14px; }
+    .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; }
+    button { background-color: #2c3e50; color: white; cursor: pointer; }
     button:hover { background-color: #34495e; }
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 20px;
-      text-align: center;
-    }
-    .button-grid div {
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background-color: #f9f9f9;
-      cursor: pointer;
-      transition: transform 0.2s ease;
-    }
+    .button-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 20px; text-align: center; }
+    .button-grid div { padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; cursor: pointer; transition: transform 0.2s ease; }
     .button-grid div:hover { transform: scale(1.05); }
-    .button-grid img {
-      width: 50px;
-      height: 50px;
-      margin-bottom: 10px;
-    }
+    .button-grid img { width: 50px; height: 50px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -211,17 +128,19 @@
 
     function showHome() {
       saveLastPage("showHome");
+
       const savedLocation = localStorage.getItem("dashboardLocation") || "all";
-      const savedDate = localStorage.getItem("dashboardDate") || "";
+      const savedStartDate = localStorage.getItem("dashboardStartDate") || "";
+      const savedEndDate = localStorage.getItem("dashboardEndDate") || "";
+
       document.getElementById("content").innerHTML = `
         <h2>Dashboard Overview</h2>
         <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
           <select id="locationFilter" style="flex:1;">
             <option value="all">All Locations</option>
-            <option value="Nairobi">Nairobi</option>
-            <option value="Mombasa">Mombasa</option>
           </select>
-          <input type="date" id="dateFilter" style="flex:1;" />
+          <input type="date" id="startDateFilter" style="flex:1;" />
+          <input type="date" id="endDateFilter" style="flex:1;" />
           <button onclick="applyFilters()">Apply</button>
         </div>
         <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
@@ -238,52 +157,70 @@
             <p id="expensesTotal">Loading...</p>
           </div>
         </div>
-        <div class="button-grid">
-          <div><img src="https://img.icons8.com/color/96/box.png"/><div>Products</div></div>
-          <div><img src="https://img.icons8.com/color/96/factory.png"/><div>Manufacturing</div></div>
-          <div><img src="https://img.icons8.com/color/96/add-shopping-cart.png"/><div>Purchases</div></div>
-          <div><img src="https://img.icons8.com/color/96/cash-register.png"/><div>Sell</div></div>
-          <div><img src="https://img.icons8.com/color/96/delivery.png"/><div>Stock Transfers</div></div>
-          <div><img src="https://img.icons8.com/color/96/scale.png"/><div>Stock Adjustment</div></div>
-          <div><img src="https://img.icons8.com/color/96/bill.png"/><div>Expenses</div></div>
-          <div><img src="https://img.icons8.com/color/96/accounting.png"/><div>Accounting</div></div>
-          <div><img src="https://img.icons8.com/color/96/artificial-intelligence.png"/><div>AI Assistance</div></div>
-          <div><img src="https://img.icons8.com/color/96/combo-chart.png"/><div>Reports</div></div>
-          <div><img src="https://img.icons8.com/color/96/secured-letter.png"/><div>Notifications</div></div>
-        </div>
       `;
-      document.getElementById("locationFilter").value = savedLocation;
-      document.getElementById("dateFilter").value = savedDate;
-      loadTotal("sales", "salesTotal", savedLocation, savedDate);
-      loadTotal("purchases", "purchasesTotal", savedLocation, savedDate);
-      loadTotal("expenses", "expensesTotal", savedLocation, savedDate);
+
+      document.getElementById("startDateFilter").value = savedStartDate;
+      document.getElementById("endDateFilter").value = savedEndDate;
+
+      loadLocations(savedLocation);
+      loadTotal("sales", "salesTotal", savedLocation, savedStartDate, savedEndDate);
+      loadTotal("purchases", "purchasesTotal", savedLocation, savedStartDate, savedEndDate);
+      loadTotal("expenses", "expensesTotal", savedLocation, savedStartDate, savedEndDate);
+    }
+
+    function loadLocations(selectedValue) {
+      const locationSelect = document.getElementById("locationFilter");
+      locationSelect.innerHTML = `<option value="all">All Locations</option>`;
+
+      firebase.firestore().collection("businessLocations").get().then(snapshot => {
+        snapshot.forEach(doc => {
+          const loc = doc.data();
+          const opt = document.createElement("option");
+          opt.value = loc.name;
+          opt.textContent = loc.name;
+          if (loc.name === selectedValue) opt.selected = true;
+          locationSelect.appendChild(opt);
+        });
+      }).catch(err => console.error("Error loading locations:", err));
     }
 
     function applyFilters() {
-      localStorage.setItem("dashboardLocation", document.getElementById("locationFilter").value);
-      localStorage.setItem("dashboardDate", document.getElementById("dateFilter").value);
+      const loc = document.getElementById("locationFilter").value;
+      const start = document.getElementById("startDateFilter").value;
+      const end = document.getElementById("endDateFilter").value;
+
+      localStorage.setItem("dashboardLocation", loc);
+      localStorage.setItem("dashboardStartDate", start);
+      localStorage.setItem("dashboardEndDate", end);
+
       showHome();
     }
 
-    function loadTotal(type, elementId, location, date) {
+    function loadTotal(type, elementId, location, startDate, endDate) {
       let query = firebase.firestore().collection(type);
-      if (location !== "all") query = query.where("location", "==", location);
-      if (date) {
-        const start = new Date(date), end = new Date(date);
+
+      if (location && location !== "all") query = query.where("location", "==", location);
+
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
         end.setDate(end.getDate() + 1);
         query = query.where("date", ">=", start).where("date", "<", end);
       }
+
       query.get().then(snap => {
-        let total = 0; snap.forEach(doc => total += doc.data().amount || 0);
+        let total = 0;
+        snap.forEach(doc => total += doc.data().amount || 0);
         document.getElementById(elementId).textContent = "KES " + total.toLocaleString();
-      }).catch(() => document.getElementById(elementId).textContent = "Error");
+      }).catch(() => {
+        document.getElementById(elementId).textContent = "Error";
+      });
     }
 
     function clearContent() { saveLastPage("clearContent"); document.getElementById("content").innerHTML = `<h2>Section Under Development</h2><p>Content will be added soon. Please check back later.</p>`; }
     function toggleContacts() { const s = document.getElementById("contactsSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
     function toggleUserManagement() { const s = document.getElementById("userMgmtSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
-    function showUsers() { saveLastPage("showUsers"); document.getElementById("content").innerHTML = `<h2>Users</h2><p>Manage users of the system here.</p><h3>Create New User</h3><input type="email" id="email" placeholder="Email" required><br><br><input type="password" id="password" placeholder="Password" required><br><br><label for="role">Select Role:</label><br><select id="role" required><option value="" disabled selected>Select role</option><option value="admin">Admin</option><option value="cashier">Cashier</option><option value="salesperson">Salesperson</option></select><br><br><button onclick="signup()">Sign Up</button>`; }
-    function signup() { const email = document.getElementById("email").value, password = document.getElementById("password").value, role = document.getElementById("role").value; if (!role) return alert("Please select a role for the user."); firebase.auth().createUserWithEmailAndPassword(email, password).then(async cred => { try { await firebase.firestore().collection("users").doc(cred.user.uid).set({ role, email, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); alert("Account created successfully with role: " + role); showUsers(); } catch (err) { alert("Error saving user role: " + err.message); } }).catch(err => alert("Error: " + err.message)); }
+    function showUsers() { saveLastPage("showUsers"); document.getElementById("content").innerHTML = `<h2>Users</h2><p>Manage users of the system here.</p>`; }
     function showRoles() { saveLastPage("showRoles"); document.getElementById("content").innerHTML = `<h2>Roles</h2><p>Define and manage user roles and permissions.</p>`; }
     function showFieldSales() { saveLastPage("showFieldSales"); document.getElementById("content").innerHTML = `<h2>Field Salespersons</h2><p>Assign and track sales agents working in the field.</p>`; }
     function showSuppliers() { saveLastPage("showSuppliers"); document.getElementById("content").innerHTML = `<h2>Suppliers</h2><p>List and manage your product suppliers here.</p>`; }
