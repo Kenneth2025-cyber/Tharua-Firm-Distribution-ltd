@@ -6,55 +6,71 @@
   <title>Tharua Login Page</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; font-family: 'Poppins', sans-serif; }
-    body {
-      margin: 0; padding: 0;
-      height: 100vh;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      display: flex; justify-content: center; align-items: center;
-      backdrop-filter: blur(2px);
+    * {
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
     }
-    .overlay {
-      position: absolute; top: 0; left: 0;
-      width: 100%; height: 100%;
-      background-color: rgba(0,0,0,0.4);
-      z-index: 0;
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4 no-repeat center center/cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      transition: background-image 1s ease-in-out;
     }
     .login-box {
-      position: relative;
-      z-index: 1;
-      background: rgba(255,255,255,0.9);
-      padding: 40px; border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-      width: 100%; max-width: 400px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      max-width: 400px;
     }
     .login-box h2 {
-      text-align: center; margin-bottom: 25px; color: #333;
+      text-align: center;
+      margin-bottom: 25px;
+      color: #333;
     }
-    input[type="email"], input[type="password"] {
-      width: 100%; padding: 12px; margin-bottom: 20px;
-      border: 1px solid #ccc; border-radius: 6px; font-size: 15px;
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
     }
     button {
-      width: 100%; padding: 12px;
-      background-color: #00695c; color: white;
-      border: none; border-radius: 6px; font-size: 16px;
+      width: 100%;
+      padding: 12px;
+      background-color: #00695c;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
       cursor: pointer;
     }
-    button:hover { background-color: #004d40; }
-    .footer-note { margin-top: 15px; text-align: center; font-size: 13px; color: #666; }
+    button:hover {
+      background-color: #004d40;
+    }
+    .footer-note {
+      margin-top: 15px;
+      text-align: center;
+      font-size: 13px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
-  <div class="overlay"></div>
-
   <div class="login-box">
     <h2>Tharua Login Page</h2>
-    <input type="email" id="email" placeholder="Email" required>
-    <input type="password" id="password" placeholder="Password" required>
-    <button onclick="login()">Login</button>
+    <form onsubmit="event.preventDefault(); login();">
+      <input type="email" id="email" placeholder="Email" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
     <div class="footer-note">Authorized users only</div>
   </div>
 
@@ -63,6 +79,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
       authDomain: "tharuasystem.firebaseapp.com",
@@ -73,37 +90,34 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // Redirect if already logged in
-    firebase.auth().onAuthStateChanged(user => {
-      if (user) {
-        window.location.href = "dashboard.html";
-      }
-    });
+    // Bing wallpaper fetch
+    fetch("https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US")
+      .then(res => res.json())
+      .then(data => {
+        const imgUrl = "https://www.bing.com" + data.images[0].url;
+        document.body.style.backgroundImage = `url('${imgUrl}')`;
+      })
+      .catch(err => console.error("Error fetching Bing wallpaper:", err));
 
+    // Login function
     function login() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
+
       if (!email || !password) {
         alert("Please enter both email and password.");
         return;
       }
-      firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(() => window.location.href = "dashboard.html")
-        .catch(error => alert("Error: " + error.message));
-    }
 
-    // Fetch and apply Bing wallpaper automatically
-    fetch("https://bing-wallpaper-api.jcolladosp.workers.dev/?index=random&resolution=1920x1080")
-      .then(res => {
-        if (res.redirected) {
-          document.body.style.backgroundImage = `url(${res.url})`;
-        } else {
-          res.json().then(data => {
-            document.body.style.backgroundImage = `url(${data.url})`;
-          });
-        }
-      })
-      .catch(err => console.error("Wallpaper load error:", err));
+      firebase.auth().signInWithEmailAndPassword(email, password)
+        .then(() => {
+          alert("Login successful!");
+          window.location.href = "dashboard.html";
+        })
+        .catch(error => {
+          alert("Error: " + error.message);
+        });
+    }
   </script>
 </body>
 </html>
