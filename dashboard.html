@@ -211,11 +211,61 @@
 
     firebase.initializeApp(firebaseConfig);
 
+    // Persist helpers
+    function saveLastPage(name) {
+      try { localStorage.setItem("lastPage", name); } catch (e) { console.warn("localStorage not available", e); }
+    }
+    function saveSidebarState(state) {
+      try { localStorage.setItem("sidebarState", state); } catch (e) { console.warn("localStorage not available", e); }
+    }
+
+    // When auth state is determined, restore UI (only when user exists)
     firebase.auth().onAuthStateChanged(user => {
       if (!user) {
         window.location.href = "login.html";
+        return;
       }
+      // restore UI (sidebar + last page)
+      restoreUIState();
     });
+
+    function restoreUIState() {
+      // Sidebar state
+      const sidebarState = localStorage.getItem("sidebarState");
+      if (sidebarState === "collapsed") {
+        document.getElementById("sidebar").classList.add("collapsed");
+        document.getElementById("mainContent").classList.add("collapsed");
+      } else {
+        document.getElementById("sidebar").classList.remove("collapsed");
+        document.getElementById("mainContent").classList.remove("collapsed");
+      }
+
+      // Last viewed page
+      const lastPage = localStorage.getItem("lastPage");
+      const userMgmtPages = ["showUsers", "showRoles", "showFieldSales"];
+      const contactsPages = ["showSuppliers", "showCustomers"];
+
+      if (lastPage && typeof window[lastPage] === "function") {
+        // open submenu if this page belongs to a dropdown
+        if (userMgmtPages.includes(lastPage)) {
+          const um = document.getElementById("userMgmtSubmenu");
+          if (um) um.style.display = "flex";
+        }
+        if (contactsPages.includes(lastPage)) {
+          const cs = document.getElementById("contactsSubmenu");
+          if (cs) cs.style.display = "flex";
+        }
+
+        try {
+          window[lastPage]();
+        } catch (e) {
+          console.error("Error restoring last page:", e);
+          showHome();
+        }
+      } else {
+        showHome();
+      }
+    }
 
     function logout() {
       firebase.auth().signOut().then(() => {
@@ -227,11 +277,21 @@
     }
 
     function toggleSidebar() {
-      document.getElementById("sidebar").classList.toggle("collapsed");
-      document.getElementById("mainContent").classList.toggle("collapsed");
+      const sidebar = document.getElementById("sidebar");
+      const mainContent = document.getElementById("mainContent");
+
+      sidebar.classList.toggle("collapsed");
+      mainContent.classList.toggle("collapsed");
+
+      if (sidebar.classList.contains("collapsed")) {
+        saveSidebarState("collapsed");
+      } else {
+        saveSidebarState("expanded");
+      }
     }
 
     function showHome() {
+      saveLastPage("showHome");
       document.getElementById("content").innerHTML = `
         <h2>Dashboard Overview</h2>
         <div class="button-grid">
@@ -251,6 +311,7 @@
     }
 
     function clearContent() {
+      saveLastPage("clearContent");
       document.getElementById("content").innerHTML = `
         <h2>Section Under Development</h2>
         <p>Content will be added soon. Please check back later.</p>
@@ -268,6 +329,7 @@
     }
 
     function showUsers() {
+      saveLastPage("showUsers");
       document.getElementById("content").innerHTML = `
         <h2>Users</h2>
         <p>Manage users of the system here.</p>
@@ -319,6 +381,7 @@
     }
 
     function showRoles() {
+      saveLastPage("showRoles");
       document.getElementById("content").innerHTML = `
         <h2>Roles</h2>
         <p>Define and manage user roles and permissions.</p>
@@ -326,6 +389,7 @@
     }
 
     function showFieldSales() {
+      saveLastPage("showFieldSales");
       document.getElementById("content").innerHTML = `
         <h2>Field Salespersons</h2>
         <p>Assign and track sales agents working in the field.</p>
@@ -333,6 +397,7 @@
     }
 
     function showSuppliers() {
+      saveLastPage("showSuppliers");
       document.getElementById("content").innerHTML = `
         <h2>Suppliers</h2>
         <p>List and manage your product suppliers here.</p>
@@ -340,6 +405,7 @@
     }
 
     function showCustomers() {
+      saveLastPage("showCustomers");
       document.getElementById("content").innerHTML = `
         <h2>Customers</h2>
         <p>View and manage your customer records here.</p>
