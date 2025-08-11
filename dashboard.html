@@ -113,7 +113,20 @@
     </div>
 
     <!-- Static Links -->
-    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
+    <div class="dropdown">
+  <a onclick="toggleProducts()" id="productsMenu">
+    <i class="fas fa-boxes"></i> Products
+    <i class="fas fa-caret-down" style="margin-left:auto;"></i>
+  </a>
+  <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showAddProduct()">Add Product</a>
+    <a onclick="showProductList()">List of Products</a>
+    <a onclick="showCategories()">Category</a>
+    <a onclick="showBrands()">Brand</a>
+    <a onclick="showBusinessLocations()">Business Location</a>
+  </div>
+</div>
+
     <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
     <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
@@ -184,6 +197,11 @@
 
     function toggleContacts() {
       const submenu = document.getElementById("contactsSubmenu");
+      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    }
+
+    function toggleProducts() {
+     const submenu = document.getElementById("productsSubmenu");
       submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
     }
 
