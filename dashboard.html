@@ -409,6 +409,106 @@
         });
       }
     }
+function showAddProduct() {
+  clearContent();
+  document.getElementById('content').innerHTML = `
+    <h2>Add Product</h2>
+
+    <label>Product Name</label>
+    <input type="text" id="productName" placeholder="Enter product name">
+
+    <label>Category</label>
+    <select id="productCategory">
+      <option value="">Select category</option>
+    </select>
+
+    <label>Brand</label>
+    <select id="productBrand">
+      <option value="">Select brand</option>
+    </select>
+
+    <label>Buying Price</label>
+    <input type="number" id="buyingPrice" placeholder="Enter buying price">
+
+    <label>Selling Price</label>
+    <input type="number" id="sellingPrice" placeholder="Enter selling price">
+
+    <label>VAT Percentage</label>
+    <input type="number" id="vatPercentage" placeholder="Enter VAT percentage">
+
+    <label>Business Location</label>
+    <select id="businessLocation">
+      <option value="">Select location</option>
+    </select>
+
+    <button onclick="saveProduct()">Add Product</button>
+
+    <hr>
+    <div style="margin-top:10px;">
+      <button onclick="setViewMode('grid')">Grid View</button>
+      <button onclick="setViewMode('list')">List View</button>
+    </div>
+    <div id="productDisplayArea"></div>
+  `;
+
+  // Example: Populate dropdowns (later we will load from Firebase)
+  document.getElementById('productCategory').innerHTML += `<option>Sample Category</option>`;
+  document.getElementById('productBrand').innerHTML += `<option>Sample Brand</option>`;
+  document.getElementById('businessLocation').innerHTML += `<option>Main Shop</option>`;
+
+  // Show sample products
+  displayProducts();
+}
+
+let currentViewMode = 'grid';
+
+function setViewMode(mode) {
+  currentViewMode = mode;
+  displayProducts();
+}
+
+function displayProducts() {
+  const container = document.getElementById('productDisplayArea');
+  const products = [
+    { name: 'Product 1', price: 100 },
+    { name: 'Product 2', price: 200 }
+  ];
+
+  if (currentViewMode === 'grid') {
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">
+        ${products.map(p => `
+          <div style="border:1px solid #ccc;padding:10px;border-radius:5px;">
+            <strong>${p.name}</strong><br>KSh ${p.price}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <ul>
+        ${products.map(p => `<li>${p.name} - KSh ${p.price}</li>`).join('')}
+      </ul>
+    `;
+  }
+}
+
+function saveProduct() {
+  const name = document.getElementById('productName').value.trim();
+  const category = document.getElementById('productCategory').value;
+  const brand = document.getElementById('productBrand').value;
+  const buying = parseFloat(document.getElementById('buyingPrice').value);
+  const selling = parseFloat(document.getElementById('sellingPrice').value);
+  const vat = parseFloat(document.getElementById('vatPercentage').value);
+  const location = document.getElementById('businessLocation').value;
+
+  if (!name || !category || !brand || isNaN(buying) || isNaN(selling) || isNaN(vat) || !location) {
+    return alert("Please fill in all fields.");
+  }
+
+  alert(`Product saved:\n${name} - ${category} - ${brand} - Buy: ${buying} - Sell: ${selling} - VAT: ${vat}% - Location: ${location}`);
+}
+
   </script>
 </body>
 </html>
