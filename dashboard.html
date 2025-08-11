@@ -11,7 +11,6 @@
       font-family: Arial, sans-serif;
       background-color: #f4f4f4;
     }
-
     .sidebar {
       position: fixed;
       top: 0;
@@ -23,13 +22,11 @@
       padding-top: 20px;
       overflow-y: auto;
     }
-
     .sidebar h2 {
       text-align: center;
       margin-bottom: 20px;
       font-size: 18px;
     }
-
     .sidebar a {
       display: flex;
       align-items: center;
@@ -40,68 +37,45 @@
       font-size: 14px;
       cursor: pointer;
     }
+    .sidebar a i { margin-right: 12px; font-size: 16px; }
+    .sidebar a:hover { background-color: #34495e; }
+    .dropdown a { font-size: 14px; color: white; padding: 10px 20px; display: flex; align-items: center; text-decoration: none; cursor: pointer; }
+    .dropdown a:hover { background-color: #34495e; }
 
-    .sidebar a i {
-      margin-right: 12px;
-      font-size: 16px;
-    }
+    .main-content { margin-left: 230px; padding: 20px; }
+    .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 900px; }
 
-    .sidebar a:hover {
-      background-color: #34495e;
-    }
-
-    .dropdown a {
-      font-size: 14px;
-      color: white;
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      text-decoration: none;
-      cursor: pointer;
-    }
-
-    .dropdown a:hover {
-      background-color: #34495e;
-    }
-
-    .main-content {
-      margin-left: 230px;
-      padding: 20px;
-    }
-
-    .content-section {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    input, select, button {
-      width: 100%;
-      padding: 8px;
-      margin: 8px 0 16px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-
-    button {
-      background-color: #2c3e50;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #34495e;
-    }
+    input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background-color: #2c3e50; color: white; cursor: pointer; font-size: 16px; }
+    button:hover { background-color: #34495e; }
+    .button-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 10px; max-width: 100%; }
+    .button-grid div { flex: 0 0 auto; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; cursor: pointer; text-align: center; transition: transform 0.2s ease; min-width: 110px; }
+    .button-grid div:hover { transform: scale(1.05); }
+    .button-grid img { width: 50px; height: 50px; margin-bottom: 10px; }
+    .category-list { list-style: none; padding: 0; margin: 0; }
+    .category-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .category-name { font-size: 15px; }
+    .delete-icon { color: #c0392b; cursor: pointer; margin-left: 12px; }
+    .small-btn { display:inline-block; padding:6px 10px; border-radius:6px; background:#ecf0f1; cursor:pointer; }
+    #message { margin-top: -12px; margin-bottom: 12px; font-weight: bold; }
+    #message.error { color: #c0392b; }
+    #message.success { color: #27ae60; }
   </style>
 </head>
 <body>
   <div class="sidebar">
     <h2>THARUA</h2>
     <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
-    <a onclick="showUserManagement()"><i class="fas fa-users-cog"></i> User Management</a>
 
-    <!-- Contacts Menu with Subitems -->
+    <div class="dropdown">
+      <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showUsers()">Users</a>
+        <a onclick="displayRoles()">Roles</a>
+        <a onclick="showFieldSales()">Field Salespersons</a>
+      </div>
+    </div>
+
     <div class="dropdown">
       <a onclick="toggleContacts()" id="contactsMenu"><i class="fas fa-address-book"></i> Contacts <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
       <div id="contactsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
@@ -112,8 +86,20 @@
       </div>
     </div>
 
-    <!-- Static Links -->
-    <a onclick="clearContent()"><i class="fas fa-boxes"></i> Products</a>
+    <a onclick="showBusinessLocations()"><i class="fas fa-map-marker-alt"></i> Business Locations</a>
+    <a onclick="showVATRates()"><i class="fas fa-percent"></i> VAT Rates</a>
+
+    <div class="dropdown">
+      <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> Products <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showProductList()">List of Products</a>
+        <a onclick="showAddProduct()">Add Product</a>
+        <a onclick="showUnits()">Units</a>
+        <a onclick="showCategories()">Categories</a>
+        <a onclick="showBrands()">Brands</a>
+      </div>
+    </div>
+
     <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
     <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
@@ -124,6 +110,184 @@
     <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
     <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
     <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
+    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+  </div>
+
+  <div class="main-content">
+    <div id="content" class="content-section">
+      <h1>Welcome to Tharua Firm</h1>
+      <p>Click a menu item on the left to view more details.</p>
+    </div>
+  </div>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Your Firebase configuration
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // Helper function to clear content area
+    function clearContent() {
+      document.getElementById('content').innerHTML = '';
+    }
+
+    // Toggle menus
+    function toggleUserManagement() {
+      const submenu = document.getElementById('userMgmtSubmenu');
+      submenu.style.display = submenu.style.display === 'flex' ? 'none' : 'flex';
+    }
+    function toggleContacts() {
+      const submenu = document.getElementById('contactsSubmenu');
+      submenu.style.display = submenu.style.display === 'flex' ? 'none' : 'flex';
+    }
+    function toggleProducts() {
+      const submenu = document.getElementById('productsSubmenu');
+      submenu.style.display = submenu.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    // Logout function
+    function logout() {
+      auth.signOut().then(() => {
+        alert('Logged out successfully');
+        // Redirect to login page if needed
+      });
+    }
+
+    // Show Home
+    function showHome() {
+      document.getElementById('content').innerHTML = `
+        <h1>Welcome to Tharua Firm</h1>
+        <p>Click a menu item on the left to view more details.</p>
+      `;
+    }
+  </script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tharua Firm Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 230px;
+      background-color: #2c3e50;
+      color: white;
+      padding-top: 20px;
+      overflow-y: auto;
+    }
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: white;
+      text-decoration: none;
+      transition: background 0.3s ease;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .sidebar a i { margin-right: 12px; font-size: 16px; }
+    .sidebar a:hover { background-color: #34495e; }
+    .dropdown a { font-size: 14px; color: white; padding: 10px 20px; display: flex; align-items: center; text-decoration: none; cursor: pointer; }
+    .dropdown a:hover { background-color: #34495e; }
+
+    .main-content { margin-left: 230px; padding: 20px; }
+    .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 900px; }
+
+    input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background-color: #2c3e50; color: white; cursor: pointer; font-size: 16px; }
+    button:hover { background-color: #34495e; }
+    .button-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 10px; max-width: 100%; }
+    .button-grid div { flex: 0 0 auto; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; cursor: pointer; text-align: center; transition: transform 0.2s ease; min-width: 110px; }
+    .button-grid div:hover { transform: scale(1.05); }
+    .button-grid img { width: 50px; height: 50px; margin-bottom: 10px; }
+    .category-list { list-style: none; padding: 0; margin: 0; }
+    .category-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; }
+    .category-name { font-size: 15px; }
+    .delete-icon { color: #c0392b; cursor: pointer; margin-left: 12px; }
+    .small-btn { display:inline-block; padding:6px 10px; border-radius:6px; background:#ecf0f1; cursor:pointer; }
+    #message { margin-top: -12px; margin-bottom: 12px; font-weight: bold; }
+    #message.error { color: #c0392b; }
+    #message.success { color: #27ae60; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>THARUA</h2>
+    <a onclick="showHome()"><i class="fas fa-home"></i> Home</a>
+
+    <div class="dropdown">
+      <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> User Management <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showUsers()">Users</a>
+        <a onclick="displayRoles()">Roles</a>
+        <a onclick="showFieldSales()">Field Salespersons</a>
+      </div>
+    </div>
+
+    <div class="dropdown">
+      <a onclick="toggleContacts()" id="contactsMenu"><i class="fas fa-address-book"></i> Contacts <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="contactsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showSuppliers()">Suppliers</a>
+        <a onclick="showCustomers()">Customers</a>
+        <a onclick="clearContent()">Customer Groups</a>
+        <a onclick="clearContent()">Import Contacts</a>
+      </div>
+    </div>
+
+    <a onclick="showBusinessLocations()"><i class="fas fa-map-marker-alt"></i> Business Locations</a>
+    <a onclick="showVATRates()"><i class="fas fa-percent"></i> VAT Rates</a>
+
+    <div class="dropdown">
+      <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> Products <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+      <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+        <a onclick="showProductList()">List of Products</a>
+        <a onclick="showAddProduct()">Add Product</a>
+        <a onclick="showUnits()">Units</a>
+        <a onclick="showCategories()">Categories</a>
+        <a onclick="showBrands()">Brands</a>
+      </div>
+    </div>
+
+    <a onclick="clearContent()"><i class="fas fa-industry"></i> Manufacturing</a>
+    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> Purchases</a>
+    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> Sell</a>
+    <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> Stock Transfers</a>
+    <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> Stock Adjustment</a>
+    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> Expenses</a>
+    <a onclick="clearContent()"><i class="fas fa-calculator"></i> Accounting</a>
+    <a onclick="clearContent()"><i class="fas fa-robot"></i> AI Assistance</a>
+    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> Reports</a>
+    <a onclick="clearContent()"><i class="fas fa-envelope"></i> Notification Templates</a>
+    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
   </div>
 
   <div class="main-content">
@@ -134,73 +298,116 @@
   </div>
 
   <script>
-    function showHome() {
-      document.getElementById("content").innerHTML = `
-        <h2>Company Overview</h2>
-        <p><strong>Name:</strong> Tharua Firm</p>
-        <p><strong>Business Type:</strong> Soft Drinks & Distribution</p>
-        <p><strong>Location:</strong> Embu County, Kenya</p>
-        <p><strong>Manager:</strong> Kenneth Muriithi</p>
-        <p><strong>Daily Sales:</strong> KSh 200,000+</p>
-        <p><strong>System:</strong> Africa.PearlBiznaLtd.com</p>
-        <p><strong>Mission:</strong> Refreshing Your Day with Quality Soft Drinks</p>
+    // Show Business Locations management
+    function showBusinessLocations() {
+      clearContent();
+      document.getElementById('content').innerHTML = `
+        <h2>Business Locations</h2>
+        <input type="text" id="locationName" placeholder="Enter location name">
+        <button onclick="addBusinessLocation()">Add Location</button>
+        <ul id="locationsList" class="category-list"></ul>
       `;
+      loadBusinessLocationList();
     }
 
-    function clearContent() {
-      document.getElementById("content").innerHTML = `
-        <h2>Section Under Development</h2>
-        <p>Content will be added soon. Please check back later.</p>
-      `;
+    function addBusinessLocation() {
+      const name = document.getElementById('locationName').value.trim();
+      if (!name) return alert('Enter location name');
+
+      db.collection('businessLocations').add({
+        name,
+        active: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        alert('Location added successfully!');
+        showBusinessLocations();
+      });
     }
 
-    function showUserManagement() {
-      document.getElementById("content").innerHTML = `
-        <h2>Create User Account</h2>
-        <form onsubmit="event.preventDefault(); alert('User account created successfully!');">
-          <label for="username">Username:</label>
-          <input type="text" id="username" name="username" required />
-
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" required />
-
-          <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required />
-
-          <label for="role">Select Role:</label>
-          <select id="role" name="role" required>
-            <option value="">-- Select Role --</option>
-            <option value="admin">Admin</option>
-            <option value="cashier">Cashier</option>
-            <option value="salesperson">Salesperson</option>
-            <option value="storekeeper">Storekeeper</option>
-          </select>
-
-          <button type="submit">Create Account</button>
-        </form>
-        <p><small>Each role will have different permissions once login functionality is implemented.</small></p>
-      `;
+    function loadBusinessLocationList() {
+      const list = document.getElementById('locationsList');
+      db.collection('businessLocations').get().then(snapshot => {
+        list.innerHTML = '';
+        snapshot.forEach(doc => {
+          const li = document.createElement('li');
+          li.className = 'category-item';
+          li.innerHTML = `
+            <span class="category-name">${doc.data().name}</span>
+            <span>
+              <span class="small-btn" onclick="toggleLocation('${doc.id}', ${doc.data().active})">
+                ${doc.data().active ? 'Deactivate' : 'Activate'}
+              </span>
+              <i class="fas fa-trash delete-icon" onclick="deleteLocation('${doc.id}')"></i>
+            </span>
+          `;
+          list.appendChild(li);
+        });
+      });
     }
 
-    function toggleContacts() {
-      const submenu = document.getElementById("contactsSubmenu");
-      submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+    function toggleLocation(id, currentStatus) {
+      db.collection('businessLocations').doc(id).update({
+        active: !currentStatus
+      }).then(() => {
+        loadBusinessLocationList();
+      });
     }
 
-    function showSuppliers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Suppliers</h2>
-        <p>List and manage your product suppliers here.</p>
-        <!-- Future: Add supplier form or table -->
-      `;
+    function deleteLocation(id) {
+      if (confirm('Delete this location?')) {
+        db.collection('businessLocations').doc(id).delete().then(() => {
+          loadBusinessLocationList();
+        });
+      }
     }
 
-    function showCustomers() {
-      document.getElementById("content").innerHTML = `
-        <h2>Customers</h2>
-        <p>View and manage your customer records here.</p>
-        <!-- Future: Add customer form or list -->
+    // Show VAT Rates management
+    function showVATRates() {
+      clearContent();
+      document.getElementById('content').innerHTML = `
+        <h2>VAT Rates</h2>
+        <input type="number" id="vatRateValue" placeholder="Enter VAT rate (%)">
+        <button onclick="addVATRates()">Add VAT Rate</button>
+        <ul id="vatRatesList" class="category-list"></ul>
       `;
+      loadVATRatesList();
+    }
+
+    function addVATRates() {
+      const rate = parseFloat(document.getElementById('vatRateValue').value);
+      if (isNaN(rate)) return alert('Enter a valid number');
+
+      db.collection('vatRates').add({
+        rate,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        alert('VAT Rate added successfully!');
+        showVATRates();
+      });
+    }
+
+    function loadVATRatesList() {
+      const list = document.getElementById('vatRatesList');
+      db.collection('vatRates').get().then(snapshot => {
+        list.innerHTML = '';
+        snapshot.forEach(doc => {
+          const li = document.createElement('li');
+          li.className = 'category-item';
+          li.innerHTML = `
+            <span class="category-name">${doc.data().rate}%</span>
+            <i class="fas fa-trash delete-icon" onclick="deleteVATRates('${doc.id}')"></i>
+          `;
+          list.appendChild(li);
+        });
+      });
+    }
+
+    function deleteVATRates(id) {
+      if (confirm('Delete this VAT rate?')) {
+        db.collection('vatRates').doc(id).delete().then(() => {
+          loadVATRatesList();
+        });
+      }
     }
   </script>
 </body>
