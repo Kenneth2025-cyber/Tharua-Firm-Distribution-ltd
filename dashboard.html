@@ -351,26 +351,68 @@ function saveProduct() {
   });
 }
 
-function showAddBrand() {
+function showBrands() {
   document.getElementById("content").innerHTML = `
-    <h2>Add Brand</h2>
-    <form onsubmit="event.preventDefault(); saveBrand();">
+    <h2>Brand Management</h2>
+    <form id="addBrandForm" onsubmit="event.preventDefault(); addBrand();">
       <label>Brand Name:</label>
-      <input type="text" id="brandName" required>
-      <button type="submit">Save Brand</button>
+      <input type="text" id="brandName" placeholder="Enter brand name" required>
+      <button type="submit">Add Brand</button>
     </form>
+    <h3>Existing Brands</h3>
+    <ul id="brandsList"></ul>
   `;
+
+  loadBrands();
 }
 
-function saveBrand() {
+// Load brands from Firestore in real-time
+function loadBrands() {
   const db = firebase.firestore();
-  const brandName = document.getElementById("brandName").value;
+  db.collection("brands").orderBy("name").onSnapshot(snapshot => {
+    const list = document.getElementById("brandsList");
+    list.innerHTML = "";
+    snapshot.forEach(doc => {
+      const brand = doc.data();
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <input type="text" value="${brand.name}" onchange="updateBrand('${doc.id}', this.value)">
+        <button onclick="deleteBrand('${doc.id}')">Delete</button>
+      `;
+      list.appendChild(li);
+    });
+  });
+}
 
-  if (!brandName.trim()) {
-    alert("Please enter a brand name.");
-    return;
-  }
+// Add a brand
+function addBrand() {
+  const name = document.getElementById("brandName").value.trim();
+  if (!name) return alert("Brand name is required");
 
+  const db = firebase.firestore();
+  db.collection("brands").add({
+    name: name
+  }).then(() => {
+    document.getElementById("brandName").value = "";
+  }).catch(err => alert("Error adding brand: " + err.message));
+}
+
+// Update brand name
+function updateBrand(id, newName) {
+  const db = firebase.firestore();
+  db.collection("brands").doc(id).update({
+    name: newName
+  }).catch(err => alert("Error updating brand: " + err.message));
+}
+
+// Delete brand
+function deleteBrand(id) {
+  if (!confirm("Are you sure you want to delete this brand?")) return;
+
+  const db = firebase.firestore();
+  db.collection("brands").doc(id).delete()
+    .catch(err => alert("Error deleting brand: " + err.message));
+}
   db.collection("brands").add({
     name: brandName,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -433,8 +475,6 @@ function loadBusinessLocations() {
     });
   });
 }
-
-
 
     function showSuppliers() {
       document.getElementById("content").innerHTML = `
