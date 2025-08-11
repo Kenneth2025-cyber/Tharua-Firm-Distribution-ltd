@@ -9,16 +9,30 @@
     * { box-sizing: border-box; font-family: 'Poppins', sans-serif; }
     body {
       margin: 0; padding: 0;
-      background: #f4f4f4;
-      display: flex; justify-content: center; align-items: center;
       height: 100vh;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex; justify-content: center; align-items: center;
+      backdrop-filter: blur(2px);
+    }
+    .overlay {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.4);
+      z-index: 0;
     }
     .login-box {
-      background: white; padding: 40px; border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      position: relative;
+      z-index: 1;
+      background: rgba(255,255,255,0.9);
+      padding: 40px; border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
       width: 100%; max-width: 400px;
     }
-    .login-box h2 { text-align: center; margin-bottom: 25px; color: #333; }
+    .login-box h2 {
+      text-align: center; margin-bottom: 25px; color: #333;
+    }
     input[type="email"], input[type="password"] {
       width: 100%; padding: 12px; margin-bottom: 20px;
       border: 1px solid #ccc; border-radius: 6px; font-size: 15px;
@@ -34,6 +48,8 @@
   </style>
 </head>
 <body>
+  <div class="overlay"></div>
+
   <div class="login-box">
     <h2>Tharua Login Page</h2>
     <input type="email" id="email" placeholder="Email" required>
@@ -55,7 +71,6 @@
       messagingSenderId: "438210516373",
       appId: "1:438210516373:web:83c188e315a69165d5129c"
     };
-
     firebase.initializeApp(firebaseConfig);
 
     // Redirect if already logged in
@@ -68,20 +83,27 @@
     function login() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
-
       if (!email || !password) {
         alert("Please enter both email and password.");
         return;
       }
-
       firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(() => {
-          window.location.href = "dashboard.html";
-        })
-        .catch(error => {
-          alert("Error: " + error.message);
-        });
+        .then(() => window.location.href = "dashboard.html")
+        .catch(error => alert("Error: " + error.message));
     }
+
+    // Fetch and apply Bing wallpaper automatically
+    fetch("https://bing-wallpaper-api.jcolladosp.workers.dev/?index=random&resolution=1920x1080")
+      .then(res => {
+        if (res.redirected) {
+          document.body.style.backgroundImage = `url(${res.url})`;
+        } else {
+          res.json().then(data => {
+            document.body.style.backgroundImage = `url(${data.url})`;
+          });
+        }
+      })
+      .catch(err => console.error("Wallpaper load error:", err));
   </script>
 </body>
 </html>
