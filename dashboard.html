@@ -93,7 +93,21 @@
 </div>
 
     <a onclick="clearContent()"><i class="fas fa-industry"></i> <span>Manufacturing</span></a>
-    <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> <span>Purchases</span></a>
+	
+<div class="dropdown">
+  <a onclick="togglePurchases()" id="purchasesMenu">
+    <i class="fas fa-shopping-cart"></i> 
+    <span>Purchases</span> 
+    <i class="fas fa-caret-down" style="margin-left:auto;"></i>
+  </a>
+  <div id="purchasesSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showAddPurchase()"><span>Add Purchase</span></a>
+    <a onclick="showListPurchases()"><span>List of Purchases</span></a>
+    <a onclick="showPurchaseReturn()"><span>Purchase Return</span></a>
+  </div>
+</div>
+
+
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> <span>Sell</span></a>
     <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> <span>Stock Transfers</span></a>
     <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> <span>Stock Adjustment</span></a>
@@ -981,6 +995,25 @@ async function deleteBrand(id) {
   } catch (error) {
     alert("Error deleting brand: " + error.message);
   }
+}
+function togglePurchases() {
+  const submenu = document.getElementById("purchasesSubmenu");
+  submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+}
+
+function showAddPurchase() {
+  saveLastPage("showAddPurchase");
+  document.getElementById("content").innerHTML = `<h2>Add Purchase</h2><p>Coming soon...</p>`;
+}
+
+function showListPurchases() {
+  saveLastPage("showListPurchases");
+  document.getElementById("content").innerHTML = `<h2>List of Purchases</h2><p>Coming soon...</p>`;
+}
+
+function showPurchaseReturn() {
+  saveLastPage("showPurchaseReturn");
+  document.getElementById("content").innerHTML = `<h2>Purchase Return</h2><p>Coming soon...</p>`;
 }
 
 
