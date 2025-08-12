@@ -1137,7 +1137,16 @@ for (const item of items) {
       buyingPrice: item.price // Update buying price to latest purchase price
     });
   });
-}
+}const newStock = currentStock + item.quantity;
+const newBuyingPrice = newStock > 0
+  ? ((currentStock * currentBuyingPrice) + (item.quantity * item.price)) / newStock
+  : item.price;
+
+await firebase.firestore().collection("products").doc(doc.id).update({
+  openingStock: newStock,
+  buyingPrice: parseFloat(newBuyingPrice.toFixed(2))
+});
+
 
     document.getElementById("purchaseMessage").style.color = "green";
     document.getElementById("purchaseMessage").textContent = "Purchase saved successfully.";
