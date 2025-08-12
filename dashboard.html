@@ -1123,6 +1123,22 @@ async function savePurchase() {
       notes,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+	// Update product stocks and buying prices
+for (const item of items) {
+  const productRef = firebase.firestore().collection("products").where("name", "==", item.productName);
+  const snapshot = await productRef.get();
+  
+  snapshot.forEach(async doc => {
+    const productData = doc.data();
+    const currentStock = productData.openingStock || 0;
+
+    await firebase.firestore().collection("products").doc(doc.id).update({
+      openingStock: currentStock + item.quantity,
+      buyingPrice: item.price // Update buying price to latest purchase price
+    });
+  });
+}
+
     document.getElementById("purchaseMessage").style.color = "green";
     document.getElementById("purchaseMessage").textContent = "Purchase saved successfully.";
     document.getElementById("addPurchaseForm").reset();
