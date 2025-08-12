@@ -1184,6 +1184,18 @@ async function showListPurchases() {
         <tr><td colspan="9">Loading...</td></tr>
       </tbody>
     </table>
+
+    <!-- Purchase Details Modal -->
+    <div id="purchaseModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+      <div style="background:white; padding:20px; width:500px; max-height:80%; overflow:auto; border-radius:8px;">
+        <h3>Purchase Details</h3>
+        <div id="purchaseModalContent"></div>
+        <div style="text-align:right; margin-top:15px;">
+          <button onclick="closePurchaseModal()">Close</button>
+        </div>
+      </div>
+    </div>
   `;
 
   const table = document.getElementById("purchasesTable");
@@ -1221,9 +1233,10 @@ async function showListPurchases() {
           <td>${p.referenceNo || ""}</td>
           <td>${status}</td>
           <td>
-            <button onclick="viewPurchase('${doc.id}')">View</button>
-            <button style="color:blue;" onclick="editPurchase('${doc.id}')">Edit</button>
-            <button style="color:red;" onclick="deletePurchase('${doc.id}')">Delete</button>
+            <span title="View" style="cursor:pointer; color:green;" onclick="viewPurchase('${doc.id}')">👁</span>
+            <span title="Print" style="cursor:pointer; color:orange; margin-left:5px;" onclick="printPurchase('${doc.id}')">🖨</span>
+            <span title="Edit" style="cursor:pointer; color:blue; margin-left:5px;" onclick="editPurchase('${doc.id}')">✏</span>
+            <span title="Delete" style="cursor:pointer; color:red; margin-left:5px;" onclick="deletePurchase('${doc.id}')">🗑</span>
           </td>
         </tr>
       `;
@@ -1232,6 +1245,102 @@ async function showListPurchases() {
   } catch (error) {
     table.innerHTML = `<tr><td colspan="9">Error loading purchases: ${error.message}</td></tr>`;
   }
+}
+
+// Modal functions
+async function viewPurchase(purchaseId) {
+  try {
+    const docSnap = await firebase.firestore().collection("purchases").doc(purchaseId).get();
+    if (!docSnap.exists) {
+      alert("Purchase not found");
+      return;
+    }
+
+    const p = docSnap.data();
+    const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
+    const balance = (p.totalAmount || 0) - (p.amountPaid || 0);
+
+    let itemsHTML = "";
+    if (p.items && p.items.length > 0) {
+      itemsHTML = `
+        <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; margin-top:10px;">
+          <thead style="background:#f0f0f0;">
+            <tr>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Price (KES)</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${p.items.map(item => `
+              <tr>
+                <td>${item.productName}</td>
+                <td>${item.quantity}</td>
+                <td>${item.price}</td>
+                <td>${(item.quantity * item.price).toFixed(2)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById("purchaseModalContent").innerHTML = `
+      <p><strong>Date:</strong> ${date}</p>
+      <p><strong>Supplier:</strong> ${p.supplier || ""}</p>
+      <p><strong>Location:</strong> ${p.location || ""}</p>
+      <p><strong>Reference No:</strong> ${p.referenceNo || ""}</p>
+      <p><strong>Payment Method:</strong> ${p.paymentMethod || ""}</p>
+      <p><strong>Total Amount:</strong> ${p.totalAmount || 0}</p>
+      <p><strong>Amount Paid:</strong> ${p.amountPaid || 0}</p>
+      <p><strong>Balance:</strong> <span style="color:${balance > 0 ? 'red' : 'black'};">${balance}</span></p>
+      <p><strong>Notes:</strong> ${p.notes || ""}</p>
+      ${itemsHTML}
+    `;
+
+    document.getElementById("purchaseModal").style.display = "flex";
+
+  } catch (error) {
+    alert("Error loading purchase: " + error.message);
+  }
+}
+
+function closePurchaseModal() {
+  document.getElementById("purchaseModal").style.display = "none";
+}
+
+// Firestore actions
+async function printPurchase(id) {
+  const docSnap = await firebase.firestore().collection("purchases").doc(id).get();
+  if (!docSnap.exists) return alert("Purchase not found");
+  const p = docSnap.data();
+
+  let html = `
+    <h2>Purchase Details</h2>
+    <p><strong>Supplier:</strong> ${p.supplier}</p>
+    <p><strong>Date:</strong> ${p.purchaseDate.toDate().toLocaleDateString()}</p>
+    <p><strong>Total:</strong> ${p.totalAmount}</p>
+  `;
+
+  if (p.items && p.items.length > 0) {
+    html += `<h3>Items</h3><ul>${p.items.map(i => `<li>${i.productName} - ${i.quantity} @ ${i.price}</li>`).join("")}</ul>`;
+  }
+
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.print();
+}
+
+function editPurchase(id) {
+  alert(`Open edit form for purchase: ${id}`);
+}
+
+async function deletePurchase(id) {
+  if (!confirm("Are you sure you want to delete this purchase?")) return;
+  await firebase.firestore().collection("purchases").doc(id).delete();
+  alert("Purchase deleted");
+  showListPurchases();
 }
 
 async function exportPurchasesCSV() {
