@@ -53,6 +53,37 @@
 .btn-cancel {
   background-color: #c0392b;
 }
+/* Sidebar dropdown styles */
+.sidebar-item.has-dropdown > a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.dropdown-menu {
+  display: none;
+  list-style: none;
+  padding-left: 15px;
+  margin: 0;
+}
+
+.sidebar-item.has-dropdown.open > .dropdown-menu {
+  display: block;
+}
+
+.dropdown-menu li a {
+  color: white;
+  padding: 8px 20px;
+  display: block;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.dropdown-menu li a:hover {
+  background-color: #34495e;
+}
+
 
   </style>
 </head>
@@ -94,6 +125,25 @@
 
     <a onclick="clearContent()"><i class="fas fa-industry"></i> <span>Manufacturing</span></a>
     <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> <span>Purchases</span></a>
+	
+	
+	<!-- Purchases menu item with dropdown -->
+<li class="sidebar-item has-dropdown">
+  <a href="#" class="sidebar-link">
+    <i class="fas fa-shopping-cart"></i>
+    <span>Purchases</span>
+    <i class="fas fa-caret-down dropdown-icon"></i>
+  </a>
+  <ul class="dropdown-menu">
+    <li><a href="#" onclick="showAddPurchase()">Add Purchase</a></li>
+    <li><a href="#" onclick="showPurchaseList()">Purchase List</a></li>
+    <li><a href="#" onclick="showSuppliers()">Suppliers</a></li>
+    <li><a href="#" onclick="showPaymentModes()">Payment Modes</a></li>
+    <li><a href="#" onclick="showPurchaseBalances()">Purchase Balances</a></li>
+    <li><a href="#" onclick="showPurchaseReports()">Purchase Reports</a></li>
+  </ul>
+</li>
+
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> <span>Sell</span></a>
     <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> <span>Stock Transfers</span></a>
     <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> <span>Stock Adjustment</span></a>
@@ -988,6 +1038,17 @@ async function deleteBrand(id) {
     function showFieldSales() { saveLastPage("showFieldSales"); document.getElementById("content").innerHTML = `<h2>Field Salespersons</h2><p>Assign and track sales agents working in the field.</p>`; }
     function showSuppliers() { saveLastPage("showSuppliers"); document.getElementById("content").innerHTML = `<h2>Suppliers</h2><p>List and manage your product suppliers here.</p>`; }
     function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
+    <!-- other HTML content -->
+
+  <!-- Put this script here -->
+  <script>
+    document.querySelectorAll('.sidebar-item.has-dropdown > a').forEach(item => {
+      item.addEventListener('click', e => {
+        e.preventDefault();
+        const parent = item.parentElement;
+        parent.classList.toggle('open');
+      });
+    }); 
   </script>
 </body>
 </html>
