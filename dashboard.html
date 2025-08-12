@@ -348,13 +348,121 @@ function toggleProducts() {
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
 }
 
-function showAddProduct() {
+async function showAddProduct() {
   saveLastPage("showAddProduct");
+
+  // Load categories, brands, and locations from Firestore
+  const categories = await getCollectionOptions("categories");
+  const brands = await getCollectionOptions("brands");
+  const locations = await getCollectionOptions("businessLocations");
+
   document.getElementById("content").innerHTML = `
     <h2>Add Product</h2>
-    <p>Form to add a new product will go here.</p>
+    <form id="addProductForm">
+      <label>Product Name *</label>
+      <input type="text" id="productName" placeholder="Enter product name" required />
+
+      <!-- SKU will be generated automatically, no input -->
+
+      <label>Category *</label>
+      <select id="category" required>
+        <option value="">Select category</option>
+        ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
+      </select>
+
+      <label>Brand *</label>
+      <select id="brand" required>
+        <option value="">Select brand</option>
+        ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
+      </select>
+
+      <label>Buying Price (KES) *</label>
+      <input type="number" id="buyingPrice" min="0" step="0.01" placeholder="Enter buying price" required />
+
+      <label>Selling Price (KES) *</label>
+      <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="Enter selling price" required />
+
+      <label>Opening Stock</label>
+      <input type="number" id="openingStock" min="0" step="1" placeholder="Enter opening stock" />
+
+      <label>Business Location *</label>
+      <select id="businessLocation" required>
+        <option value="">Select location</option>
+        ${locations.map(l => `<option value="${l}">${l}</option>`).join("")}
+      </select>
+
+      <button type="submit">Add Product</button>
+    </form>
+    <div id="addProductMessage" style="color: red; margin-top: 10px;"></div>
   `;
+
+  document.getElementById("addProductForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await addProductSubmit();
+  });
 }
+
+async function getCollectionOptions(collectionName) {
+  try {
+    const snapshot = await firebase.firestore().collection(collectionName).get();
+    return snapshot.docs.map(doc => doc.data().name || doc.id);
+  } catch (error) {
+    console.error(`Error loading ${collectionName}:`, error);
+    return [];
+  }
+}
+
+async function addProductSubmit() {
+  const name = document.getElementById("productName").value.trim();
+  const category = document.getElementById("category").value;
+  const brand = document.getElementById("brand").value;
+  const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
+  const sellingPrice = parseFloat(document.getElementById("sellingPrice").value);
+  const openingStock = parseInt(document.getElementById("openingStock").value) || 0;
+  const location = document.getElementById("businessLocation").value;
+
+  const messageEl = document.getElementById("addProductMessage");
+  messageEl.style.color = "red";
+
+  // Basic validation
+  if (!name || !category || !brand || isNaN(buyingPrice) || isNaN(sellingPrice) || !location) {
+    messageEl.textContent = "Please fill in all required fields correctly.";
+    return;
+  }
+
+  if (buyingPrice < 0 || sellingPrice < 0 || openingStock < 0) {
+    messageEl.textContent = "Prices and stock cannot be negative.";
+    return;
+  }
+
+  // Generate SKU - e.g. PROD + timestamp + random number
+  const sku = `PROD-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+
+  const productData = {
+    name,
+    sku,
+    category,
+    brand,
+    buyingPrice,
+    sellingPrice,
+    openingStock,
+    location,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    await firebase.firestore().collection("products").add(productData);
+    messageEl.style.color = "green";
+    messageEl.textContent = `Product added successfully with SKU: ${sku}`;
+
+    // Clear form
+    document.getElementById("addProductForm").reset();
+  } catch (error) {
+    console.error("Error adding product:", error);
+    messageEl.textContent = "Error adding product: " + error.message;
+  }
+}
+
 
 function showListProducts() {
   saveLastPage("showListProducts");
