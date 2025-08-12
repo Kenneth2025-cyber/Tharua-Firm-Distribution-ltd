@@ -472,28 +472,279 @@ function showListProducts() {
   `;
 }
 
-function showBusinessLocations() {
+async function showBusinessLocations() {
   saveLastPage("showBusinessLocations");
+
+  const locations = await loadCollection("businessLocations");
+
   document.getElementById("content").innerHTML = `
-    <h2>Business Locations</h2>
-    <p>Manage business locations here.</p>
+    <h2>Manage Business Locations</h2>
+    <input type="text" id="newLocationName" placeholder="Location name" />
+    <input type="text" id="newLocationAddress" placeholder="Address (optional)" />
+    <button onclick="addBusinessLocation()">Add Location</button>
+    <div id="locationMessage" style="margin-top:10px;"></div>
+
+    <h3>Existing Locations</h3>
+    <ul id="locationList" style="list-style:none; padding-left:0;"></ul>
   `;
+
+  renderLocationList(locations);
 }
 
-function showCategory() {
+function renderLocationList(locations) {
+  const ul = document.getElementById("locationList");
+  ul.innerHTML = "";
+  if (locations.length === 0) {
+    ul.innerHTML = "<li>No locations found.</li>";
+    return;
+  }
+  locations.forEach(loc => {
+    ul.innerHTML += `
+      <li style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        <div>
+          <strong>${loc.name}</strong><br/>
+          <small>${loc.address || ""}</small>
+        </div>
+        <button style="background:red;color:white; border:none; cursor:pointer;" onclick="deleteBusinessLocation('${loc.id}')">Delete</button>
+      </li>`;
+  });
+}
+
+async function addBusinessLocation() {
+  const nameInput = document.getElementById("newLocationName");
+  const addressInput = document.getElementById("newLocationAddress");
+  const messageEl = document.getElementById("locationMessage");
+
+  const name = nameInput.value.trim();
+  const address = addressInput.value.trim();
+
+  messageEl.style.color = "red";
+  if (!name) {
+    messageEl.textContent = "Location name cannot be empty.";
+    return;
+  }
+
+  const existing = await firebase.firestore().collection("businessLocations").where("name", "==", name).get();
+  if (!existing.empty) {
+    messageEl.textContent = "Location already exists.";
+    return;
+  }
+
+  try {
+    await firebase.firestore().collection("businessLocations").add({
+      name,
+      address: address || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    messageEl.style.color = "green";
+    messageEl.textContent = `Location "${name}" added successfully.`;
+    nameInput.value = "";
+    addressInput.value = "";
+
+    const locations = await loadCollection("businessLocations");
+    renderLocationList(locations);
+  } catch (error) {
+    console.error("Error adding location:", error);
+    messageEl.textContent = "Error adding location: " + error.message;
+  }
+}
+
+async function deleteBusinessLocation(id) {
+  if (!confirm("Are you sure you want to delete this location?")) return;
+
+  try {
+    await firebase.firestore().collection("businessLocations").doc(id).delete();
+    const messageEl = document.getElementById("locationMessage");
+    messageEl.style.color = "green";
+    messageEl.textContent = "Location deleted.";
+
+    const locations = await loadCollection("businessLocations");
+    renderLocationList(locations);
+  } catch (error) {
+    alert("Error deleting location: " + error.message);
+  }
+}
+
+async function showCategory() {
   saveLastPage("showCategory");
+
+  // Load existing categories
+  const categories = await loadCollection("categories");
+
   document.getElementById("content").innerHTML = `
-    <h2>Category</h2>
-    <p>Manage product categories here.</p>
+    <h2>Manage Categories</h2>
+    <input type="text" id="newCategoryName" placeholder="New category name" />
+    <button onclick="addCategory()">Add Category</button>
+    <div id="categoryMessage" style="margin-top:10px;"></div>
+
+    <h3>Existing Categories</h3>
+    <ul id="categoryList" style="list-style:none; padding-left:0;"></ul>
   `;
+
+  renderCategoryList(categories);
 }
 
-function showBrand() {
+async function loadCollection(collectionName) {
+  try {
+    const snapshot = await firebase.firestore().collection(collectionName).orderBy("name").get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    console.error(`Error loading ${collectionName}:`, err);
+    return [];
+  }
+}
+
+function renderCategoryList(categories) {
+  const ul = document.getElementById("categoryList");
+  ul.innerHTML = "";
+  if (categories.length === 0) {
+    ul.innerHTML = "<li>No categories found.</li>";
+    return;
+  }
+  categories.forEach(cat => {
+    ul.innerHTML += `
+      <li style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        ${cat.name} 
+        <button style="background:red;color:white; border:none; cursor:pointer;" onclick="deleteCategory('${cat.id}')">Delete</button>
+      </li>`;
+  });
+}
+
+async function addCategory() {
+  const nameInput = document.getElementById("newCategoryName");
+  const messageEl = document.getElementById("categoryMessage");
+  const name = nameInput.value.trim();
+
+  messageEl.style.color = "red";
+  if (!name) {
+    messageEl.textContent = "Category name cannot be empty.";
+    return;
+  }
+
+  // Check if category already exists (optional)
+  const existing = await firebase.firestore().collection("categories").where("name", "==", name).get();
+  if (!existing.empty) {
+    messageEl.textContent = "Category already exists.";
+    return;
+  }
+
+  try {
+    await firebase.firestore().collection("categories").add({
+      name,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    messageEl.style.color = "green";
+    messageEl.textContent = `Category "${name}" added successfully.`;
+    nameInput.value = "";
+
+    // Reload list
+    const categories = await loadCollection("categories");
+    renderCategoryList(categories);
+  } catch (error) {
+    console.error("Error adding category:", error);
+    messageEl.textContent = "Error adding category: " + error.message;
+  }
+}
+
+async function deleteCategory(id) {
+  if (!confirm("Are you sure you want to delete this category?")) return;
+
+  try {
+    await firebase.firestore().collection("categories").doc(id).delete();
+    const messageEl = document.getElementById("categoryMessage");
+    messageEl.style.color = "green";
+    messageEl.textContent = "Category deleted.";
+
+    // Reload list
+    const categories = await loadCollection("categories");
+    renderCategoryList(categories);
+  } catch (error) {
+    alert("Error deleting category: " + error.message);
+  }
+}
+
+
+async function showBrand() {
   saveLastPage("showBrand");
+  const brands = await loadCollection("brands");
+
   document.getElementById("content").innerHTML = `
-    <h2>Brand</h2>
-    <p>Manage product brands here.</p>
+    <h2>Manage Brands</h2>
+    <input type="text" id="newBrandName" placeholder="New brand name" />
+    <button onclick="addBrand()">Add Brand</button>
+    <div id="brandMessage" style="margin-top:10px;"></div>
+
+    <h3>Existing Brands</h3>
+    <ul id="brandList" style="list-style:none; padding-left:0;"></ul>
   `;
+
+  renderBrandList(brands);
+}
+
+function renderBrandList(brands) {
+  const ul = document.getElementById("brandList");
+  ul.innerHTML = "";
+  if (brands.length === 0) {
+    ul.innerHTML = "<li>No brands found.</li>";
+    return;
+  }
+  brands.forEach(brand => {
+    ul.innerHTML += `
+      <li style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        ${brand.name}
+        <button style="background:red;color:white; border:none; cursor:pointer;" onclick="deleteBrand('${brand.id}')">Delete</button>
+      </li>`;
+  });
+}
+
+async function addBrand() {
+  const nameInput = document.getElementById("newBrandName");
+  const messageEl = document.getElementById("brandMessage");
+  const name = nameInput.value.trim();
+
+  messageEl.style.color = "red";
+  if (!name) {
+    messageEl.textContent = "Brand name cannot be empty.";
+    return;
+  }
+
+  const existing = await firebase.firestore().collection("brands").where("name", "==", name).get();
+  if (!existing.empty) {
+    messageEl.textContent = "Brand already exists.";
+    return;
+  }
+
+  try {
+    await firebase.firestore().collection("brands").add({
+      name,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    messageEl.style.color = "green";
+    messageEl.textContent = `Brand "${name}" added successfully.`;
+    nameInput.value = "";
+
+    const brands = await loadCollection("brands");
+    renderBrandList(brands);
+  } catch (error) {
+    console.error("Error adding brand:", error);
+    messageEl.textContent = "Error adding brand: " + error.message;
+  }
+}
+
+async function deleteBrand(id) {
+  if (!confirm("Are you sure you want to delete this brand?")) return;
+
+  try {
+    await firebase.firestore().collection("brands").doc(id).delete();
+    const messageEl = document.getElementById("brandMessage");
+    messageEl.style.color = "green";
+    messageEl.textContent = "Brand deleted.";
+
+    const brands = await loadCollection("brands");
+    renderBrandList(brands);
+  } catch (error) {
+    alert("Error deleting brand: " + error.message);
+  }
 }
 
 
