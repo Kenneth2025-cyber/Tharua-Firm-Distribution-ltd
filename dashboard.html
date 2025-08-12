@@ -1158,12 +1158,111 @@ async function savePurchase() {
     document.getElementById("purchaseMessage").textContent = "Error saving purchase: " + error.message;
   }
 }
-
-
-function showListPurchases() {
+async function showListPurchases() {
   saveLastPage("showListPurchases");
-  document.getElementById("content").innerHTML = `<h2>List of Purchases</h2><p>Coming soon...</p>`;
+
+  document.getElementById("content").innerHTML = `
+    <h2>List of Purchases</h2>
+    <div style="margin-bottom:10px;">
+      <button onclick="exportPurchasesCSV()">Export to CSV</button>
+    </div>
+    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
+      <thead style="background:#f0f0f0;">
+        <tr>
+          <th>Date</th>
+          <th>Supplier</th>
+          <th>Total (KES)</th>
+          <th>Paid (KES)</th>
+          <th>Balance (KES)</th>
+          <th>Payment Method</th>
+          <th>Reference No</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="purchasesTable">
+        <tr><td colspan="9">Loading...</td></tr>
+      </tbody>
+    </table>
+  `;
+
+  const table = document.getElementById("purchasesTable");
+
+  try {
+    const snapshot = await firebase.firestore().collection("purchases")
+      .orderBy("purchaseDate", "desc")
+      .get();
+
+    table.innerHTML = "";
+
+    if (snapshot.empty) {
+      table.innerHTML = `<tr><td colspan="9">No purchases found.</td></tr>`;
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const p = doc.data();
+      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
+      const total = p.totalAmount || 0;
+      const paid = p.amountPaid || 0;
+      const balance = total - paid;
+      const status = balance > 0 
+        ? `<span style="color:red;font-weight:bold;">Due</span>` 
+        : `<span style="color:green;">Paid</span>`;
+
+      table.innerHTML += `
+        <tr>
+          <td>${date}</td>
+          <td>${p.supplier || ""}</td>
+          <td>${total}</td>
+          <td>${paid}</td>
+          <td style="color:${balance > 0 ? 'red' : 'black'};">${balance}</td>
+          <td>${p.paymentMethod || ""}</td>
+          <td>${p.referenceNo || ""}</td>
+          <td>${status}</td>
+          <td>
+            <button onclick="viewPurchase('${doc.id}')">View</button>
+            <button style="color:blue;" onclick="editPurchase('${doc.id}')">Edit</button>
+            <button style="color:red;" onclick="deletePurchase('${doc.id}')">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+
+  } catch (error) {
+    table.innerHTML = `<tr><td colspan="9">Error loading purchases: ${error.message}</td></tr>`;
+  }
 }
+
+async function exportPurchasesCSV() {
+  try {
+    const snapshot = await firebase.firestore().collection("purchases")
+      .orderBy("purchaseDate", "desc")
+      .get();
+
+    if (snapshot.empty) {
+      alert("No purchases to export");
+      return;
+    }
+
+    let csv = "Date,Supplier,Total Amount,Amount Paid,Balance,Payment Method,Reference No\n";
+    snapshot.forEach(doc => {
+      const p = doc.data();
+      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
+      const balance = (p.totalAmount || 0) - (p.amountPaid || 0);
+      csv += `${date},"${p.supplier}",${p.totalAmount || 0},${p.amountPaid || 0},${balance},"${p.paymentMethod || ""}","${p.referenceNo || ""}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `purchases_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+  } catch (err) {
+    alert("Error exporting purchases: " + err.message);
+  }
+}
+
 
 function showPurchaseReturn() {
   saveLastPage("showPurchaseReturn");
