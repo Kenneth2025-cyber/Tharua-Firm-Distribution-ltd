@@ -529,8 +529,9 @@ function showListProducts() {
 
   // Export button click event
   document.getElementById("exportBtn").addEventListener("click", () => {
-    openExportModal();
-  });
+  exportProductsCSV();
+});
+
 
   // Location filter change event
   document.getElementById("locationFilter").addEventListener("change", (e) => {
@@ -711,6 +712,39 @@ function renderLocationList(locations) {
       </li>`;
   });
 }
+function exportProductsCSV() {
+  // Prepare CSV header
+  const headers = ["Product Name", "SKU", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
+  
+  // Filter products according to selected location
+  const filteredProducts = selectedLocation === "all" ? products : products.filter(p => p.location === selectedLocation);
+
+  // Prepare rows
+  const rows = filteredProducts.map(p => [
+    `"${p.name}"`,
+    `"${p.sku}"`,
+    `"${p.category}"`,
+    `"${p.brand}"`,
+    p.buyingPrice?.toFixed(2) ?? "0.00",
+    p.sellingPrice?.toFixed(2) ?? "0.00",
+    p.openingStock ?? 0,
+    `"${p.location}"`
+  ].join(","));
+
+  const csvContent = [headers.join(","), ...rows].join("\n");
+
+  // Create a blob and trigger download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "products_export.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 
 async function addBusinessLocation() {
   const nameInput = document.getElementById("newLocationName");
