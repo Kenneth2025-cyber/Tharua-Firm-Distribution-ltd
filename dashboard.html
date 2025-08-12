@@ -56,7 +56,17 @@
       </div>
     </div>
 
-    <a onclick="clearContent()"><i class="fas fa-boxes"></i> <span>Products</span></a>
+    <div class="dropdown">
+  <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> <span>Products</span> <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
+  <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showAddProduct()"><span>Add Product</span></a>
+    <a onclick="showListProducts()"><span>List of Products</span></a>
+    <a onclick="showBusinessLocations()"><span>Business Location</span></a>
+    <a onclick="showCategory()"><span>Category</span></a>
+    <a onclick="showBrand()"><span>Brand</span></a>
+  </div>
+</div>
+
     <a onclick="clearContent()"><i class="fas fa-industry"></i> <span>Manufacturing</span></a>
     <a onclick="clearContent()"><i class="fas fa-shopping-cart"></i> <span>Purchases</span></a>
     <a onclick="clearContent()"><i class="fas fa-cash-register"></i> <span>Sell</span></a>
@@ -332,6 +342,50 @@ function deleteUser(userId) {
 
 function editUser(userId) {
   alert("Edit feature coming soon for user ID: " + userId);
+}
+function toggleProducts() {
+  const submenu = document.getElementById("productsSubmenu");
+  submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+}
+
+function showAddProduct() {
+  saveLastPage("showAddProduct");
+  document.getElementById("content").innerHTML = `
+    <h2>Add Product</h2>
+    <p>Form to add a new product will go here.</p>
+  `;
+}
+
+function showListProducts() {
+  saveLastPage("showListProducts");
+  document.getElementById("content").innerHTML = `
+    <h2>List of Products</h2>
+    <p>Product list and details will show here.</p>
+  `;
+}
+
+function showBusinessLocations() {
+  saveLastPage("showBusinessLocations");
+  document.getElementById("content").innerHTML = `
+    <h2>Business Locations</h2>
+    <p>Manage business locations here.</p>
+  `;
+}
+
+function showCategory() {
+  saveLastPage("showCategory");
+  document.getElementById("content").innerHTML = `
+    <h2>Category</h2>
+    <p>Manage product categories here.</p>
+  `;
+}
+
+function showBrand() {
+  saveLastPage("showBrand");
+  document.getElementById("content").innerHTML = `
+    <h2>Brand</h2>
+    <p>Manage product brands here.</p>
+  `;
 }
 
 
