@@ -1147,8 +1147,105 @@ function showPurchaseReturn() {
 
     function showRoles() { saveLastPage("showRoles"); document.getElementById("content").innerHTML = `<h2>Roles</h2><p>Define and manage user roles and permissions.</p>`; }
     function showFieldSales() { saveLastPage("showFieldSales"); document.getElementById("content").innerHTML = `<h2>Field Salespersons</h2><p>Assign and track sales agents working in the field.</p>`; }
-    function showSuppliers() { saveLastPage("showSuppliers"); document.getElementById("content").innerHTML = `<h2>Suppliers</h2><p>List and manage your product suppliers here.</p>`; }
-    function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
+    
+	function showSuppliers() {
+  saveLastPage("showSuppliers");
+  document.getElementById("content").innerHTML = `
+    <h2>Suppliers</h2>
+    <input type="text" id="supplierName" placeholder="Supplier Name" required>
+    <input type="text" id="supplierPhone" placeholder="Phone">
+    <input type="email" id="supplierEmail" placeholder="Email">
+    <input type="text" id="supplierAddress" placeholder="Address">
+    <button onclick="addSupplier()">Add Supplier</button>
+    <div id="supplierMessage" style="margin-top:10px; color:red;"></div>
+
+    <h3>Existing Suppliers</h3>
+    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="background:#eee;">
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Address</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="suppliersTable"></tbody>
+    </table>
+  `;
+
+  loadSuppliers();
+}
+
+function addSupplier() {
+  const name = document.getElementById("supplierName").value.trim();
+  const phone = document.getElementById("supplierPhone").value.trim();
+  const email = document.getElementById("supplierEmail").value.trim();
+  const address = document.getElementById("supplierAddress").value.trim();
+  const msg = document.getElementById("supplierMessage");
+
+  if (!name) {
+    msg.textContent = "Supplier name is required.";
+    return;
+  }
+
+  firebase.firestore().collection("suppliers").add({
+    name, phone, email, address,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  })
+  .then(() => {
+    msg.style.color = "green";
+    msg.textContent = "Supplier added successfully.";
+    document.getElementById("supplierName").value = "";
+    document.getElementById("supplierPhone").value = "";
+    document.getElementById("supplierEmail").value = "";
+    document.getElementById("supplierAddress").value = "";
+    loadSuppliers();
+  })
+  .catch(err => {
+    msg.style.color = "red";
+    msg.textContent = "Error: " + err.message;
+  });
+}
+
+function loadSuppliers() {
+  const table = document.getElementById("suppliersTable");
+  table.innerHTML = "<tr><td colspan='5'>Loading...</td></tr>";
+
+  firebase.firestore().collection("suppliers").orderBy("name").get()
+    .then(snapshot => {
+      table.innerHTML = "";
+      if (snapshot.empty) {
+        table.innerHTML = "<tr><td colspan='5'>No suppliers found.</td></tr>";
+        return;
+      }
+      snapshot.forEach(doc => {
+        const s = doc.data();
+        table.innerHTML += `
+          <tr>
+            <td>${s.name}</td>
+            <td>${s.phone || ""}</td>
+            <td>${s.email || ""}</td>
+            <td>${s.address || ""}</td>
+            <td><button style="background:red;color:white;" onclick="deleteSupplier('${doc.id}')">Delete</button></td>
+          </tr>
+        `;
+      });
+    })
+    .catch(err => {
+      table.innerHTML = `<tr><td colspan='5'>Error loading suppliers: ${err.message}</td></tr>`;
+    });
+}
+
+function deleteSupplier(id) {
+  if (!confirm("Delete this supplier?")) return;
+  firebase.firestore().collection("suppliers").doc(id).delete()
+    .then(() => loadSuppliers())
+    .catch(err => alert("Error deleting: " + err.message));
+}
+
+    
+	function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
   </script>
 </body>
 </html>
