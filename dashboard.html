@@ -1489,21 +1489,88 @@ async function printPurchase(id) {
   if (!docSnap.exists) return alert("Purchase not found");
   const p = docSnap.data();
 
-  let html = `
-    <h2>Purchase Details</h2>
-    <p><strong>Supplier:</strong> ${p.supplier}</p>
-    <p><strong>Date:</strong> ${p.purchaseDate.toDate().toLocaleDateString()}</p>
-    <p><strong>Total:</strong> ${p.totalAmount}</p>
+  const paid = p.amountPaid || 0;
+  const balance = (p.totalAmount || 0) - paid;
+
+  const html = `
+    <html>
+      <head>
+        <title>Purchase Receipt</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+          h1, h2, h3 { margin: 0; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .header h1 { font-size: 22px; color: #2c3e50; }
+          .header p { margin: 2px 0; font-size: 12px; color: #555; }
+          .info { margin-bottom: 20px; }
+          .info p { margin: 4px 0; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+          th { background: #f4f4f4; }
+          tr:nth-child(even) { background: #fafafa; }
+          .totals { margin-top: 20px; text-align: right; }
+          .totals p { margin: 4px 0; font-size: 14px; }
+          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #777; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1><!-- Business Name here --></h1>
+          <p><!-- Address line here --></p>
+          <p><!-- Phone | Email here --></p>
+          <hr/>
+        </div>
+
+        <div class="info">
+          <p><b>Date:</b> ${p.purchaseDate.toDate().toLocaleDateString()}</p>
+          <p><b>Supplier:</b> ${p.supplier}</p>
+          <p><b>Reference:</b> ${p.referenceNo || "-"}</p>
+          <p><b>Payment Method:</b> ${p.paymentMethod || "-"}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Unit Price (KES)</th>
+              <th>Subtotal (KES)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${p.items && p.items.length > 0
+              ? p.items.map((i, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>${i.productName}</td>
+                  <td>${i.quantity}</td>
+                  <td style="text-align:right;">${i.price.toFixed(2)}</td>
+                  <td style="text-align:right;">${i.subtotal ? i.subtotal.toFixed(2) : (i.quantity * i.price).toFixed(2)}</td>
+                </tr>`).join("")
+              : "<tr><td colspan='5'>No items</td></tr>"}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <p><b>Total:</b> KES ${p.totalAmount.toFixed(2)}</p>
+          <p><b>Paid:</b> KES ${paid.toFixed(2)}</p>
+          <p><b>Balance:</b> KES ${balance.toFixed(2)}</p>
+        </div>
+
+        <div class="footer">
+          <p><!-- Footer message here --></p>
+        </div>
+      </body>
+    </html>
   `;
 
-  if (p.items && p.items.length > 0) {
-    html += `<h3>Items</h3><ul>${p.items.map(i => `<li>${i.productName} - ${i.quantity} @ ${i.price}</li>`).join("")}</ul>`;
-  }
-
-  const w = window.open("", "_blank");
+  const w = window.open("", "_blank", "width=800,height=600");
   w.document.write(html);
+  w.document.close();
   w.print();
 }
+
 
 function editPurchase(id) {
   alert(`Open edit form for purchase: ${id}`);
