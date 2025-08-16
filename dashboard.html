@@ -246,52 +246,27 @@
     }
 
     function loadTotal(type, elementId, location, startDate, endDate) {
-  // Map each collection to its date and amount fields
-  const dateFieldMap = { sales: "saleDate", purchases: "purchaseDate", expenses: "expenseDate" };
-  const amountFieldMap = { sales: "totalAmount", purchases: "totalAmount", expenses: "amount" };
+      let query = firebase.firestore().collection(type);
 
-  const dateField = dateFieldMap[type] || "date";
-  const amountField = amountFieldMap[type] || "amount";
+      if (location && location !== "all") query = query.where("location", "==", location);
 
-  let query = firebase.firestore().collection(type);
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setDate(end.getDate() + 1);
+        query = query.where("date", ">=", start).where("date", "<", end);
+      }
 
-  if (location && location !== "all") {
-    query = query.where("location", "==", location);
-  }
+      query.get().then(snap => {
+        let total = 0;
+        snap.forEach(doc => total += doc.data().amount || 0);
+        document.getElementById(elementId).textContent = "KES " + total.toLocaleString();
+      }).catch(() => {
+        document.getElementById(elementId).textContent = "Error";
+      });
+    }
 
-  if (startDate && endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setDate(end.getDate() + 1); // make end exclusive
-    query = query.where(dateField, ">=", start).where(dateField, "<", end);
-  }
-
-  query.get().then(snap => {
-    let total = 0;
-    snap.forEach(doc => {
-      const data = doc.data();
-      // Prefer the mapped amount field, but fall back gracefully
-      const value =
-        (data && (
-          (amountField in data ? data[amountField] : undefined) ??
-          data.totalAmount ??
-          data.amount ??
-          data.net ??
-          0
-        )) || 0;
-      total += Number(value) || 0;
-    });
-
-    const el = document.getElementById(elementId);
-    if (el) el.textContent = "KES " + total.toLocaleString();
-  }).catch(err => {
-    console.error("loadTotal error:", err);
-    const el = document.getElementById(elementId);
-    if (el) el.textContent = "Error";
-  });
-}
-
-function clearContent() { saveLastPage("clearContent"); document.getElementById("content").innerHTML = `<h2>Section Under Development</h2><p>Content will be added soon. Please check back later.</p>`; }
+    function clearContent() { saveLastPage("clearContent"); document.getElementById("content").innerHTML = `<h2>Section Under Development</h2><p>Content will be added soon. Please check back later.</p>`; }
     function toggleContacts() { const s = document.getElementById("contactsSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
     function toggleUserManagement() { const s = document.getElementById("userMgmtSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
 	
@@ -1121,11 +1096,13 @@ async function savePurchase() {
   const items = [];
 
   document.querySelectorAll("#purchaseItems div").forEach(row => {
-    items.push({
+    items.unshift({
       productName: row.querySelector(".purchaseProduct").value,
       quantity: parseFloat(row.querySelector(".purchaseQty").value) || 0,
       price: parseFloat(row.querySelector(".purchasePrice").value) || 0
     });
+});
+renderItems();
   });
 
   const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
@@ -1505,6 +1482,24 @@ function deleteSupplier(id) {
 
     
 	function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
-  </script>
+  function renderItems() {
+  const tbody = document.querySelector("#itemsTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  items.forEach((item, index) => {
+    const subtotal = item.quantity * item.price;
+    tbody.innerHTML += `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${item.quantity}</td>
+        <td>${item.productName}</td>
+        <td>KES ${item.price.toLocaleString()}</td>
+        <td>KES ${subtotal.toLocaleString()}</td>
+      </tr>
+    `;
+  });
+}
+
+</script>
 </body>
 </html>
