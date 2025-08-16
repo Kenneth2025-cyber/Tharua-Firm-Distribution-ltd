@@ -1086,18 +1086,77 @@ async function showAddPurchase() {
 }
 
 function addPurchaseItem(productsList) {
-  const itemsDiv = document.getElementById("purchaseItems");
-  const row = document.createElement("div");
+  let table = document.getElementById("purchaseItemsTable");
+
+  // If table doesn't exist yet, create it
+  if (!table) {
+    const itemsDiv = document.getElementById("purchaseItems");
+    itemsDiv.innerHTML = `
+      <table id="purchaseItemsTable" border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; margin-top:10px;">
+        <thead style="background:#f0f0f0;">
+          <tr>
+            <th>#</th>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Unit Price (KES)</th>
+            <th>Subtotal (KES)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="purchaseItemsBody"></tbody>
+      </table>
+    `;
+    table = document.getElementById("purchaseItemsTable");
+  }
+
+  const tbody = document.getElementById("purchaseItemsBody");
+
+  // Create a new row
+  const row = document.createElement("tr");
+
   row.innerHTML = `
-    <select class="purchaseProduct">
-      ${productsList.split(",").map(p => `<option value="${p}">${p}</option>`).join("")}
-    </select>
-    <input type="number" class="purchaseQty" placeholder="Qty" min="1" value="1">
-    <input type="number" class="purchasePrice" placeholder="Price" min="0" step="0.01" value="0">
-    <button type="button" onclick="this.parentElement.remove(); updatePurchaseTotal()">Remove</button>
+    <td class="item-index"></td>
+    <td>
+      <select class="purchaseProduct">
+        ${productsList.split(",").map(p => `<option value="${p}">${p}</option>`).join("")}
+      </select>
+    </td>
+    <td><input type="number" class="purchaseQty" min="1" value="1" style="width:70px;"></td>
+    <td><input type="number" class="purchasePrice" min="0" step="0.01" value="0" style="width:90px;"></td>
+    <td class="itemSubtotal">0.00</td>
+    <td><button type="button" onclick="this.closest('tr').remove(); updatePurchaseIndexes(); updatePurchaseTotal()">Remove</button></td>
   `;
-  row.querySelectorAll("input").forEach(input => input.addEventListener("input", updatePurchaseTotal));
-  itemsDiv.appendChild(row);
+
+  // Insert row at the TOP (latest item = #1)
+  if (tbody.firstChild) {
+    tbody.insertBefore(row, tbody.firstChild);
+  } else {
+    tbody.appendChild(row);
+  }
+
+  // Bind input events
+  row.querySelector(".purchaseQty").addEventListener("input", () => updateRowSubtotal(row));
+  row.querySelector(".purchasePrice").addEventListener("input", () => updateRowSubtotal(row));
+
+  // Update numbering and totals
+  updatePurchaseIndexes();
+  updateRowSubtotal(row);
+  updatePurchaseTotal();
+}
+
+function updateRowSubtotal(row) {
+  const qty = parseFloat(row.querySelector(".purchaseQty").value) || 0;
+  const price = parseFloat(row.querySelector(".purchasePrice").value) || 0;
+  const subtotal = qty * price;
+  row.querySelector(".itemSubtotal").textContent = subtotal.toFixed(2);
+  updatePurchaseTotal();
+}
+
+function updatePurchaseIndexes() {
+  const rows = document.querySelectorAll("#purchaseItemsBody tr");
+  rows.forEach((r, i) => {
+    r.querySelector(".item-index").textContent = i + 1;
+  });
 }
 
 function updatePurchaseTotal() {
@@ -1118,25 +1177,31 @@ async function savePurchase() {
   const amountPaid = parseFloat(document.getElementById("amountPaid").value) || 0;
   const paymentMethod = document.getElementById("paymentMethod").value;
   const notes = document.getElementById("notes").value;
-  const items = [];
 
-  document.querySelectorAll("#purchaseItems div").forEach(row => {
-    items.push({
-      productName: row.querySelector(".purchaseProduct").value,
-      quantity: parseFloat(row.querySelector(".purchaseQty").value) || 0,
-      price: parseFloat(row.querySelector(".purchasePrice").value) || 0
-    });
+  const items = [];
+  let totalAmount = 0;
+
+  // 🔹 Collect data from the new purchase items table
+  document.querySelectorAll("#purchaseItemsBody tr").forEach(row => {
+    const productName = row.querySelector(".purchaseProduct").value;
+    const quantity = parseFloat(row.querySelector(".purchaseQty").value) || 0;
+    const price = parseFloat(row.querySelector(".purchasePrice").value) || 0;
+    const subtotal = quantity * price;
+
+    if (productName && quantity > 0 && price >= 0) {
+      items.push({ productName, quantity, price, subtotal });
+      totalAmount += subtotal;
+    }
   });
 
-  const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-
   if (!supplier || !date || !location || items.length === 0) {
-    document.getElementById("purchaseMessage").textContent = "Please fill in all required fields and add at least one item.";
+    document.getElementById("purchaseMessage").textContent = 
+      "Please fill in all required fields and add at least one valid item.";
     return;
   }
 
   try {
-    // 1️⃣ Save purchase
+    // 1️⃣ Save purchase in Firestore
     await firebase.firestore().collection("purchases").add({
       supplier,
       purchaseDate: new Date(date),
@@ -1180,9 +1245,11 @@ async function savePurchase() {
     document.getElementById("totalAmount").textContent = "0";
 
   } catch (error) {
-    document.getElementById("purchaseMessage").textContent = "Error saving purchase: " + error.message;
+    document.getElementById("purchaseMessage").textContent = 
+      "Error saving purchase: " + error.message;
   }
 }
+
 async function showListPurchases() {
   saveLastPage("showListPurchases");
 
