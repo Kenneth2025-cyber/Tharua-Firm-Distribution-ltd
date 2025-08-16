@@ -1443,28 +1443,35 @@ async function showListPurchases() {
 let selectedDateRange = "all";
 
 async function loadFilterOptions() {
-  // Business Locations
   const locSelect = document.getElementById("filterLocation");
-  const locs = await firebase.firestore().collection("businessLocations").get();
-  locs.forEach(doc => {
-    const l = doc.data();
+  const supSelect = document.getElementById("filterSupplier");
+
+  const snapshot = await firebase.firestore().collection("purchases").get();
+
+  const locations = new Set();
+  const suppliers = new Set();
+
+  snapshot.forEach(doc => {
+    const p = doc.data();
+    if (p.location) locations.add(p.location.trim());
+    if (p.supplier) suppliers.add(p.supplier.trim());
+  });
+
+  locations.forEach(loc => {
     const opt = document.createElement("option");
-    opt.value = l.name;
-    opt.textContent = l.name;
+    opt.value = loc;
+    opt.textContent = loc;
     locSelect.appendChild(opt);
   });
 
-  // Suppliers
-  const supSelect = document.getElementById("filterSupplier");
-  const sups = await firebase.firestore().collection("suppliers").get();
-  sups.forEach(doc => {
-    const s = doc.data();
+  suppliers.forEach(sup => {
     const opt = document.createElement("option");
-    opt.value = s.name;
-    opt.textContent = s.name;
+    opt.value = sup;
+    opt.textContent = sup;
     supSelect.appendChild(opt);
   });
 }
+
 
 async function loadFilteredPurchases() {
   const table = document.getElementById("purchasesTable");
