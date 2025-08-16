@@ -259,7 +259,11 @@
 
       query.get().then(snap => {
         let total = 0;
-        snap.forEach(doc => total += doc.data().amount || 0);
+        snap.forEach(doc => {
+        const data = doc.data();
+        total += data.amount || data.totalAmount || 0;
+        });
+
         document.getElementById(elementId).textContent = "KES " + total.toLocaleString();
       }).catch(() => {
         document.getElementById(elementId).textContent = "Error";
@@ -1483,3 +1487,4 @@ function deleteSupplier(id) {
   </script>
 </body>
 </html>
+
