@@ -1443,15 +1443,18 @@ async function showListPurchases() {
 let selectedDateRange = "all";
 
 async function loadFilterOptions() {
+async function loadFilterOptions() {
   // Business Locations
   const locSelect = document.getElementById("filterLocation");
   const locs = await firebase.firestore().collection("businessLocations").get();
   locs.forEach(doc => {
     const l = doc.data();
-    const opt = document.createElement("option");
-    opt.value = l.name;
-    opt.textContent = l.name;
-    locSelect.appendChild(opt);
+    if (l.name) {   // ensure field exists
+      const opt = document.createElement("option");
+      opt.value = l.name;          // must match purchases.location
+      opt.textContent = l.name;
+      locSelect.appendChild(opt);
+    }
   });
 
   // Suppliers
@@ -1459,12 +1462,20 @@ async function loadFilterOptions() {
   const sups = await firebase.firestore().collection("suppliers").get();
   sups.forEach(doc => {
     const s = doc.data();
-    const opt = document.createElement("option");
-    opt.value = s.name;
-    opt.textContent = s.name;
-    supSelect.appendChild(opt);
+    if (s.name) {   // if field is "name"
+      const opt = document.createElement("option");
+      opt.value = s.name;          // must match purchases.supplier
+      opt.textContent = s.name;
+      supSelect.appendChild(opt);
+    }
+    // else if (s.supplierName) {  // uncomment if your supplier docs use supplierName
+    //   opt.value = s.supplierName;
+    //   opt.textContent = s.supplierName;
+    //   supSelect.appendChild(opt);
+    // }
   });
 }
+
 
 async function loadFilteredPurchases() {
   const table = document.getElementById("purchasesTable");
