@@ -1555,7 +1555,7 @@ async function loadFilteredPurchases() {
   }
 }
 
-function exportPurchasesCSV() {
+async function exportPurchasesCSV() {
   const rows = [];
   
   // CSV headers
@@ -1571,8 +1571,36 @@ function exportPurchasesCSV() {
     "Status"
   ]);
 
-  // Get all rows from Firestore again (filtered results)
-  firebase.firestore().collection("purchases").get().then(snapshot => {
+  try {
+    let query = firebase.firestore().collection("purchases");
+
+    // Apply Location filter
+    const loc = document.getElementById("filterLocation").value;
+    if (loc && loc !== "all") {
+      query = query.where("location", "==", loc);
+    }
+
+    // Apply Supplier filter
+    const sup = document.getElementById("filterSupplier").value;
+    if (sup && sup !== "all") {
+      query = query.where("supplier", "==", sup);
+    }
+
+    // Apply Date filter
+    const { start, end } = getDateRange(selectedDateRange);
+    if (start && end) {
+      query = query.where("purchaseDate", ">=", start).where("purchaseDate", "<=", end);
+    }
+
+    query = query.orderBy("purchaseDate", "desc");
+
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+      alert("No purchases found to export with current filters.");
+      return;
+    }
+
     snapshot.forEach(doc => {
       const p = doc.data();
       const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
@@ -1616,9 +1644,15 @@ function exportPurchasesCSV() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }).catch(err => {
+
+    // ✅ Show success toast
+    if (typeof showSuccess === "function") {
+      showSuccess("Purchases exported successfully!");
+    }
+
+  } catch (err) {
     alert("Error exporting purchases: " + err.message);
-  });
+  }
 }
 
 
