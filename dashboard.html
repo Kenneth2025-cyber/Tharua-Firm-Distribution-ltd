@@ -1512,21 +1512,32 @@ async function loadFilteredPurchases() {
     snapshot.forEach(doc => {
       const p = doc.data();
       const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-      const total = p.totalAmount || 0;
-      const paid = p.amountPaid || 0;
+
+      // ✅ Ensure numeric values
+      const total = Number(p.totalAmount) || 0;
+      const paid = Number(p.amountPaid) || 0;
       const balance = total - paid;
-      const status = balance > 0 
-        ? `<span style="color:red;font-weight:bold;">Due</span>` 
-        : `<span style="color:green;">Paid</span>`;
+
+      // ✅ Smarter status handling
+      let status = "";
+      if (balance > 0) {
+        status = `<span style="color:red;font-weight:bold;">Due</span>`;
+      } else if (balance < 0) {
+        status = `<span style="color:orange;font-weight:bold;">Overpaid</span>`;
+      } else {
+        status = `<span style="color:green;">Paid</span>`;
+      }
 
       table.innerHTML += `
         <tr>
           <td>${date}</td>
           <td>${p.location || ""}</td>
           <td>${p.supplier || ""}</td>
-          <td>${total}</td>
-          <td>${paid}</td>
-          <td style="color:${balance > 0 ? 'red' : 'black'};">${balance}</td>
+          <td>${total.toFixed(2)}</td>
+          <td>${paid.toFixed(2)}</td>
+          <td style="color:${balance > 0 ? 'red' : balance < 0 ? 'orange' : 'black'};">
+            ${balance.toFixed(2)}
+          </td>
           <td>${p.paymentMethod || ""}</td>
           <td>${p.referenceNo || ""}</td>
           <td>${status}</td>
@@ -1543,6 +1554,73 @@ async function loadFilteredPurchases() {
     table.innerHTML = `<tr><td colspan="10">Error: ${err.message}</td></tr>`;
   }
 }
+
+function exportPurchasesCSV() {
+  const rows = [];
+  
+  // CSV headers
+  rows.push([
+    "Date",
+    "Location",
+    "Supplier",
+    "Total (KES)",
+    "Paid (KES)",
+    "Balance (KES)",
+    "Payment Method",
+    "Reference No",
+    "Status"
+  ]);
+
+  // Get all rows from Firestore again (filtered results)
+  firebase.firestore().collection("purchases").get().then(snapshot => {
+    snapshot.forEach(doc => {
+      const p = doc.data();
+      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
+
+      const total = Number(p.totalAmount) || 0;
+      const paid = Number(p.amountPaid) || 0;
+      const balance = total - paid;
+
+      let status = "";
+      if (balance > 0) {
+        status = "Due";
+      } else if (balance < 0) {
+        status = "Overpaid";
+      } else {
+        status = "Paid";
+      }
+
+      rows.push([
+        date,
+        p.location || "",
+        p.supplier || "",
+        total.toFixed(2),
+        paid.toFixed(2),
+        balance.toFixed(2),
+        p.paymentMethod || "",
+        p.referenceNo || "",
+        status
+      ]);
+    });
+
+    // Build CSV string
+    const csvContent = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+    // Trigger download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "purchases_export.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }).catch(err => {
+    alert("Error exporting purchases: " + err.message);
+  });
+}
+
 
 function getDateRange(range) {
   const today = new Date();
