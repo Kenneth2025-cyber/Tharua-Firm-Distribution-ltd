@@ -1526,6 +1526,7 @@ async function printPurchase(id) {
           <p><b>Supplier:</b> ${p.supplier}</p>
           <p><b>Reference:</b> ${p.referenceNo || "-"}</p>
           <p><b>Payment Method:</b> ${p.paymentMethod || "-"}</p>
+          <p><b>Location:</b> ${p.location || "-"}</p>
         </div>
 
         <table>
@@ -1570,6 +1571,7 @@ async function printPurchase(id) {
   w.document.close();
   w.print();
 }
+
 
 
 function editPurchase(id) {
