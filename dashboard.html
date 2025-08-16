@@ -1330,15 +1330,48 @@ async function savePurchase() {
   }
 }
 
-
 async function showListPurchases() {
   saveLastPage("showListPurchases");
 
   document.getElementById("content").innerHTML = `
     <h2>List of Purchases</h2>
-    <div style="margin-bottom:10px;">
-      <button onclick="exportPurchasesCSV()">Export to CSV</button>
+
+    <!-- Filter Section -->
+    <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <select id="filterLocation" style="min-width:160px; padding:5px;">
+        <option value="all">All Locations</option>
+      </select>
+      <select id="filterSupplier" style="min-width:160px; padding:5px;">
+        <option value="all">All Suppliers</option>
+      </select>
+
+      <!-- Date filter -->
+      <div style="position:relative;">
+        <button id="dateFilterBtn" style="padding:6px 12px; cursor:pointer;">Date: All</button>
+        <div id="dateFilterMenu" 
+          style="display:none; position:absolute; top:35px; left:0; background:white; border:1px solid #ccc; 
+                 box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:100; min-width:180px;">
+          <div class="date-option" data-range="today">Today</div>
+          <div class="date-option" data-range="yesterday">Yesterday</div>
+          <div class="date-option" data-range="thisWeek">This Week</div>
+          <div class="date-option" data-range="lastWeek">Last Week</div>
+          <div class="date-option" data-range="thisMonth">This Month</div>
+          <div class="date-option" data-range="lastMonth">Last Month</div>
+          <div class="date-option" data-range="thisYear">This Year</div>
+          <div class="date-option" data-range="lastYear">Last Year</div>
+          <div class="date-option" data-range="custom">Custom...</div>
+        </div>
+      </div>
+
+      <!-- Custom date pickers -->
+      <input type="date" id="startDate" style="display:none;">
+      <input type="date" id="endDate" style="display:none;">
+
+      <button id="applyFilterBtn" style="padding:6px 12px; cursor:pointer; background:#2c3e50; color:white;">Apply Filter</button>
+      <button onclick="exportPurchasesCSV()" style="margin-left:auto; padding:6px 12px; cursor:pointer;">Export</button>
     </div>
+
+    <!-- Purchases Table -->
     <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
       <thead style="background:#f0f0f0;">
         <tr>
@@ -1371,17 +1404,100 @@ async function showListPurchases() {
     </div>
   `;
 
+  // Load dropdowns for suppliers & locations
+  loadFilterOptions();
+
+  // Setup date filter menu toggle
+  const dateBtn = document.getElementById("dateFilterBtn");
+  const dateMenu = document.getElementById("dateFilterMenu");
+  dateBtn.addEventListener("click", () => {
+    dateMenu.style.display = (dateMenu.style.display === "none" ? "block" : "none");
+  });
+
+  // Handle date menu clicks
+  dateMenu.querySelectorAll(".date-option").forEach(opt => {
+    opt.addEventListener("click", (e) => {
+      const range = e.target.dataset.range;
+      selectedDateRange = range;
+      dateBtn.textContent = "Date: " + e.target.textContent;
+      dateMenu.style.display = "none";
+
+      if (range === "custom") {
+        document.getElementById("startDate").style.display = "inline-block";
+        document.getElementById("endDate").style.display = "inline-block";
+      } else {
+        document.getElementById("startDate").style.display = "none";
+        document.getElementById("endDate").style.display = "none";
+      }
+    });
+  });
+
+  // Apply filter button
+  document.getElementById("applyFilterBtn").addEventListener("click", () => {
+    loadFilteredPurchases();
+  });
+
+  // Load all purchases initially
+  loadFilteredPurchases();
+}
+let selectedDateRange = "all";
+
+async function loadFilterOptions() {
+  // Business Locations
+  const locSelect = document.getElementById("filterLocation");
+  const locs = await firebase.firestore().collection("businessLocations").get();
+  locs.forEach(doc => {
+    const l = doc.data();
+    const opt = document.createElement("option");
+    opt.value = l.name;
+    opt.textContent = l.name;
+    locSelect.appendChild(opt);
+  });
+
+  // Suppliers
+  const supSelect = document.getElementById("filterSupplier");
+  const sups = await firebase.firestore().collection("suppliers").get();
+  sups.forEach(doc => {
+    const s = doc.data();
+    const opt = document.createElement("option");
+    opt.value = s.name;
+    opt.textContent = s.name;
+    supSelect.appendChild(opt);
+  });
+}
+
+async function loadFilteredPurchases() {
   const table = document.getElementById("purchasesTable");
+  table.innerHTML = "<tr><td colspan='9'>Loading...</td></tr>";
+
+  let query = firebase.firestore().collection("purchases");
+
+  // Apply Location filter
+  const loc = document.getElementById("filterLocation").value;
+  if (loc && loc !== "all") {
+    query = query.where("location", "==", loc);
+  }
+
+  // Apply Supplier filter
+  const sup = document.getElementById("filterSupplier").value;
+  if (sup && sup !== "all") {
+    query = query.where("supplier", "==", sup);
+  }
+
+  // Apply Date filter
+  const { start, end } = getDateRange(selectedDateRange);
+  if (start && end) {
+    query = query.where("purchaseDate", ">=", start).where("purchaseDate", "<=", end);
+  }
+
+  query = query.orderBy("purchaseDate", "desc");
 
   try {
-    const snapshot = await firebase.firestore().collection("purchases")
-      .orderBy("purchaseDate", "desc")
-      .get();
-
+    const snapshot = await query.get();
     table.innerHTML = "";
 
     if (snapshot.empty) {
-      table.innerHTML = `<tr><td colspan="9">No purchases found.</td></tr>`;
+      table.innerHTML = "<tr><td colspan='9'>No purchases found.</td></tr>";
       return;
     }
 
@@ -1414,11 +1530,68 @@ async function showListPurchases() {
         </tr>
       `;
     });
-
-  } catch (error) {
-    table.innerHTML = `<tr><td colspan="9">Error loading purchases: ${error.message}</td></tr>`;
+  } catch (err) {
+    table.innerHTML = `<tr><td colspan="9">Error: ${err.message}</td></tr>`;
   }
 }
+
+function getDateRange(range) {
+  const today = new Date();
+  let start = null, end = null;
+
+  switch (range) {
+    case "today":
+      start = new Date(today.setHours(0,0,0,0));
+      end = new Date(today.setHours(23,59,59,999));
+      break;
+    case "yesterday":
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      start = new Date(y.setHours(0,0,0,0));
+      end = new Date(y.setHours(23,59,59,999));
+      break;
+    case "thisWeek":
+      const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+      start = new Date(firstDay.setHours(0,0,0,0));
+      end = new Date();
+      break;
+    case "lastWeek":
+      const lastWeekStart = new Date();
+      lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
+      start = new Date(lastWeekStart.setHours(0,0,0,0));
+      const lastWeekEnd = new Date(start);
+      lastWeekEnd.setDate(start.getDate() + 6);
+      end = new Date(lastWeekEnd.setHours(23,59,59,999));
+      break;
+    case "thisMonth":
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date();
+      break;
+    case "lastMonth":
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0, 23,59,59,999);
+      break;
+    case "thisYear":
+      start = new Date(today.getFullYear(), 0, 1);
+      end = new Date();
+      break;
+    case "lastYear":
+      start = new Date(today.getFullYear() - 1, 0, 1);
+      end = new Date(today.getFullYear() - 1, 11, 31, 23,59,59,999);
+      break;
+    case "custom":
+      const s = document.getElementById("startDate").value;
+      const e = document.getElementById("endDate").value;
+      if (s && e) {
+        start = new Date(s);
+        end = new Date(e);
+        end.setHours(23,59,59,999);
+      }
+      break;
+  }
+  return { start, end };
+}
+
 
 // Modal functions
 async function viewPurchase(purchaseId) {
