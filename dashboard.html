@@ -1509,6 +1509,11 @@ async function loadFilteredPurchases() {
       return;
     }
 
+    // ✅ Totals accumulators
+    let totalSum = 0;
+    let paidSum = 0;
+    let balanceSum = 0;
+
     snapshot.forEach(doc => {
       const p = doc.data();
       const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
@@ -1518,12 +1523,16 @@ async function loadFilteredPurchases() {
       const paid = Number(p.amountPaid) || 0;
       const balance = total - paid;
 
+      totalSum += total;
+      paidSum += paid;
+      balanceSum += balance;
+
       // ✅ Smarter status handling
       let status = "";
       if (balance > 0) {
         status = `<span style="color:red;font-weight:bold;">Due</span>`;
       } else if (balance < 0) {
-        status = `<span style="color:orange;font-weight:bold;">Overpaid</span>`;
+        status = `<span style="color:#27ae60;font-weight:bold;">Overpaid</span>`; // lighter green
       } else {
         status = `<span style="color:green;">Paid</span>`;
       }
@@ -1535,7 +1544,7 @@ async function loadFilteredPurchases() {
           <td>${p.supplier || ""}</td>
           <td>${total.toFixed(2)}</td>
           <td>${paid.toFixed(2)}</td>
-          <td style="color:${balance > 0 ? 'red' : balance < 0 ? 'orange' : 'black'};">
+          <td style="color:${balance > 0 ? 'red' : balance < 0 ? '#27ae60' : 'black'};">
             ${balance.toFixed(2)}
           </td>
           <td>${p.paymentMethod || ""}</td>
@@ -1550,10 +1559,23 @@ async function loadFilteredPurchases() {
         </tr>
       `;
     });
+
+    // ✅ Totals row at bottom
+    table.innerHTML += `
+      <tr style="background:#f9f9f9; font-weight:bold;">
+        <td colspan="3" style="text-align:right;">Totals:</td>
+        <td>${totalSum.toFixed(2)}</td>
+        <td>${paidSum.toFixed(2)}</td>
+        <td>${balanceSum.toFixed(2)}</td>
+        <td colspan="4"></td>
+      </tr>
+    `;
+
   } catch (err) {
     table.innerHTML = `<tr><td colspan="10">Error: ${err.message}</td></tr>`;
   }
 }
+
 
 async function exportPurchasesCSV() {
   const rows = [];
