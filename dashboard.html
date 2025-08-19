@@ -362,7 +362,7 @@ function clearContent() { saveLastPage("clearContent"); document.getElementById(
     function toggleContacts() { const s = document.getElementById("contactsSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
     function toggleUserManagement() { const s = document.getElementById("userMgmtSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
 	
- function showUsers() {
+function showUsers() {
   saveLastPage("showUsers");
   document.getElementById("content").innerHTML = `
     <h2>Manage Users</h2>
@@ -384,10 +384,11 @@ function clearContent() { saveLastPage("clearContent"); document.getElementById(
     <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
       <thead>
         <tr style="background:#eee;">
+          <th>Username</th>
           <th>Name</th>
-          <th>Email</th>
           <th>Role</th>
-          <th>Actions</th>
+          <th>Email</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody id="usersTable"></tbody>
@@ -399,13 +400,13 @@ function clearContent() { saveLastPage("clearContent"); document.getElementById(
 
 function loadUsers() {
   const tbody = document.getElementById("usersTable");
-  tbody.innerHTML = "<tr><td colspan='4'>Loading...</td></tr>";
+  tbody.innerHTML = "<tr><td colspan='5'>Loading...</td></tr>";
 
   firebase.firestore().collection("users").get()
   .then(snapshot => {
     tbody.innerHTML = "";
     if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='4'>No users found.</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='5'>No users found.</td></tr>";
       return;
     }
 
@@ -413,21 +414,24 @@ function loadUsers() {
       const u = doc.data();
       tbody.innerHTML += `
         <tr>
+          <td>${doc.id || ""}</td> <!-- Using document ID as Username -->
           <td>${u.name || ""}</td>
-          <td>${u.email || ""}</td>
           <td>${u.role || ""}</td>
+          <td>${u.email || ""}</td>
           <td>
-            <button onclick="editUser('${doc.id}')">Edit</button>
-            <button style="background:red;color:white;" onclick="deleteUser('${doc.id}')">Delete</button>
+            <span title="Edit" style="cursor:pointer; color:#2980b9;" onclick="editUser('${doc.id}')">✏</span>
+            <span title="View" style="cursor:pointer; color:green; margin-left:6px;" onclick="viewUser('${doc.id}')">👁</span>
+            <span title="Delete" style="cursor:pointer; color:red; margin-left:6px;" onclick="deleteUser('${doc.id}')">🗑</span>
           </td>
         </tr>
       `;
     });
   })
   .catch(err => {
-    tbody.innerHTML = `<tr><td colspan='4'>Error loading users: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan='5'>Error loading users: ${err.message}</td></tr>`;
   });
 }
+
 function createUser() {
   const name = document.getElementById("newName").value.trim();
   const email = document.getElementById("newEmail").value.trim();
@@ -473,7 +477,12 @@ function deleteUser(userId) {
 
 function editUser(userId) {
   alert("Edit feature coming soon for user ID: " + userId);
-}	
+}
+
+// New function for view action (placeholder)
+function viewUser(userId) {
+  alert("View feature coming soon for user ID: " + userId);
+}
 
 function toggleProducts() {
   const submenu = document.getElementById("productsSubmenu");
