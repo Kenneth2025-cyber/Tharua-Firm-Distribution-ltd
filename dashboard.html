@@ -413,13 +413,13 @@ function loadUsers() {
     snapshot.forEach(doc => {
       const u = doc.data();
       tbody.innerHTML += `
-        <tr>
-          <td>${doc.id || ""}</td> <!-- Using document ID as Username -->
-          <td>${u.name || ""}</td>
-          <td>${u.role || ""}</td>
-          <td>${u.email || ""}</td>
+        <tr data-id="${doc.id}">
+          <td>${doc.id || ""}</td>
+          <td class="editable" data-field="name">${u.name || ""}</td>
+          <td class="editable" data-field="role">${u.role || ""}</td>
+          <td class="editable" data-field="email">${u.email || ""}</td>
           <td>
-            <span title="Edit" style="cursor:pointer; color:#2980b9;" onclick="editUser('${doc.id}')">✏</span>
+            <span title="Edit" style="cursor:pointer; color:#2980b9;" onclick="enterEditMode(this)">✏</span>
             <span title="View" style="cursor:pointer; color:green; margin-left:6px;" onclick="viewUser('${doc.id}')">👁</span>
             <span title="Delete" style="cursor:pointer; color:red; margin-left:6px;" onclick="deleteUser('${doc.id}')">🗑</span>
           </td>
@@ -432,6 +432,90 @@ function loadUsers() {
   });
 }
 
+// Enter edit mode for a user row
+function enterEditMode(editSpan) {
+  const row = editSpan.closest('tr');
+  const userId = row.getAttribute('data-id');
+  const cells = row.querySelectorAll('.editable');
+
+  // Store original values
+  const originalData = {};
+  cells.forEach(cell => {
+    originalData[cell.getAttribute('data-field')] = cell.textContent;
+  });
+
+  // Convert cells to inputs
+  cells.forEach(cell => {
+    const field = cell.getAttribute('data-field');
+    let input;
+    if (field === 'role') {
+      input = document.createElement('select');
+      input.className = 'edit-input';
+      ['admin', 'cashier', 'salesperson'].forEach(role => {
+        const option = document.createElement('option');
+        option.value = role;
+        option.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+        if (role === cell.textContent) option.selected = true;
+        input.appendChild(option);
+      });
+    } else {
+      input = document.createElement('input');
+      input.type = field === 'email' ? 'email' : 'text';
+      input.className = 'edit-input';
+      input.value = cell.textContent || '';
+    }
+    cell.innerHTML = '';
+    cell.appendChild(input);
+  });
+
+  // Replace action icons with save and cancel buttons
+  const actionCell = row.querySelector('td:last-child');
+  actionCell.innerHTML = `
+    <button class="btn-save" onclick="saveUser('${userId}', this)">Save</button>
+    <button class="btn-cancel" onclick="cancelEdit(this, ${JSON.stringify(originalData)})">Cancel</button>
+  `;
+}
+
+// Save edited user data
+async function saveUser(userId, saveButton) {
+  const row = saveButton.closest('tr');
+  const cells = row.querySelectorAll('.editable');
+  const updatedData = {};
+
+  cells.forEach(cell => {
+    const field = cell.getAttribute('data-field');
+    const input = cell.querySelector('input, select');
+    updatedData[field] = input.value;
+  });
+
+  try {
+    await firebase.firestore().collection("users").doc(userId).update(updatedData);
+    showSuccessNotification("User updated successfully.");
+    loadUsers(); // Refresh the table
+  } catch (err) {
+    alert("Error updating user: " + err.message);
+  }
+}
+
+// Cancel edit mode and revert to original values
+function cancelEdit(cancelButton, originalData) {
+  const row = cancelButton.closest('tr');
+  const cells = row.querySelectorAll('.editable');
+
+  cells.forEach(cell => {
+    const field = cell.getAttribute('data-field');
+    cell.innerHTML = originalData[field] || '';
+  });
+
+  const actionCell = row.querySelector('td:last-child');
+  actionCell.innerHTML = `
+    <span title="Edit" style="cursor:pointer; color:#2980b9;" onclick="enterEditMode(this)">✏</span>
+    <span title="View" style="cursor:pointer; color:green; margin-left:6px;" onclick="viewUser('${row.getAttribute('data-id')}')">👁</span>
+    <span title="Delete" style="cursor:pointer; color:red; margin-left:6px;" onclick="deleteUser('${row.getAttribute('data-id')}')">🗑</span>
+  `;
+}
+
+// Existing functions remain unchanged
 function createUser() {
   const name = document.getElementById("newName").value.trim();
   const email = document.getElementById("newEmail").value.trim();
@@ -446,18 +530,17 @@ function createUser() {
   firebase.firestore().collection("users").add({
     name: name,
     email: email,
-    password: password,  // storing password as plain text (not recommended in production)
+    password: password,
     role: role,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   })
   .then(() => {
     alert("User created successfully.");
-    // Clear inputs
     document.getElementById("newName").value = "";
     document.getElementById("newEmail").value = "";
     document.getElementById("newPassword").value = "";
     document.getElementById("newRole").value = "";
-    loadUsers(); // refresh list
+    loadUsers();
   })
   .catch(error => {
     alert("Error creating user: " + error.message);
@@ -479,7 +562,6 @@ function editUser(userId) {
   alert("Edit feature coming soon for user ID: " + userId);
 }
 
-// New function for view action (placeholder)
 function viewUser(userId) {
   alert("View feature coming soon for user ID: " + userId);
 }
