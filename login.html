@@ -57,6 +57,9 @@
       padding: 10px;
       border-radius: 6px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     .lang-dropdown select {
       padding: 5px;
@@ -67,15 +70,19 @@
       cursor: pointer;
     }
     .lang-dropdown i {
-      margin-right: 5px;
+      font-size: 1rem;
     }
-    img {
+    .logo-container {
       position: absolute;
-      top: 20px;
-      left: 20px;
+      top: 60px; /* Adjusted to place below lang-dropdown */
+      right: 20px;
+      z-index: 1;
+    }
+    .logo-container img {
       width: 100px;
       height: auto;
-      loading="lazy";
+      display: block;
+      loading: lazy;
     }
 
     /* Toast notification styles */
@@ -102,7 +109,8 @@
     @media (max-width: 600px) {
       .login-box { padding: 20px; max-width: 300px; }
       .lang-dropdown { top: 10px; right: 10px; }
-      img { top: 10px; left: 10px; width: 80px; }
+      .logo-container { top: 50px; right: 10px; } /* Adjusted for mobile */
+      .logo-container img { width: 80px; }
     }
   </style>
 </head>
@@ -118,14 +126,16 @@
       <div class="footer-note">Authorized users only | <a href="#" onclick="resetPassword()">Forgot Password?</a></div>
     </div>
     <div class="lang-dropdown">
-      <select onchange="changeLanguage(this.value)">
+      <i class="fas fa-globe"></i>
+      <select onchange="changeLanguage(this.value)" aria-label="Select language">
         <option value="en">English</option>
         <option value="es">Español</option>
         <option value="fr">Français</option>
       </select>
-      <i class="fas fa-globe"></i>
     </div>
-    <img src="Bold Buffalo Logo In Black and White.png" alt="Buffalo Head Logo" style="position: absolute; top: 20px; left: 20px; width: 100px; height: auto;">
+    <div class="logo-container">
+      <img src="images/Bold Buffalo Logo In Black and White.png" alt="Buffalo Head Logo">
+    </div>
   </div>
 
   <!-- Success sound -->
