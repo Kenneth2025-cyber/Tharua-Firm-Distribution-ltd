@@ -81,7 +81,7 @@
 
   <script>
     const firebaseConfig = {
-      apiKey: "YOUR_ACTUAL_API_KEY_HERE", // Replace with your valid API key from Firebase Console
+      apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
       authDomain: "tharuasystem.firebaseapp.com",
       projectId: "tharuasystem",
       storageBucket: "tharuasystem.appspot.com",
@@ -90,17 +90,14 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // Bing daily wallpaper with fallback
+    // Bing daily wallpaper
     fetch("https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US")
       .then(res => res.json())
       .then(data => {
         const imgUrl = "https://www.bing.com" + data.images[0].url;
         document.body.style.backgroundImage = `url('${imgUrl}')`;
       })
-      .catch(err => {
-        console.error("Wallpaper fetch error:", err);
-        document.body.style.backgroundImage = `url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')`; // Fallback to a blank image
-      });
+      .catch(err => console.error("Wallpaper fetch error:", err));
 
     function showToast(message, type) {
       const toast = document.createElement("div");
@@ -132,3 +129,4 @@
   </script>
 </body>
 </html>
+
