@@ -362,72 +362,155 @@ function clearContent() { saveLastPage("clearContent"); document.getElementById(
     function toggleContacts() { const s = document.getElementById("contactsSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
     function toggleUserManagement() { const s = document.getElementById("userMgmtSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
 	
-    function showUsers() {
+<script>
+function showUsers() {
   saveLastPage("showUsers");
   document.getElementById("content").innerHTML = `
-    <h2>Manage Users</h2>
+    <h2>Users <small style="font-size:14px;color:#777;">Manage users</small></h2>
 
-    <!-- Create User Form -->
-   <input type="text" id="newName" placeholder="Full Name" required>
-<input type="email" id="newEmail" placeholder="Email" required>
-<input type="password" id="newPassword" placeholder="Password" required>
-<select id="newRole">
-  <option value="">Select Role</option>
-  <option value="admin">Admin</option>
-  <option value="cashier">Cashier</option>
-  <option value="salesperson">Salesperson</option>
-</select>
-<button onclick="createUser()">Create User</button>
+    <!-- Toolbar -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:15px 0;">
+      <div>
+        Show 
+        <select id="entriesSelect" style="padding:4px 6px;">
+          <option value="10">10</option>
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        entries
+      </div>
+      <div>
+        <button onclick="exportUsersCSV()">Export CSV</button>
+        <button onclick="exportUsersExcel()">Export Excel</button>
+        <button onclick="window.print()">Print</button>
+        <button onclick="exportUsersPDF()">Export PDF</button>
+      </div>
+      <div>
+        <input type="text" id="searchUsers" placeholder="Search ..." style="padding:6px;"/>
+      </div>
+      <button id="addUserBtn" 
+        style="background:#2c3e50;color:white;padding:6px 12px;border:none;border-radius:4px;cursor:pointer;">
+        + Add
+      </button>
+    </div>
 
-    <!-- Existing Users Table -->
-    <h3>Existing Users</h3>
-    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead>
-        <tr style="background:#eee;">
+    <!-- Users Table -->
+    <table id="usersTable" border="1" cellpadding="8" cellspacing="0" 
+      style="width:100%; border-collapse:collapse; text-align:left;">
+      <thead style="background:#f0f0f0;">
+        <tr>
           <th>Name</th>
           <th>Email</th>
           <th>Role</th>
-          <th>Actions</th>
+          <th>Action</th>
         </tr>
       </thead>
-      <tbody id="usersTable"></tbody>
+      <tbody id="usersTbody">
+        <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+      </tbody>
     </table>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" style="display:none; position:fixed; top:0; left:0; 
+        width:100%; height:100%; background:rgba(0,0,0,0.5); 
+        justify-content:center; align-items:center; z-index:1000;">
+      <div style="background:white; padding:20px; width:400px; border-radius:8px;">
+        <h3>Create User</h3>
+        <input type="text" id="newName" placeholder="Full Name" required>
+        <input type="email" id="newEmail" placeholder="Email" required>
+        <input type="password" id="newPassword" placeholder="Password" required>
+        <select id="newRole" required>
+          <option value="">Select Role</option>
+          <option value="admin">Admin</option>
+          <option value="cashier">Cashier</option>
+          <option value="salesperson">Salesperson</option>
+        </select>
+        <div style="margin-top:10px; text-align:right;">
+          <button onclick="closeAddUserModal()">Cancel</button>
+          <button onclick="createUser()" 
+            style="background:#2c3e50;color:white;padding:6px 12px;border:none;border-radius:4px;cursor:pointer;">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
   `;
+
+  document.getElementById("addUserBtn").addEventListener("click", () => {
+    document.getElementById("addUserModal").style.display = "flex";
+  });
+
+  document.getElementById("searchUsers").addEventListener("input", filterUsers);
 
   loadUsers();
 }
 
+function closeAddUserModal() {
+  document.getElementById("addUserModal").style.display = "none";
+}
+
+let allUsers = []; 
+
 function loadUsers() {
-  const tbody = document.getElementById("usersTable");
+  const tbody = document.getElementById("usersTbody");
   tbody.innerHTML = "<tr><td colspan='4'>Loading...</td></tr>";
 
-  firebase.firestore().collection("users").get()
+  firebase.firestore().collection("users").orderBy("createdAt", "desc").get()
   .then(snapshot => {
-    tbody.innerHTML = "";
-    if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='4'>No users found.</td></tr>";
-      return;
-    }
-
+    allUsers = [];
     snapshot.forEach(doc => {
       const u = doc.data();
-      tbody.innerHTML += `
-        <tr>
-          <td>${u.name || ""}</td>
-          <td>${u.email || ""}</td>
-          <td>${u.role || ""}</td>
-          <td>
-            <button onclick="editUser('${doc.id}')">Edit</button>
-            <button style="background:red;color:white;" onclick="deleteUser('${doc.id}')">Delete</button>
-          </td>
-        </tr>
-      `;
+      allUsers.push({
+        id: doc.id,
+        name: u.name || "",
+        email: u.email || "",
+        role: u.role || ""
+      });
     });
+    renderUsers(allUsers);
   })
   .catch(err => {
-    tbody.innerHTML = `<tr><td colspan='4'>Error loading users: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan='4'>Error: ${err.message}</td></tr>`;
   });
 }
+
+function renderUsers(users) {
+  const tbody = document.getElementById("usersTbody");
+  if (!users || users.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No users found.</td></tr>";
+    return;
+  }
+  tbody.innerHTML = "";
+  users.forEach(u => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${u.name}</td>
+        <td>${u.email}</td>
+        <td>${u.role}</td>
+        <td>
+          <button style="background:#2980b9;color:white;padding:4px 8px;border:none;border-radius:4px;cursor:pointer;" 
+            onclick="editUser('${u.id}')">Edit</button>
+          <button style="background:#16a085;color:white;padding:4px 8px;border:none;border-radius:4px;cursor:pointer;" 
+            onclick="viewUser('${u.id}')">View</button>
+          <button style="background:#c0392b;color:white;padding:4px 8px;border:none;border-radius:4px;cursor:pointer;" 
+            onclick="deleteUser('${u.id}')">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function filterUsers() {
+  const q = document.getElementById("searchUsers").value.toLowerCase();
+  const filtered = allUsers.filter(u =>
+    u.name.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q) ||
+    u.role.toLowerCase().includes(q)
+  );
+  renderUsers(filtered);
+}
+
 function createUser() {
   const name = document.getElementById("newName").value.trim();
   const email = document.getElementById("newEmail").value.trim();
@@ -435,25 +518,21 @@ function createUser() {
   const role = document.getElementById("newRole").value;
 
   if (!name || !email || !password || !role) {
-    alert("Please fill in all fields and select a role.");
+    alert("Please fill in all fields.");
     return;
   }
 
   firebase.firestore().collection("users").add({
-    name: name,
-    email: email,
-    password: password,  // storing password as plain text (not recommended in production)
-    role: role,
+    name,
+    email,
+    password, // ⚠️ plain text – for now same as your original code
+    role,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   })
   .then(() => {
+    closeAddUserModal();
     alert("User created successfully.");
-    // Clear inputs
-    document.getElementById("newName").value = "";
-    document.getElementById("newEmail").value = "";
-    document.getElementById("newPassword").value = "";
-    document.getElementById("newRole").value = "";
-    loadUsers(); // refresh list
+    loadUsers();
   })
   .catch(error => {
     alert("Error creating user: " + error.message);
@@ -474,10 +553,17 @@ function deleteUser(userId) {
 function editUser(userId) {
   alert("Edit feature coming soon for user ID: " + userId);
 }
-function toggleProducts() {
-  const submenu = document.getElementById("productsSubmenu");
-  submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+
+function viewUser(userId) {
+  alert("View feature coming soon for user ID: " + userId);
 }
+
+// Exports (placeholders)
+function exportUsersCSV() { alert("Export CSV coming soon."); }
+function exportUsersExcel() { alert("Export Excel coming soon."); }
+function exportUsersPDF() { alert("Export PDF coming soon."); }
+</script>
+
 
 async function showAddProduct() {
   saveLastPage("showAddProduct");
