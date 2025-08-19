@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset Password - Tharua System</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tharua Login Page</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -14,19 +14,19 @@
       display: flex; justify-content: center; align-items: center;
       height: 100vh;
     }
-    .reset-box {
+    .login-box {
       background: #f4e6e6;
-      padding: 40px;
+      padding: 50px 40px;
       border-radius: 16px;
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-      width: 100%; max-width: 380px;
-      text-align: center;
+      width: 100%; max-width: 400px;
     }
-    .reset-box h2 {
-      margin-bottom: 20px;
+    .login-box h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      color: #333;
       font-size: 22px;
       font-weight: 600;
-      color: #333;
     }
     .input-group {
       position: relative;
@@ -64,17 +64,38 @@
       cursor: not-allowed;
     }
     .footer-note {
-      margin-top: 15px;
+      margin-top: 20px;
       font-size: 13px;
+      color: #777;
+      text-align: center;
     }
     .footer-note a {
       color: #600000;
-      text-decoration: none;
       font-weight: 500;
+      text-decoration: none;
     }
     .footer-note a:hover { text-decoration: underline; }
-
-    /* Toast notification styles */
+    .language-switch {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: white;
+      border-radius: 6px;
+      padding: 4px 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .language-switch i {
+      color: #333;
+    }
+    .language-switch select {
+      border: none;
+      background: none;
+      font-size: 14px;
+      outline: none;
+    }
     .toast {
       position: fixed;
       top: 20px; left: 20px;
@@ -97,26 +118,35 @@
   </style>
 </head>
 <body>
-  <div class="reset-box">
-    <h2>Reset Your Password</h2>
-    <div class="input-group">
-      <i class="fas fa-envelope"></i>
-      <input type="email" id="email" placeholder="Enter your email" required>
-    </div>
-    <button onclick="resetPassword()" id="resetBtn">Send Reset Link</button>
+  <div class="language-switch">
+    <i class="fas fa-globe"></i>
+    <select>
+      <option>English</option>
+      <option>Kiswahili</option>
+      <option>French</option>
+    </select>
+  </div>
+  <div class="login-box">
+    <h2>Welcome Back to TharuaFirm</h2>
+    <form onsubmit="event.preventDefault(); login();">
+      <div class="input-group">
+        <i class="fas fa-envelope"></i>
+        <input type="email" id="email" placeholder="Email" required>
+      </div>
+      <div class="input-group">
+        <i class="fas fa-lock"></i>
+        <input type="password" id="password" placeholder="Password" required>
+      </div>
+      <button type="submit">Login</button>
+    </form>
     <div class="footer-note">
-      <a href="login.html">Back to Login</a>
+      Authorized users only | <a href="reset.html">Forgot Password?</a>
     </div>
   </div>
-
-  <!-- Success & Error sounds -->
   <audio id="successSound" src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3"></audio>
   <audio id="errorSound" src="https://assets.mixkit.co/sfx/preview/mixkit-click-error-1110.mp3"></audio>
-
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
@@ -127,40 +157,34 @@
       appId: "1:438210516373:web:83c188e315a69165d5129c"
     };
     firebase.initializeApp(firebaseConfig);
-
     function showToast(message, type) {
       const toast = document.createElement("div");
       toast.className = `toast ${type}`;
       toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${message}`;
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 3000);
-
       if (type === "success") document.getElementById("successSound").play();
       if (type === "error") document.getElementById("errorSound").play();
     }
-
-    function resetPassword() {
+    function login() {
       const email = document.getElementById("email").value.trim();
-      const button = document.getElementById("resetBtn");
-
-      if (!email) {
-        showToast("Please enter your email", "error");
+      const password = document.getElementById("password").value.trim();
+      const button = document.querySelector("button");
+      if (!email || !password) {
+        showToast("Please enter both email and password", "error");
         return;
       }
-
       button.disabled = true;
-      button.textContent = "Sending...";
-
-      firebase.auth().sendPasswordResetEmail(email)
+      button.textContent = "Logging in...";
+      firebase.auth().signInWithEmailAndPassword(email, password)
         .then(() => {
-          showToast("Password reset link sent to your email.", "success");
-          button.disabled = false;
-          button.textContent = "Send Reset Link";
+          showToast("Login successful!", "success");
+          setTimeout(() => window.location.href = "dashboard.html", 1500);
         })
-        .catch((error) => {
+        .catch(error => {
           showToast(error.message, "error");
           button.disabled = false;
-          button.textContent = "Send Reset Link";
+          button.textContent = "Login";
         });
     }
   </script>
