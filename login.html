@@ -5,114 +5,150 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tharua Login Page</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     * { box-sizing: border-box; font-family: 'Poppins', sans-serif; }
     body {
       margin: 0; padding: 0;
-      background: linear-gradient(135deg, #600000, #800000); /* Gradient background */
+      background: linear-gradient(135deg, #600000, #8b0000);
       display: flex; justify-content: center; align-items: center;
       height: 100vh;
     }
     .login-box {
-      background: #f4e6e6; /* Soft beige card */
-      padding: 48px 32px; /* Increased padding */
-      border-radius: 16px; /* Softer corners */
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); /* Stronger shadow */
-      width: 100%; max-width: 420px; /* Slightly wider */
-      position: relative; /* For language switcher positioning */
+      background: #f4e6e6;
+      padding: 50px 40px;
+      border-radius: 16px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+      width: 100%; max-width: 400px;
     }
     .login-box h2 {
-      text-align: center; margin-bottom: 30px; color: #333;
-      font-size: 24px; /* Larger title */
-      font-weight: 700; /* Bolder title */
+      text-align: center;
+      margin-bottom: 25px;
+      color: #333;
+      font-size: 22px;
+      font-weight: 600;
     }
-    input[type="email"], input[type="password"] {
-      width: 100%; padding: 14px; margin-bottom: 18px; /* Adjusted spacing */
-      border: 1px solid #ccc; border-radius: 8px; font-size: 15px;
-      transition: border-color 0.3s, box-shadow 0.3s; /* Smooth focus transition */
+
+    /* Input groups with icons */
+    .input-group {
+      position: relative;
+      margin-bottom: 20px;
     }
-    input:focus {
-      border-color: #600000; /* Highlight on focus */
-      box-shadow: 0 0 8px rgba(96, 0, 0, 0.2); /* Subtle glow */
-      outline: none;
+    .input-group i {
+      position: absolute;
+      top: 50%;
+      left: 12px;
+      transform: translateY(-50%);
+      color: #888;
     }
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      padding-left: 36px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+
     button {
-      width: 100%; padding: 14px;
-      background: linear-gradient(135deg, #600000, #700000); /* Gradient button */
-      color: white; border: none; border-radius: 8px; font-size: 16px;
-      cursor: pointer; transition: background 0.3s ease, transform 0.2s;
+      width: 100%;
+      padding: 12px;
+      background-color: #600000;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s ease;
     }
-    button:hover {
-      background: linear-gradient(135deg, #400000, #500000);
-      transform: translateY(-2px); /* Subtle lift effect */
-    }
+    button:hover { background-color: #400000; }
     button:disabled {
-      background: #999; cursor: not-allowed; /* Disabled state */
+      background-color: #999;
+      cursor: not-allowed;
     }
+
     .footer-note {
-      margin-top: 20px; text-align: center; font-size: 13px; color: #555;
-      line-height: 1.5; /* Better readability */
+      margin-top: 20px;
+      font-size: 13px;
+      color: #777;
+      text-align: center;
     }
-    .footer-note a { color: #600000; text-decoration: none; }
+    .footer-note a {
+      color: #600000;
+      font-weight: 500;
+      text-decoration: none;
+    }
     .footer-note a:hover { text-decoration: underline; }
 
     /* Language selector */
     .language-switch {
       position: absolute;
-      top: 12px; right: 12px; /* Inside login box */
-      display: flex; align-items: center; gap: 6px;
-      background: rgba(255, 255, 255, 0.9); border-radius: 6px;
-      padding: 4px 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: white;
+      border-radius: 6px;
+      padding: 4px 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
-    .language-switch i { color: #333; font-size: 14px; }
+    .language-switch i {
+      color: #333;
+    }
     .language-switch select {
-      border: none; background: none; font-size: 13px; outline: none;
+      border: none;
+      background: none;
+      font-size: 14px;
+      outline: none;
     }
 
     /* Toast notification styles */
     .toast {
-      position: fixed; top: 20px; left: 20px;
-      padding: 12px 16px; border-radius: 8px; color: white;
-      font-size: 14px; display: flex; align-items: center; gap: 8px;
+      position: fixed;
+      top: 20px; left: 20px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in forwards;
-      animation-delay: 0s, 2.7s; z-index: 9999;
+      animation-delay: 0s, 2.7s;
+      z-index: 9999;
     }
     .toast.success { background-color: #28a745; }
     .toast.error { background-color: #dc3545; }
     .toast i { font-size: 18px; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
-
-    /* Responsive adjustments */
-    @media (max-width: 400px) {
-      .login-box { padding: 32px 24px; max-width: 90%; }
-      .login-box h2 { font-size: 20px; }
-      input[type="email"], input[type="password"] { padding: 12px; font-size: 14px; }
-      button { padding: 12px; font-size: 15px; }
-    }
-    @media (min-width: 768px) {
-      .login-box { max-width: 450px; }
-    }
   </style>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+  <!-- Language Switch -->
+  <div class="language-switch">
+    <i class="fas fa-globe"></i>
+    <select>
+      <option>English</option>
+      <option>Kiswahili</option>
+      <option>French</option>
+    </select>
+  </div>
+
   <!-- Login Box -->
   <div class="login-box">
-    <!-- Language Switch -->
-    <div class="language-switch">
-      <i class="fas fa-globe"></i>
-      <select>
-        <option>English</option>
-        <option>Kiswahili</option>
-        <option>French</option>
-      </select>
-    </div>
     <h2>Welcome Back to TharuaFirm</h2>
     <form onsubmit="event.preventDefault(); login();">
-      <input type="email" id="email" placeholder="Email" required>
-      <input type="password" id="password" placeholder="Password" required>
-      <button type="submit" id="loginBtn">Login</button>
+      <div class="input-group">
+        <i class="fas fa-envelope"></i>
+        <input type="email" id="email" placeholder="Email" required>
+      </div>
+      <div class="input-group">
+        <i class="fas fa-lock"></i>
+        <input type="password" id="password" placeholder="Password" required>
+      </div>
+      <button type="submit">Login</button>
     </form>
     <div class="footer-note">
       Authorized users only | <a href="#">Forgot Password?</a>
@@ -144,6 +180,7 @@
       toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${message}`;
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 3000);
+
       if (type === "success") document.getElementById("successSound").play();
       if (type === "error") document.getElementById("errorSound").play();
     }
@@ -151,16 +188,15 @@
     function login() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
-      const loginBtn = document.getElementById("loginBtn");
+      const button = document.querySelector("button");
 
       if (!email || !password) {
         showToast("Please enter both email and password", "error");
         return;
       }
 
-      // Show loading state
-      loginBtn.disabled = true;
-      loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+      button.disabled = true;
+      button.textContent = "Logging in...";
 
       firebase.auth().signInWithEmailAndPassword(email, password)
         .then(() => {
@@ -169,11 +205,8 @@
         })
         .catch(error => {
           showToast(error.message, "error");
-        })
-        .finally(() => {
-          // Reset button state
-          loginBtn.disabled = false;
-          loginBtn.innerHTML = "Login";
+          button.disabled = false;
+          button.textContent = "Login";
         });
     }
   </script>
