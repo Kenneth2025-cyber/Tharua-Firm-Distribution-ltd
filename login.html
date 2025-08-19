@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tharua Login Page</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password - Tharua System</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -14,22 +14,20 @@
       display: flex; justify-content: center; align-items: center;
       height: 100vh;
     }
-    .login-box {
+    .reset-box {
       background: #f4e6e6;
-      padding: 50px 40px;
+      padding: 40px;
       border-radius: 16px;
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-      width: 100%; max-width: 400px;
-    }
-    .login-box h2 {
+      width: 100%; max-width: 380px;
       text-align: center;
-      margin-bottom: 25px;
-      color: #333;
+    }
+    .reset-box h2 {
+      margin-bottom: 20px;
       font-size: 22px;
       font-weight: 600;
+      color: #333;
     }
-
-    /* Input groups with icons */
     .input-group {
       position: relative;
       margin-bottom: 20px;
@@ -49,7 +47,6 @@
       border-radius: 6px;
       font-size: 15px;
     }
-
     button {
       width: 100%;
       padding: 12px;
@@ -66,42 +63,16 @@
       background-color: #999;
       cursor: not-allowed;
     }
-
     .footer-note {
-      margin-top: 20px;
+      margin-top: 15px;
       font-size: 13px;
-      color: #777;
-      text-align: center;
     }
     .footer-note a {
       color: #600000;
-      font-weight: 500;
       text-decoration: none;
+      font-weight: 500;
     }
     .footer-note a:hover { text-decoration: underline; }
-
-    /* Language selector */
-    .language-switch {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: white;
-      border-radius: 6px;
-      padding: 4px 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    .language-switch i {
-      color: #333;
-    }
-    .language-switch select {
-      border: none;
-      background: none;
-      font-size: 14px;
-      outline: none;
-    }
 
     /* Toast notification styles */
     .toast {
@@ -126,32 +97,15 @@
   </style>
 </head>
 <body>
-  <!-- Language Switch -->
-  <div class="language-switch">
-    <i class="fas fa-globe"></i>
-    <select>
-      <option>English</option>
-      <option>Kiswahili</option>
-      <option>French</option>
-    </select>
-  </div>
-
-  <!-- Login Box -->
-  <div class="login-box">
-    <h2>Welcome Back to TharuaFirm</h2>
-    <form onsubmit="event.preventDefault(); login();">
-      <div class="input-group">
-        <i class="fas fa-envelope"></i>
-        <input type="email" id="email" placeholder="Email" required>
-      </div>
-      <div class="input-group">
-        <i class="fas fa-lock"></i>
-        <input type="password" id="password" placeholder="Password" required>
-      </div>
-      <button type="submit">Login</button>
-    </form>
+  <div class="reset-box">
+    <h2>Reset Your Password</h2>
+    <div class="input-group">
+      <i class="fas fa-envelope"></i>
+      <input type="email" id="email" placeholder="Enter your email" required>
+    </div>
+    <button onclick="resetPassword()" id="resetBtn">Send Reset Link</button>
     <div class="footer-note">
-      Authorized users only | <a href="#">Forgot Password?</a>
+      <a href="login.html">Back to Login</a>
     </div>
   </div>
 
@@ -185,28 +139,28 @@
       if (type === "error") document.getElementById("errorSound").play();
     }
 
-    function login() {
+    function resetPassword() {
       const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value.trim();
-      const button = document.querySelector("button");
+      const button = document.getElementById("resetBtn");
 
-      if (!email || !password) {
-        showToast("Please enter both email and password", "error");
+      if (!email) {
+        showToast("Please enter your email", "error");
         return;
       }
 
       button.disabled = true;
-      button.textContent = "Logging in...";
+      button.textContent = "Sending...";
 
-      firebase.auth().signInWithEmailAndPassword(email, password)
+      firebase.auth().sendPasswordResetEmail(email)
         .then(() => {
-          showToast("Login successful!", "success");
-          setTimeout(() => window.location.href = "dashboard.html", 1500);
+          showToast("Password reset link sent to your email.", "success");
+          button.disabled = false;
+          button.textContent = "Send Reset Link";
         })
-        .catch(error => {
+        .catch((error) => {
           showToast(error.message, "error");
           button.disabled = false;
-          button.textContent = "Login";
+          button.textContent = "Send Reset Link";
         });
     }
   </script>
