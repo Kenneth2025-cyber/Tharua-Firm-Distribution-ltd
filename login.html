@@ -30,13 +30,26 @@
       width: 100%; max-width: 400px;
       animation: fadeIn 0.5s ease-in;
       z-index: 1;
+      position: relative; /* Added for password toggle positioning */
     }
     .login-box h2 {
       text-align: center; margin-bottom: 25px; color: #333;
     }
+    .input-container {
+      position: relative; /* Added for password toggle */
+      width: 100%;
+    }
     input[type="email"], input[type="password"] {
       width: 100%; padding: 12px; margin-bottom: 20px;
       border: 1px solid #ccc; border-radius: 6px; font-size: 1rem;
+    }
+    .toggle-password {
+      color: #666;
+      cursor: pointer;
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
     }
     button {
       width: 100%; padding: 12px;
@@ -74,7 +87,7 @@
     }
     .logo-container {
       position: absolute;
-      top: 60px; /* Adjusted to place below lang-dropdown */
+      top: 60px;
       right: 20px;
       z-index: 1;
     }
@@ -84,8 +97,6 @@
       display: block;
       loading: lazy;
     }
-
-    /* Toast notification styles */
     .toast {
       position: fixed;
       top: 20px; left: 20px;
@@ -105,11 +116,10 @@
     .toast i { font-size: 1.125rem; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
-
     @media (max-width: 600px) {
       .login-box { padding: 20px; max-width: 300px; }
       .lang-dropdown { top: 10px; right: 10px; }
-      .logo-container { top: 50px; right: 10px; } /* Adjusted for mobile */
+      .logo-container { top: 50px; right: 10px; }
       .logo-container img { width: 80px; }
     }
   </style>
@@ -119,15 +129,20 @@
     <div class="login-box">
       <h2>Welcome Back to TharuaFirm</h2>
       <form onsubmit="event.preventDefault(); login();">
-        <input type="email" id="email" placeholder="Email" required aria-label="Email address">
-        <input type="password" id="password" placeholder="Password" required aria-label="Password">
+        <div class="input-container">
+          <input type="email" id="email" placeholder="Email" required aria-label="Email address">
+        </div>
+        <div class="input-container">
+          <input type="password" id="password" placeholder="Password" required aria-label="Password">
+          <i class="fas fa-eye toggle-password" onclick="togglePassword()"></i>
+        </div>
         <button type="submit" id="loginButton" aria-label="Log in">Login</button>
       </form>
       <div class="footer-note">Authorized users only | <a href="#" onclick="resetPassword()">Forgot Password?</a></div>
     </div>
     <div class="lang-dropdown">
       <i class="fas fa-globe"></i>
-      <select onchange="changeLanguage(this.value)" aria-label="Select language">
+      <select name="language" onchange="changeLanguage(this.value)" aria-label="Select language">
         <option value="en">English</option>
         <option value="es">Español</option>
         <option value="fr">Français</option>
@@ -138,17 +153,15 @@
     </div>
   </div>
 
-  <!-- Success sound -->
   <audio id="successSound" src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3"></audio>
   <audio id="errorSound" src="https://assets.mixkit.co/sfx/preview/mixkit-click-error-1110.mp3"></audio>
 
-  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyCLRiUG0ePdP68nbjtptb5pbY34ohiUP30",
+      apiKey: "AIzaSyCLRiUG0ePdP68nbjtb5pbY34ohiUP30",
       authDomain: "tharuasystem.firebaseapp.com",
       projectId: "tharuasystem",
       storageBucket: "tharuasystem.appspot.com",
@@ -157,22 +170,26 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // Bing daily wallpaper
+    // Bing daily wallpaper with fallback
+    const fallbackImage = "images/fallback-background.jpg"; // Fallback image path
     fetch("https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US")
       .then(res => res.json())
       .then(data => {
         const imgUrl = "https://www.bing.com" + data.images[0].url;
         document.body.style.backgroundImage = `url('${imgUrl}')`;
       })
-      .catch(err => console.error("Wallpaper fetch error:", err));
+      .catch(err => {
+        console.error("Wallpaper fetch error:", err);
+        document.body.style.backgroundImage = `url('${fallbackImage}')`; // Apply fallback image
+      });
 
     function showToast(message, type) {
       const toast = document.createElement("div");
       toast.className = `toast ${type}`;
+      toast.setAttribute("aria-live", "polite"); // Accessibility improvement
       toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${message}`;
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 3000);
-
       if (type === "success") document.getElementById("successSound").play();
       if (type === "error") document.getElementById("errorSound").play();
     }
@@ -185,6 +202,26 @@
       };
       document.querySelector(".login-box h2").innerHTML = messages[lang].welcome;
       document.querySelector(".footer-note").innerHTML = messages[lang].footer;
+      localStorage.setItem("preferredLang", lang); // Save language preference
+    }
+
+    // Load saved language on page load
+    window.onload = () => {
+      const savedLang = localStorage.getItem("preferredLang") || "en";
+      document.querySelector("select").value = savedLang;
+      changeLanguage(savedLang);
+    };
+
+    function togglePassword() {
+      const passwordInput = document.getElementById("password");
+      const toggleIcon = document.querySelector(".toggle-password");
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+        toggleIcon.classList.replace("fa-eye", "fa-eye-slash");
+      } else {
+        passwordInput.type = "password";
+        toggleIcon.classList.replace("fa-eye-slash", "fa-eye");
+      }
     }
 
     function resetPassword() {
@@ -202,23 +239,23 @@
       const loginButton = document.getElementById("loginButton");
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       loginButton.disabled = true;
-      loginButton.textContent = "Logging in...";
+      loginButton.innerHTML = 'Logging in... <i class="fas fa-spinner fa-spin"></i>'; // Added spinner
       if (!email || !password) {
         showToast("Please enter both email and password", "error");
         loginButton.disabled = false;
-        loginButton.textContent = "Login";
+        loginButton.innerHTML = "Login";
         return;
       }
       if (!emailRegex.test(email)) {
         showToast("Please enter a valid email", "error");
         loginButton.disabled = false;
-        loginButton.textContent = "Login";
+        loginButton.innerHTML = "Login";
         return;
       }
       if (password.length < 6) {
         showToast("Password must be at least 6 characters", "error");
         loginButton.disabled = false;
-        loginButton.textContent = "Login";
+        loginButton.innerHTML = "Login";
         return;
       }
       firebase.auth().signInWithEmailAndPassword(email, password)
@@ -229,7 +266,7 @@
         .catch(error => {
           showToast(error.message === "auth/invalid-email" ? "Invalid email format" : error.message, "error");
           loginButton.disabled = false;
-          loginButton.textContent = "Login";
+          loginButton.innerHTML = "Login";
         });
     }
   </script>
