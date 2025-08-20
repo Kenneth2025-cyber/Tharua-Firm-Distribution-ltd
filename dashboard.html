@@ -810,7 +810,7 @@ async function getCollectionOptions(collectionName) {
 }
 
 async function addProductSubmit() {
-  const name = document.getElementById("productName").value.trim();
+  const name = escapeHTML(document.getElementById("productName").value.trim());
   const category = document.getElementById("category").value;
   const brand = document.getElementById("brand").value;
   const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
@@ -832,8 +832,26 @@ async function addProductSubmit() {
     return;
   }
 
-  // Generate SKU - e.g. PROD + timestamp + random number
-  const sku = `PROD-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+  // Validate selling price > buying price
+  if (sellingPrice <= buyingPrice) {
+    messageEl.textContent = "Selling price must be greater than buying price.";
+    return;
+  }
+
+  // Check for duplicate product
+  const existing = await firebase.firestore().collection("products")
+    .where("name", "==", name)
+    .where("location", "==", location)
+    .get();
+  if (!existing.empty) {
+    messageEl.textContent = "Product already exists at this location.";
+    return;
+  }
+
+  // Generate SKU with category and location codes
+  const catCode = category.substring(0, 3).toUpperCase();
+  const locCode = location.substring(0, 3).toUpperCase();
+  const sku = `PROD-${catCode}-${locCode}-${Date.now()}`;
 
   const productData = {
     name,
@@ -847,16 +865,19 @@ async function addProductSubmit() {
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
+  messageEl.innerHTML = `<span class="spinner"></span> Saving...`;
   try {
     await firebase.firestore().collection("products").add(productData);
     messageEl.style.color = "green";
     messageEl.textContent = `Product added successfully with SKU: ${sku}`;
-
-    // Clear form
+    showSuccessNotification(`Product added successfully with SKU: ${sku}`);
     document.getElementById("addProductForm").reset();
   } catch (error) {
+    messageEl.style.color = "red";
+    messageEl.textContent = error.code === "permission-denied"
+      ? "You do not have permission to add products."
+      : `Error adding product: ${error.message}`;
     console.error("Error adding product:", error);
-    messageEl.textContent = "Error adding product: " + error.message;
   }
 }
 
