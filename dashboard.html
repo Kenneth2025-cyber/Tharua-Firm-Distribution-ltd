@@ -881,29 +881,35 @@ function showListProducts() {
     <style>
       .filter-section {
         background: #f8f9fa;
-        padding: 15px;
+        padding: 12px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         margin-bottom: 20px;
         display: flex;
         flex-wrap: wrap;
-        gap: 15px;
+        gap: 10px;
         align-items: center;
         border: 1px solid #e0e0e0;
       }
       .filter-section label {
         font-weight: 600;
         color: #333;
-        font-size: 14px;
+        font-size: 13px;
+        margin-right: 5px;
       }
       .filter-section select, .filter-section input[type="text"] {
-        padding: 8px 12px;
+        padding: 6px 10px;
         border: 1px solid #ccc;
         border-radius: 4px;
-        font-size: 14px;
-        min-width: 180px;
+        font-size: 13px;
         background: #fff;
         transition: border-color 0.2s;
+      }
+      .filter-section select {
+        width: 120px; /* Fixed width for dropdowns in desktop */
+      }
+      .filter-section input[type="text"] {
+        width: 150px; /* Smaller search bar */
       }
       .filter-section select:focus, .filter-section input[type="text"]:focus {
         border-color: #007bff;
@@ -911,34 +917,44 @@ function showListProducts() {
         box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
       }
       .filter-section button {
-        padding: 8px 16px;
+        padding: 6px 12px; /* Smaller buttons */
         border: none;
         border-radius: 4px;
-        font-size: 14px;
+        font-size: 13px;
+        font-weight: 500;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: background-color 0.2s, transform 0.1s;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+      .filter-section button:hover {
+        transform: translateY(-1px);
       }
       .filter-section .apply-btn {
-        background: #007bff;
+        background: #0056b3; /* Darker blue for professional look */
         color: white;
       }
       .filter-section .apply-btn:hover {
-        background: #0056b3;
+        background: #003d82;
       }
       .filter-section .export-btn {
-        background: #28a745;
+        background: #218838; /* Darker green for professional look */
         color: white;
       }
       .filter-section .export-btn:hover {
-        background: #218838;
+        background: #1a6d2e;
       }
       .filter-section .search-help {
-        font-size: 12px;
+        font-size: 11px;
         color: #666;
         margin-left: 8px;
       }
+      .filter-section .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
       .table-container {
-        max-height: 400px; /* Adjust height as needed */
+        max-height: 400px;
         overflow-y: auto;
         width: 100%;
         position: relative;
@@ -996,13 +1012,34 @@ function showListProducts() {
         border-radius: 4px;
         font-size: 14px;
       }
-      @media (max-width: 600px) {
-        .filter-section select, .filter-section input[type="text"] {
-          min-width: 100%;
+      @media (min-width: 601px) {
+        .filter-section {
+          flex-wrap: nowrap; /* Keep dropdowns in one line */
+          justify-content: space-between;
         }
+        .filter-section .filter-group {
+          flex: 1; /* Each dropdown group takes equal space */
+          max-width: 180px; /* Matches width of one original dropdown */
+        }
+        .filter-section input[type="text"] {
+          width: 150px; /* Ensure search bar stays small */
+        }
+        .filter-section .search-group {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+        }
+      }
+      @media (max-width: 600px) {
         .filter-section {
           flex-direction: column;
           align-items: stretch;
+        }
+        .filter-section select, .filter-section input[type="text"] {
+          width: 100%; /* Full width on mobile */
+        }
+        .filter-section .filter-group {
+          width: 100%;
         }
         .pagination-section {
           flex-direction: column;
@@ -1014,32 +1051,36 @@ function showListProducts() {
 
     <!-- Filter Section -->
     <div class="filter-section">
-      <label for="locationFilter">Filter by Location:</label>
-      <select id="locationFilter" aria-label="Filter by location">
-        <option value="all">All Locations</option>
-      </select>
-
-      <label for="categoryFilter">Filter by Category:</label>
-      <select id="categoryFilter" aria-label="Filter by category">
-        <option value="all">All Categories</option>
-      </select>
-
-      <label for="brandFilter">Filter by Brand:</label>
-      <select id="brandFilter" aria-label="Filter by brand">
-        <option value="all">All Brands</option>
-      </select>
-
-      <label for="searchProduct">Search Product:</label>
-      <input
-        type="text"
-        id="searchProduct"
-        placeholder="Type at least 3 characters..."
-        aria-label="Search products by name"
-        aria-describedby="searchHelpText"
-      />
-      <span id="searchHelpText" class="search-help">Search activates at 3+ characters</span>
-
-      <button id="applyProductFilterBtn" class="apply-btn">Apply Filter</button>
+      <div class="filter-group">
+        <label for="locationFilter">Location:</label>
+        <select id="locationFilter" aria-label="Filter by location">
+          <option value="all">All Locations</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="categoryFilter">Category:</label>
+        <select id="categoryFilter" aria-label="Filter by category">
+          <option value="all">All Categories</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="brandFilter">Brand:</label>
+        <select id="brandFilter" aria-label="Filter by brand">
+          <option value="all">All Brands</option>
+        </select>
+      </div>
+      <div class="search-group">
+        <label for="searchProduct">Search:</label>
+        <input
+          type="text"
+          id="searchProduct"
+          placeholder="3+ chars..."
+          aria-label="Search products by name"
+          aria-describedby="searchHelpText"
+        />
+        <span id="searchHelpText" class="search-help">3+ chars</span>
+      </div>
+      <button id="applyProductFilterBtn" class="apply-btn">Apply</button>
       <button id="exportBtn" class="export-btn">Export</button>
     </div>
 
