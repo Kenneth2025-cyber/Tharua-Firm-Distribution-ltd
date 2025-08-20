@@ -883,7 +883,7 @@ function showListProducts() {
     <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       <label for="locationFilter" style="font-weight:bold;">Filter by Location:</label>
       <select id="locationFilter" style="min-width:160px; padding:5px;" aria-label="Filter by location">
-        option value="all">All Locations</option>
+        <option value="all">All Locations</option>
       </select>
 
       <label for="categoryFilter" style="font-weight:bold;">Filter by Category:</label>
@@ -931,7 +931,9 @@ function showListProducts() {
     </table>
   `;
 
-  loadFilters();
+  loadLocations();
+  loadCategories();
+  loadBrands();
   loadProducts();
 
   // Debounced search (3+ chars)
@@ -953,19 +955,21 @@ function showListProducts() {
     renderProductsTable(searchText);
   });
 
-  // Instant filter on dropdown changes
+  // Instant filter on location change
   document.getElementById("locationFilter").addEventListener("change", () => {
     productManager.selectedLocation = document.getElementById("locationFilter").value;
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     renderProductsTable(searchText);
   });
 
+  // Instant filter on category change
   document.getElementById("categoryFilter").addEventListener("change", () => {
     productManager.selectedCategory = document.getElementById("categoryFilter").value;
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     renderProductsTable(searchText);
   });
 
+  // Instant filter on brand change
   document.getElementById("brandFilter").addEventListener("change", () => {
     productManager.selectedBrand = document.getElementById("brandFilter").value;
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
@@ -982,18 +986,12 @@ function showListProducts() {
 // ==========================
 // Helpers / Config
 // ==========================
-const MIN_SEARCH_CH ParS = 3;
+const MIN_SEARCH_CHARS = 3;
 const fmtKES = (v) => (Number(v) || 0).toLocaleString("en-KE", { style: "currency", currency: "KES" });
 
 // ==========================
-// Load Filters (Locations, Categories, Brands)
+// Load Locations
 // ==========================
-function loadFilters() {
-  loadLocations();
-  loadCategories();
-  loadBrands();
-}
-
 function loadLocations() {
   const select = document.getElementById("locationFilter");
   firebase.firestore().collection("businessLocations").get()
@@ -1018,11 +1016,21 @@ function loadLocations() {
     });
 }
 
+// ==========================
+// Load Categories
+// ==========================
 function loadCategories() {
   const select = document.getElementById("categoryFilter");
   firebase.firestore().collection("products").get()
     .then(snapshot => {
-      productManager.categories = [...new Set(snapshot.docs.map(doc => doc.data().category).filter(Boolean))];
+      productManager.categories = [];
+      const categorySet = new Set();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data && data.category) categorySet.add(data.category);
+      });
+      productManager.categories = Array.from(categorySet).sort();
+
       select.innerHTML = `<option value="all">All Categories</option>`;
       productManager.categories.forEach(category => {
         const option = document.createElement("option");
@@ -1037,11 +1045,21 @@ function loadCategories() {
     });
 }
 
+// ==========================
+// Load Brands
+// ==========================
 function loadBrands() {
   const select = document.getElementById("brandFilter");
   firebase.firestore().collection("products").get()
     .then(snapshot => {
-      productManager.brands = [...new Set(snapshot.docs.map(doc => doc.data().brand).filter(Boolean))];
+      productManager.brands = [];
+      const brandSet = new Set();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data && data.brand) brandSet.add(data.brand);
+      });
+      productManager.brands = Array.from(brandSet).sort();
+
       select.innerHTML = `<option value="all">All Brands</option>`;
       productManager.brands.forEach(brand => {
         const option = document.createElement("option");
@@ -1085,18 +1103,22 @@ function loadProducts() {
 function getFilteredProducts(searchText = "") {
   let filtered = productManager.products;
 
+  // Filter by location
   if (productManager.selectedLocation !== "all") {
     filtered = filtered.filter(p => p.location === productManager.selectedLocation);
   }
 
+  // Filter by category
   if (productManager.selectedCategory !== "all") {
     filtered = filtered.filter(p => p.category === productManager.selectedCategory);
   }
 
+  // Filter by brand
   if (productManager.selectedBrand !== "all") {
     filtered = filtered.filter(p => p.brand === productManager.selectedBrand);
   }
 
+  // Apply search filter
   const q = (searchText || "").toLowerCase();
   if (q.length >= MIN_SEARCH_CHARS) {
     filtered = filtered.filter(p =>
@@ -1183,10 +1205,8 @@ function createProductRow(product) {
   tr.querySelector('[title="View"]').addEventListener("click", () => {
     alert(`
       Product Details:
-
-
       Name: ${escapeHTML(product.name)}
-      Category: ${escape CuteHTML(product.category)}
+      Category: ${escapeHTML(product.category)}
       Brand: ${escapeHTML(product.brand)}
       Buying Price: ${buying}
       Selling Price: ${selling}
@@ -1271,7 +1291,7 @@ function enterEditMode(row, product) {
     try {
       await firebase.firestore().collection("products").doc(product.id).update(newData);
       Object.assign(product, newData);
-      // Update filters after edit to reflect possible new category/brand
+      // Reload categories and brands to reflect any changes
       loadCategories();
       loadBrands();
       renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
@@ -1346,6 +1366,7 @@ function escapeHTML(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[m]);
 }
+
 
 
 async function addBusinessLocation() {
