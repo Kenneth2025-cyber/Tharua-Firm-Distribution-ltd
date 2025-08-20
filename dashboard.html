@@ -1009,12 +1009,10 @@ function loadProducts() {
 // Common filter logic
 // ==========================
 function getFilteredProducts(searchText = "") {
-  // Filter by location
   let filtered = productManager.selectedLocation === "all"
     ? productManager.products
     : productManager.products.filter(p => p.location === productManager.selectedLocation);
 
-  // Apply search only when length >= MIN_SEARCH_CHARS
   const q = (searchText || "").toLowerCase();
   if (q.length >= MIN_SEARCH_CHARS) {
     filtered = filtered.filter(p =>
@@ -1057,7 +1055,6 @@ function renderProductsTable(searchText = "") {
     totalSelling += stock * sell;
   });
 
-  // Totals row
   const tr = document.createElement("tr");
   tr.style.background = "#f9f9f9";
   tr.style.fontWeight = "bold";
@@ -1094,12 +1091,43 @@ function createProductRow(product) {
     <td class="stock-cell">${stock}</td>
     <td class="location-cell">${escapeHTML(product.location)}</td>
     <td class="actions-cell">
-      <button class="btn-edit" aria-label="Edit product ${escapeHTML(product.name)}">Edit</button>
+      <button class="btn-view" aria-label="View product ${escapeHTML(product.name)}" title="View">👁️</button>
+      <button class="btn-edit" aria-label="Edit product ${escapeHTML(product.name)}" title="Edit">✏️</button>
+      <button class="btn-delete" aria-label="Delete product ${escapeHTML(product.name)}" title="Delete">🗑️</button>
     </td>
   `;
 
+  // View action
+  tr.querySelector(".btn-view").addEventListener("click", () => {
+    alert(`
+      Product Details:
+      Name: ${escapeHTML(product.name)}
+      SKU: ${escapeHTML(product.sku)}
+      Category: ${escapeHTML(product.category)}
+      Brand: ${escapeHTML(product.brand)}
+      Buying Price: ${buying}
+      Selling Price: ${selling}
+      Opening Stock: ${stock}
+      Location: ${escapeHTML(product.location)}
+    `);
+  });
+
+  // Edit action
   tr.querySelector(".btn-edit").addEventListener("click", () => {
     enterEditMode(tr, product);
+  });
+
+  // Delete action
+  tr.querySelector(".btn-delete").addEventListener("click", async () => {
+    if (confirm(`Are you sure you want to delete ${escapeHTML(product.name)}?`)) {
+      try {
+        await firebase.firestore().collection("products").doc(product.id).delete();
+        productManager.products = productManager.products.filter(p => p.id !== product.id);
+        renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
+      } catch (err) {
+        alert(`Error deleting product: ${err.message}`);
+      }
+    }
   });
 
   return tr;
@@ -1125,8 +1153,8 @@ function enterEditMode(row, product) {
 
   const actionsCell = row.querySelector(".actions-cell");
   actionsCell.innerHTML = `
-    <button class="btn-save">Save</button>
-    <button class="btn-cancel">Cancel</button>
+    <button class="btn-save" aria-label="Save changes" title="Save">💾</button>
+    <button class="btn-cancel" aria-label="Cancel editing" title="Cancel">❌</button>
   `;
   row.querySelector(".name-input").focus();
 
@@ -1209,7 +1237,6 @@ function exportProductsCSV(searchText = "") {
     csvRows.push(row.join(","));
   });
 
-  // Totals row
   csvRows.push([
     "Totals", "", "", "",
     totalBuying.toFixed(2),
