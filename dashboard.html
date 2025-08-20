@@ -1078,7 +1078,7 @@ function renderProductsTable(searchText = "") {
 }
 
 // ==========================
-// Create Row
+// Create Row (emoji icons)
 // ==========================
 function createProductRow(product) {
   const buying = fmtKES(product.buyingPrice);
@@ -1094,15 +1094,15 @@ function createProductRow(product) {
     <td class="selling-price-cell">${selling}</td>
     <td class="stock-cell">${stock}</td>
     <td class="location-cell">${escapeHTML(product.location)}</td>
-    <td class="actions-cell">
-      <button class="btn-view" aria-label="View product ${escapeHTML(product.name)}" title="View">👁️</button>
-      <button class="btn-edit" aria-label="Edit product ${escapeHTML(product.name)}" title="Edit">✏️</button>
-      <button class="btn-delete" aria-label="Delete product ${escapeHTML(product.name)}" title="Delete">🗑️</button>
+    <td class="actions-cell" style="white-space:nowrap;">
+      <span title="View" style="cursor:pointer; color:green; margin-right:6px;">👁</span>
+      <span title="Edit" style="cursor:pointer; color:#2980b9; margin-right:6px;">✏</span>
+      <span title="Delete" style="cursor:pointer; color:red;">🗑</span>
     </td>
   `;
 
   // View action
-  tr.querySelector(".btn-view").addEventListener("click", () => {
+  tr.querySelector('[title="View"]').addEventListener("click", () => {
     alert(`
       Product Details:
       Name: ${escapeHTML(product.name)}
@@ -1116,12 +1116,12 @@ function createProductRow(product) {
   });
 
   // Edit action
-  tr.querySelector(".btn-edit").addEventListener("click", () => {
+  tr.querySelector('[title="Edit"]').addEventListener("click", () => {
     enterEditMode(tr, product);
   });
 
   // Delete action
-  tr.querySelector(".btn-delete").addEventListener("click", async () => {
+  tr.querySelector('[title="Delete"]').addEventListener("click", async () => {
     if (confirm(`Are you sure you want to delete ${escapeHTML(product.name)}?`)) {
       try {
         await firebase.firestore().collection("products").doc(product.id).delete();
@@ -1137,7 +1137,7 @@ function createProductRow(product) {
 }
 
 // ==========================
-// Edit Mode
+// Edit Mode (emoji save/cancel)
 // ==========================
 function enterEditMode(row, product) {
   row.querySelector(".name-cell").innerHTML = `<input type="text" class="edit-input name-input" value="${escapeHTML(product.name)}" aria-label="Edit Product Name" />`;
@@ -1155,8 +1155,8 @@ function enterEditMode(row, product) {
 
   const actionsCell = row.querySelector(".actions-cell");
   actionsCell.innerHTML = `
-    <button class="btn-save" aria-label="Save changes" title="Save">💾</button>
-    <button class="btn-cancel" aria-label="Cancel editing" title="Cancel">❌</button>
+    <span class="btn-save" title="Save" style="cursor:pointer; color:green; margin-right:6px;">💾</span>
+    <span class="btn-cancel" title="Cancel" style="cursor:pointer; color:red;">❌</span>
   `;
   row.querySelector(".name-input").focus();
 
@@ -1263,6 +1263,7 @@ function escapeHTML(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[m]);
 }
+
 
 
 async function addBusinessLocation() {
