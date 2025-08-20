@@ -874,6 +874,64 @@ const productManager = {
   itemsPerPage: 10
 };
 
+// Toast notification functions
+function playSuccessSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(360, ctx.currentTime);
+    g.gain.setValueAtTime(0.8, ctx.currentTime); // Increased volume for louder sound
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.35);
+    o.stop(ctx.currentTime + 0.36);
+    setTimeout(() => { try { ctx.close(); } catch (e) {} }, 500);
+  } catch (e) {
+    console.warn("playSuccessSound error:", e);
+  }
+}
+
+function showToast(message, type) {
+  const prev = document.getElementById("globalToast");
+  if (prev) prev.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "globalToast";
+  toast.textContent = message;
+  Object.assign(toast.style, {
+    position: "fixed",
+    top: "20px",
+    right: "20px",
+    background: type === "success" ? "#27ae60" : "#dc3545",
+    color: "white",
+    padding: "12px 16px",
+    borderRadius: "8px",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+    zIndex: 99999,
+    opacity: "0",
+    transform: "translateY(-8px)",
+    transition: "opacity 300ms ease, transform 300ms ease",
+    fontFamily: "Arial, sans-serif",
+    fontSize: "14px"
+  });
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  });
+  if (type === "success") playSuccessSound();
+  if (type === "error") document.getElementById("errorSound").play();
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-8px)";
+    setTimeout(() => { try { toast.remove(); } catch (e) {} }, 350);
+  }, 3000);
+}
+
 function showListProducts() {
   if (typeof saveLastPage === "function") saveLastPage("showListProducts");
 
@@ -1237,9 +1295,13 @@ function showListProducts() {
           <label for="editName">Product Name:</label>
           <input type="text" id="editName" required>
           <label for="editCategory">Category:</label>
-          <input type="text" id="editCategory" required>
-万博体育3.0手机版          <label for="editBrand">Brand:</label>
-          <input type="text" id="editBrand" required>
+          <select id="editCategory" required>
+            <option value="">Select Category</option>
+          </select>
+          <label for="editBrand">Brand:</label>
+          <select id="editBrand" required>
+            <option value="">Select Brand</option>
+          </select>
           <label for="editBuyingPrice">Buying Price (KES):</label>
           <input type="number" id="editBuyingPrice" min="0" step="0.01" required>
           <label for="editSellingPrice">Selling Price (KES):</label>
@@ -1286,6 +1348,7 @@ function showListProducts() {
     const tbody = document.getElementById("productsTbody");
     tbody.innerHTML = `<tr><td colspan="8" class="error-row">Failed to load data: ${escapeHTML(err.message)}</td></tr>`;
     tbody.setAttribute("aria-busy", "false");
+    showToast(`Failed to load data: ${err.message}`, "error");
   });
 
   // Debounced search (3+ chars)
@@ -1362,12 +1425,11 @@ function showListProducts() {
   document.getElementById("exportBtn").addEventListener("click", () => {
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     exportProductsCSV(searchText);
+    showToast("Products exported successfully!", "success");
   });
 }
 
-// ==========================
 // Helpers / Config
-// ==========================
 const MIN_SEARCH_CHARS = 3;
 const fmtKES = (v) => (Number(v) || 0).toLocaleString("en-KE", { style: "currency", currency: "KES" });
 
@@ -1389,9 +1451,7 @@ function applyFilters(searchText) {
   renderProductsTable(searchText);
 }
 
-// ==========================
 // Load Locations
-// ==========================
 function loadLocations() {
   return firebase.firestore().collection("businessLocations").get()
     .then(snapshot => {
@@ -1424,12 +1484,11 @@ function loadLocations() {
       console.error("Error loading locations:", err);
       const select = document.getElementById("locationFilter");
       select.innerHTML = `<option value="">Select Location</option>`;
+      showToast(`Error loading locations: ${err.message}`, "error");
     });
 }
 
-// ==========================
 // Load Categories
-// ==========================
 function loadCategories() {
   return firebase.firestore().collection("products").get()
     .then(snapshot => {
@@ -1441,25 +1500,36 @@ function loadCategories() {
       });
       productManager.categories = Array.from(categorySet).sort();
 
-      const select = document.getElementById("categoryFilter");
-      select.innerHTML = `<option value="">Select Category</option>`;
+      const filterSelect = document.getElementById("categoryFilter");
+      filterSelect.innerHTML = `<option value="">Select Category</option>`;
       productManager.categories.forEach(category => {
         const option = document.createElement("option");
         option.value = category;
         option.textContent = category;
-        select.appendChild(option);
+        filterSelect.appendChild(option);
+      });
+
+      // Update edit modal category dropdown
+      const editCategorySelect = document.getElementById("editCategory");
+      editCategorySelect.innerHTML = `<option value="">Select Category</option>`;
+      productManager.categories.forEach(category => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        editCategorySelect.appendChild(option);
       });
     })
     .catch(err => {
       console.error("Error loading categories:", err);
-      const select = document.getElementById("categoryFilter");
-      select.innerHTML = `<option value="">Select Category</option>`;
+      const filterSelect = document.getElementById("categoryFilter");
+      filterSelect.innerHTML = `<option value="">Select Category</option>`;
+      const editCategorySelect = document.getElementById("editCategory");
+      editCategorySelect.innerHTML = `<option value="">Select Category</option>`;
+      showToast(`Error loading categories: ${err.message}`, "error");
     });
 }
 
-// ==========================
 // Load Brands
-// ==========================
 function loadBrands() {
   return firebase.firestore().collection("products").get()
     .then(snapshot => {
@@ -1471,25 +1541,36 @@ function loadBrands() {
       });
       productManager.brands = Array.from(brandSet).sort();
 
-      const select = document.getElementById("brandFilter");
-      select.innerHTML = `<option value="">Select Brand</option>`;
+      const filterSelect = document.getElementById("brandFilter");
+      filterSelect.innerHTML = `<option value="">Select Brand</option>`;
       productManager.brands.forEach(brand => {
         const option = document.createElement("option");
         option.value = brand;
         option.textContent = brand;
-        select.appendChild(option);
+        filterSelect.appendChild(option);
+      });
+
+      // Update edit modal brand dropdown
+      const editBrandSelect = document.getElementById("editBrand");
+      editBrandSelect.innerHTML = `<option value="">Select Brand</option>`;
+      productManager.brands.forEach(brand => {
+        const option = document.createElement("option");
+        option.value = brand;
+        option.textContent = brand;
+        editBrandSelect.appendChild(option);
       });
     })
     .catch(err => {
       console.error("Error loading brands:", err);
-      const select = document.getElementById("brandFilter");
-      select.innerHTML = `<option value="">Select Brand</option>`;
+      const filterSelect = document.getElementById("brandFilter");
+      filterSelect.innerHTML = `<option value="">Select Brand</option>`;
+      const editBrandSelect = document.getElementById("editBrand");
+      editBrandSelect.innerHTML = `<option value="">Select Brand</option>`;
+      showToast(`Error loading brands: ${err.message}`, "error");
     });
 }
 
-// ==========================
 // Load Products
-// ==========================
 function loadProducts() {
   const tbody = document.getElementById("productsTbody");
   tbody.setAttribute("aria-busy", "true");
@@ -1507,12 +1588,11 @@ function loadProducts() {
       const tbody = document.getElementById("productsTbody");
       tbody.innerHTML = `<tr><td colspan="8" class="error-row">Failed to load products: ${escapeHTML(err.message)}</td></tr>`;
       tbody.setAttribute("aria-busy", "false");
+      showToast(`Error loading products: ${err.message}`, "error");
     });
 }
 
-// ==========================
 // Common filter logic
-// ==========================
 function getFilteredProducts(searchText = "") {
   let filtered = productManager.products;
 
@@ -1537,9 +1617,7 @@ function getFilteredProducts(searchText = "") {
   return filtered;
 }
 
-// ==========================
 // Render Products + Totals
-// ==========================
 function renderProductsTable(searchText = "") {
   const tbody = document.getElementById("productsTbody");
   tbody.setAttribute("aria-busy", "true");
@@ -1604,9 +1682,7 @@ function renderProductsTable(searchText = "") {
   tbody.setAttribute("aria-busy", "false");
 }
 
-// ==========================
 // Create Row
-// ==========================
 function createProductRow(product) {
   const buying = fmtKES(product.buyingPrice);
   const selling = fmtKES(product.sellingPrice);
@@ -1659,8 +1735,8 @@ function createProductRow(product) {
       e.preventDefault();
       const newData = {
         name: document.getElementById("editName").value.trim(),
-        category: document.getElementById("editCategory").value.trim(),
-        brand: document.getElementById("editBrand").value.trim(),
+        category: document.getElementById("editCategory").value,
+        brand: document.getElementById("editBrand").value,
         buyingPrice: Number(document.getElementById("editBuyingPrice").value),
         sellingPrice: Number(document.getElementById("editSellingPrice").value),
         openingStock: parseInt(document.getElementById("editStock").value, 10),
@@ -1668,23 +1744,24 @@ function createProductRow(product) {
       };
 
       if (!newData.name || !newData.category || !newData.brand || !newData.location) {
-        alert("Please fill in all required fields.");
+        showToast("Please fill in all required fields.", "error");
         return;
       }
       if (isNaN(newData.buyingPrice) || newData.buyingPrice < 0) {
-        alert("Buying price must be a valid non-negative number.");
+        showToast("Buying price must be a valid non-negative number.", "error");
         return;
       }
       if (isNaN(newData.sellingPrice) || newData.sellingPrice < 0) {
-        alert("Selling price must be a valid non-negative number.");
+        showToast("Selling price must be a valid non-negative number.", "error");
         return;
       }
       if (newData.sellingPrice <= newData.buyingPrice) {
         document.getElementById("priceError").style.display = "block";
+        showToast("Selling price must be greater than buying price.", "error");
         return;
       }
       if (isNaN(newData.openingStock) || newData.openingStock < 0) {
-        alert("Opening stock must be a valid non-negative number.");
+        showToast("Opening stock must be a valid non-negative number.", "error");
         return;
       }
 
@@ -1694,9 +1771,10 @@ function createProductRow(product) {
         Promise.all([loadCategories(), loadBrands()]).then(() => {
           closeModal("editModal");
           renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
+          showToast("Product updated successfully!", "success");
         });
       } catch (err) {
-        alert(`Error updating product: ${err.message}`);
+        showToast(`Error updating product: ${err.message}`, "error");
       }
     };
     openModal("editModal");
@@ -1721,8 +1799,9 @@ function createProductRow(product) {
         }
         closeModal("deleteModal");
         renderProductsTable(searchText);
+        showToast("Product deleted successfully!", "success");
       } catch (err) {
-        alert(`Error deleting product: ${err.message}`);
+        showToast(`Error deleting product: ${err.message}`, "error");
       }
     });
   });
@@ -1730,9 +1809,7 @@ function createProductRow(product) {
   return tr;
 }
 
-// ==========================
 // Export CSV with Current Filters
-// ==========================
 function exportProductsCSV(searchText = "") {
   const headers = ["Name", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
   const csvRows = [headers.join(",")];
@@ -1781,9 +1858,7 @@ function exportProductsCSV(searchText = "") {
   URL.revokeObjectURL(link.href);
 }
 
-// ==========================
 // Escape HTML
-// ==========================
 function escapeHTML(str) {
   if (str === null || str === undefined) return "";
   return String(str).replace(/[&<>"']/g, m => ({
