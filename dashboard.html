@@ -935,6 +935,26 @@ function showListProducts() {
         color: #666;
         margin-left: 8px;
       }
+      .table-container {
+        max-height: 400px; /* Adjust height as needed */
+        overflow-y: auto;
+        width: 100%;
+        position: relative;
+      }
+      .table-container table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .table-container thead {
+        position: sticky;
+        top: 0;
+        background: #f0f0f0;
+        z-index: 1;
+      }
+      .table-container th, .table-container td {
+        padding: 8px;
+        border: 1px solid #ddd;
+      }
       @media (max-width: 600px) {
         .filter-section select, .filter-section input[type="text"] {
           min-width: 100%;
@@ -979,23 +999,25 @@ function showListProducts() {
     </div>
 
     <!-- Products Table -->
-    <table role="grid" border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead style="background:#f0f0f0;">
-        <tr>
-          <th scope="col">Product Name</th>
-          <th scope="col">Category</th>
-          <th scope="col">Brand</th>
-          <th scope="col">Buying Price (KES)</th>
-          <th scope="col">Selling Price (KES)</th>
-          <th scope="col">Opening Stock</th>
-          <th scope="col">Location</th>
-          <th scope="col">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="productsTbody" aria-live="polite" aria-busy="true">
-        <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
-      </tbody>
-    </table>
+    <div class="table-container">
+      <table role="grid" border="1" cellpadding="8" cellspacing="0">
+        <thead>
+          <tr>
+            <th scope="col">Product Name</th>
+            <th scope="col">Category</th>
+            <th scope="col">Brand</th>
+            <th scope="col">Buying Price (KES)</th>
+            <th scope="col">Selling Price (KES)</th>
+            <th scope="col">Opening Stock</th>
+            <th scope="col">Location</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="productsTbody" aria-live="polite" aria-busy="true">
+          <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
   `;
 
   // Load all data and then render the table
@@ -1302,7 +1324,7 @@ function createProductRow(product) {
 
   // Delete action
   tr.querySelector('[title="Delete"]').addEventListener("click", async () => {
-    if ( personallyconfirm(`Are you sure you want to delete ${escapeHTML(product.name)}?`)) {
+    if (confirm(`Are you sure you want to delete ${escapeHTML(product.name)}?`)) {
       try {
         await firebase.firestore().collection("products").doc(product.id).delete();
         productManager.products = productManager.products.filter(p => p.id !== product.id);
