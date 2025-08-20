@@ -759,7 +759,7 @@ async function showAddProduct() {
   const brands = await getCollectionOptions("brands");
   const locations = await getCollectionOptions("businessLocations");
 
-  // Render professional form
+  // Render professional, responsive form
   document.getElementById("content").innerHTML = `
     <style>
       .loading-overlay {
@@ -791,6 +791,7 @@ async function showAddProduct() {
       }
       .form-container {
         max-width: 600px;
+        width: 90%;
         margin: 20px auto;
         padding: 20px;
         background: #fff;
@@ -811,6 +812,7 @@ async function showAddProduct() {
         font-weight: 600;
         color: #333;
         margin-bottom: 5px;
+        font-size: 14px;
       }
       .form-group input,
       .form-group select {
@@ -823,6 +825,7 @@ async function showAddProduct() {
       }
       .form-group select[multiple] {
         height: 100px;
+        padding: 5px;
       }
       .form-group input[type="checkbox"],
       .form-group input[type="radio"] {
@@ -831,12 +834,14 @@ async function showAddProduct() {
       }
       .form-group .radio-group {
         display: flex;
+        flex-direction: row;
         gap: 20px;
+        flex-wrap: wrap;
       }
       .submit-btn {
         background: #3498db;
         color: #fff;
-        padding: 10px 20px;
+        padding: 12px;
         border: none;
         border-radius: 4px;
         cursor: pointer;
@@ -851,6 +856,35 @@ async function showAddProduct() {
         margin-top: 15px;
         text-align: center;
         font-size: 14px;
+      }
+      /* Mobile responsiveness */
+      @media (max-width: 600px) {
+        .form-container {
+          width: 95%;
+          padding: 15px;
+        }
+        .form-container h2 {
+          font-size: 20px;
+        }
+        .form-group label {
+          font-size: 12px;
+        }
+        .form-group input,
+        .form-group select {
+          font-size: 12px;
+          padding: 8px;
+        }
+        .form-group select[multiple] {
+          height: 80px;
+        }
+        .submit-btn {
+          font-size: 14px;
+          padding: 10px;
+        }
+        .radio-group {
+          flex-direction: column;
+          gap: 10px;
+        }
       }
     </style>
     <div class="form-container">
@@ -901,11 +935,14 @@ async function showAddProduct() {
 
         <div class="form-group">
           <label>
-            <input type="checkbox" id="vatable" aria-label="Vatable Product" /> Vatable Product (16% VAT)
+            <input type="checkbox" id="vatable" aria-label="Vatable Product" /> Vatable Product
           </label>
         </div>
 
         <div class="form-group" id="vatOptions" style="display: none;">
+          <label for="vatPercentage">VAT Percentage (%)</label>
+          <input type="number" id="vatPercentage" min="0" max="100" step="0.01" value="16" placeholder="Enter VAT percentage" aria-label="VAT Percentage" />
+
           <label>VAT Inclusion *</label>
           <div class="radio-group">
             <label>
@@ -956,8 +993,8 @@ async function addProductSubmit() {
   const locationSelect = document.getElementById("businessLocations");
   const locations = Array.from(locationSelect.selectedOptions).map(option => option.value);
   const vatable = document.getElementById("vatable").checked;
+  const vatPercentage = vatable ? parseFloat(document.getElementById("vatPercentage").value) : 0;
   const vatInclusion = vatable ? document.querySelector('input[name="vatInclusion"]:checked').value : null;
-  const vatRate = vatable ? 0.16 : 0;
 
   const messageEl = document.getElementById("addProductMessage");
   messageEl.style.color = "red";
@@ -979,10 +1016,16 @@ async function addProductSubmit() {
     return;
   }
 
-  // Validate VAT inclusion selection
-  if (vatable && !vatInclusion) {
-    messageEl.textContent = "Please select whether VAT is inclusive or exclusive.";
-    return;
+  // Validate VAT percentage and inclusion
+  if (vatable) {
+    if (isNaN(vatPercentage) || vatPercentage < 0 || vatPercentage > 100) {
+      messageEl.textContent = "VAT percentage must be between 0 and 100.";
+      return;
+    }
+    if (!vatInclusion) {
+      messageEl.textContent = "Please select whether VAT is inclusive or exclusive.";
+      return;
+    }
   }
 
   // Check for duplicate product by name
@@ -1008,7 +1051,7 @@ async function addProductSubmit() {
     openingStock,
     locations, // Store as array
     vatable,
-    vatRate,
+    vatRate: vatable ? vatPercentage / 100 : 0, // Store as decimal
     vatInclusion: vatable ? vatInclusion : null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
