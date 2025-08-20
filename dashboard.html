@@ -745,7 +745,18 @@ function toggleProducts() {
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
 }
 
+// Initialize page on load to restore last page
+window.addEventListener("load", async () => {
+  const lastPage = localStorage.getItem("lastPage");
+  if (lastPage === "showAddProduct") {
+    await showAddProduct();
+  }
+});
+
 async function showAddProduct() {
+  // Save page state
+  saveLastPage("showAddProduct");
+
   // Show loading overlay
   document.getElementById("content").innerHTML = `
     <div class="loading-overlay">
