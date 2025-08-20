@@ -885,13 +885,13 @@ function showListProducts() {
         id="searchProduct"
         placeholder="Type at least 3 characters..."
         style="min-width:220px; padding:6px;"
-        aria-label="Search products by name or SKU"
+        aria-label="Search products by name"
         aria-describedby="searchHelpText"
       />
       <span id="searchHelpText" style="font-size:12px; opacity:.8;">Search activates at 3+ characters</span>
 
       <button id="applyProductFilterBtn" style="padding:6px 12px; cursor:pointer; background:#2c3e50; color:white;">Apply Filter</button>
-      <button id="exportBtn" style="margin-left:auto; padding:6px 12px; cursor:pointer;">Export</button>
+      <button id="exportBtn" style="margin-left:auto; padding:4px 8px; font-size:12px; cursor:pointer;">Export</button>
     </div>
 
     <!-- Products Table -->
@@ -899,7 +899,6 @@ function showListProducts() {
       <thead style="background:#f0f0f0;">
         <tr>
           <th scope="col">Product Name</th>
-          <th scope="col">SKU</th>
           <th scope="col">Category</th>
           <th scope="col">Brand</th>
           <th scope="col">Buying Price (KES)</th>
@@ -910,9 +909,16 @@ function showListProducts() {
         </tr>
       </thead>
       <tbody id="productsTbody" aria-live="polite" aria-busy="true">
-        <tr><td colspan="9" style="text-align:center;">Loading...</td></tr>
+        <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
       </tbody>
     </table>
+
+    <style>
+      .actions-cell button {
+        font-size: 14px; /* smaller icons */
+        margin: 0 2px;
+      }
+    </style>
   `;
 
   loadLocations();
@@ -988,7 +994,7 @@ function loadLocations() {
 function loadProducts() {
   const tbody = document.getElementById("productsTbody");
   tbody.setAttribute("aria-busy", "true");
-  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;"><span class="spinner"></span>Loading...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;"><span class="spinner"></span>Loading...</td></tr>`;
 
   firebase.firestore().collection("products").orderBy("name").get()
     .then(snapshot => {
@@ -1000,7 +1006,7 @@ function loadProducts() {
     })
     .catch(err => {
       console.error("Error loading products:", err);
-      tbody.innerHTML = `<tr><td colspan="9" class="error-row">Failed to load products: ${escapeHTML(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="error-row">Failed to load products: ${escapeHTML(err.message)}</td></tr>`;
       tbody.setAttribute("aria-busy", "false");
     });
 }
@@ -1016,8 +1022,7 @@ function getFilteredProducts(searchText = "") {
   const q = (searchText || "").toLowerCase();
   if (q.length >= MIN_SEARCH_CHARS) {
     filtered = filtered.filter(p =>
-      (p.name && String(p.name).toLowerCase().includes(q)) ||
-      (p.sku && String(p.sku).toLowerCase().includes(q))
+      (p.name && String(p.name).toLowerCase().includes(q))
     );
   }
   return filtered;
@@ -1033,7 +1038,7 @@ function renderProductsTable(searchText = "") {
   const filteredProducts = getFilteredProducts(searchText);
 
   if (!filteredProducts.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No products found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No products found.</td></tr>`;
     tbody.setAttribute("aria-busy", "false");
     return;
   }
@@ -1059,7 +1064,7 @@ function renderProductsTable(searchText = "") {
   tr.style.background = "#f9f9f9";
   tr.style.fontWeight = "bold";
   tr.innerHTML = `
-    <td colspan="4" style="text-align:right;">Totals:</td>
+    <td colspan="3" style="text-align:right;">Totals:</td>
     <td>${fmtKES(totalBuying)}</td>
     <td>${fmtKES(totalSelling)}</td>
     <td>${totalStock}</td>
@@ -1083,7 +1088,6 @@ function createProductRow(product) {
   const tr = document.createElement("tr");
   tr.innerHTML = `
     <td class="name-cell">${escapeHTML(product.name)}</td>
-    <td class="sku-cell">${escapeHTML(product.sku)}</td>
     <td class="category-cell">${escapeHTML(product.category)}</td>
     <td class="brand-cell">${escapeHTML(product.brand)}</td>
     <td class="buying-price-cell">${buying}</td>
@@ -1102,7 +1106,6 @@ function createProductRow(product) {
     alert(`
       Product Details:
       Name: ${escapeHTML(product.name)}
-      SKU: ${escapeHTML(product.sku)}
       Category: ${escapeHTML(product.category)}
       Brand: ${escapeHTML(product.brand)}
       Buying Price: ${buying}
@@ -1138,7 +1141,6 @@ function createProductRow(product) {
 // ==========================
 function enterEditMode(row, product) {
   row.querySelector(".name-cell").innerHTML = `<input type="text" class="edit-input name-input" value="${escapeHTML(product.name)}" aria-label="Edit Product Name" />`;
-  row.querySelector(".sku-cell").innerHTML = `<input type="text" class="edit-input sku-input" value="${escapeHTML(product.sku)}" aria-label="Edit SKU" />`;
   row.querySelector(".category-cell").innerHTML = `<input type="text" class="edit-input category-input" value="${escapeHTML(product.category)}" aria-label="Edit Category" />`;
   row.querySelector(".brand-cell").innerHTML = `<input type="text" class="edit-input brand-input" value="${escapeHTML(product.brand)}" aria-label="Edit Brand" />`;
   row.querySelector(".buying-price-cell").innerHTML = `<input type="number" min="0" step="0.01" class="edit-input buying-input" value="${Number(product.buyingPrice) || 0}" aria-label="Edit Buying Price" />`;
@@ -1161,7 +1163,6 @@ function enterEditMode(row, product) {
   actionsCell.querySelector(".btn-save").addEventListener("click", async () => {
     const newData = {
       name: row.querySelector(".name-input").value.trim(),
-      sku: row.querySelector(".sku-input").value.trim(),
       category: row.querySelector(".category-input").value.trim(),
       brand: row.querySelector(".brand-input").value.trim(),
       buyingPrice: Number(row.querySelector(".buying-input").value),
@@ -1170,7 +1171,7 @@ function enterEditMode(row, product) {
       location: row.querySelector(".location-input").value,
     };
 
-    if (!newData.name || !newData.sku || !newData.category || !newData.brand || !newData.location) {
+    if (!newData.name || !newData.category || !newData.brand || !newData.location) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -1206,7 +1207,7 @@ function enterEditMode(row, product) {
 // Export CSV with Current Filters
 // ==========================
 function exportProductsCSV(searchText = "") {
-  const headers = ["Name", "SKU", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
+  const headers = ["Name", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
   const csvRows = [headers.join(",")];
 
   const list = getFilteredProducts(searchText);
@@ -1226,7 +1227,6 @@ function exportProductsCSV(searchText = "") {
 
     const row = [
       `"${(product.name ?? "").replace(/"/g, '""')}"`,
-      `"${(product.sku ?? "").replace(/"/g, '""')}"`,
       `"${(product.category ?? "").replace(/"/g, '""')}"`,
       `"${(product.brand ?? "").replace(/"/g, '""')}"`,
       (Number(product.buyingPrice) || 0).toFixed(2),
@@ -1238,7 +1238,7 @@ function exportProductsCSV(searchText = "") {
   });
 
   csvRows.push([
-    "Totals", "", "", "",
+    "Totals", "", "",
     totalBuying.toFixed(2),
     totalSelling.toFixed(2),
     totalStock,
@@ -1263,8 +1263,6 @@ function escapeHTML(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[m]);
 }
-
-
 
 
 async function addBusinessLocation() {
