@@ -192,6 +192,32 @@ button {
   background-color: #c0392b;
 }
 
+ <!-- Inline CSS -->
+ 
+      .spinner {
+        display: inline-block;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #2c3e50;
+        border-radius: 50%;
+        width: 16px;
+        height: 16px;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .edit-input {
+        width: 100%;
+        padding: 4px;
+        box-sizing: border-box;
+      }
+      .error-row {
+        color: red;
+        text-align: center;
+      }
+
   </style>
 </head>
 <body>
@@ -828,107 +854,199 @@ async function addProductSubmit() {
 }
 
 
+// ==========================
+// State Management
+// ==========================
+const productManager = {
+  products: [],
+  selectedLocation: "all",
+  locations: [], // Store locations for the filter
+};
+
+// ==========================
+// Main Function: Show List
+// ==========================
 function showListProducts() {
-  saveLastPage("showListProducts");
+  if (typeof saveLastPage === "function") saveLastPage("showListProducts");
 
   document.getElementById("content").innerHTML = `
     <h2>List of Products</h2>
 
     <!-- Filter Section -->
     <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <select id="locationFilter" style="min-width:160px; padding:5px;">
+      <label for="locationFilter" style="font-weight:bold;">Filter by Location:</label>
+      <select id="locationFilter" style="min-width:160px; padding:5px;" aria-label="Filter by location">
         <option value="all">All Locations</option>
       </select>
-      <input type="text" id="searchProduct" placeholder="Search product..." style="min-width:200px; padding:6px;">
+
+      <label for="searchProduct" style="font-weight:bold;">Search Product:</label>
+      <input
+        type="text"
+        id="searchProduct"
+        placeholder="Type at least 3 characters..."
+        style="min-width:220px; padding:6px;"
+        aria-label="Search products by name or SKU"
+        aria-describedby="searchHelpText"
+      />
+      <span id="searchHelpText" style="font-size:12px; opacity:.8;">Search activates at 3+ characters</span>
+
       <button id="applyProductFilterBtn" style="padding:6px 12px; cursor:pointer; background:#2c3e50; color:white;">Apply Filter</button>
       <button id="exportBtn" style="margin-left:auto; padding:6px 12px; cursor:pointer;">Export</button>
     </div>
 
     <!-- Products Table -->
-    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
+    <table role="grid" border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
       <thead style="background:#f0f0f0;">
         <tr>
-          <th>Product Name</th>
-          <th>SKU</th>
-          <th>Category</th>
-          <th>Brand</th>
-          <th>Buying Price (KES)</th>
-          <th>Selling Price (KES)</th>
-          <th>Opening Stock</th>
-          <th>Location</th>
-          <th>Actions</th>
+          <th scope="col">Product Name</th>
+          <th scope="col">SKU</th>
+          <th scope="col">Category</th>
+          <th scope="col">Brand</th>
+          <th scope="col">Buying Price (KES)</th>
+          <th scope="col">Selling Price (KES)</th>
+          <th scope="col">Opening Stock</th>
+          <th scope="col">Location</th>
+          <th scope="col">Actions</th>
         </tr>
       </thead>
-      <tbody id="productsTbody">
-        <tr><td colspan="9">Loading...</td></tr>
+      <tbody id="productsTbody" aria-live="polite" aria-busy="true">
+        <tr><td colspan="9" style="text-align:center;">Loading...</td></tr>
       </tbody>
     </table>
   `;
 
-  // Load locations
   loadLocations();
-
-  // Load products
   loadProducts();
 
-  // Apply filter
+  // Debounced search (3+ chars)
+  let debounceTimeout;
+  document.getElementById("searchProduct").addEventListener("input", () => {
+    clearTimeout(debounceTimeout);
+    debounceTimeout = setTimeout(() => {
+      const searchText = document.getElementById("searchProduct").value.toLowerCase();
+      renderProductsTable(searchText);
+    }, 300);
+  });
+
+  // Apply filter button
   document.getElementById("applyProductFilterBtn").addEventListener("click", () => {
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
-    selectedLocation = document.getElementById("locationFilter").value;
+    productManager.selectedLocation = document.getElementById("locationFilter").value;
     renderProductsTable(searchText);
   });
 
-  // Export
+  // Instant filter on location change
+  document.getElementById("locationFilter").addEventListener("change", () => {
+    productManager.selectedLocation = document.getElementById("locationFilter").value;
+    const searchText = document.getElementById("searchProduct").value.toLowerCase();
+    renderProductsTable(searchText);
+  });
+
+  // Export (uses filtered + searched list)
   document.getElementById("exportBtn").addEventListener("click", () => {
-    exportProductsCSV();
+    const searchText = document.getElementById("searchProduct").value.toLowerCase();
+    exportProductsCSV(searchText);
   });
 }
 
-// Globals
-let products = [];
-let selectedLocation = "all";
+// ==========================
+// Helpers / Config
+// ==========================
+const MIN_SEARCH_CHARS = 3;
+const fmtKES = (v) => (Number(v) || 0).toLocaleString("en-KE", { style: "currency", currency: "KES" });
 
-// Load products
+// ==========================
+// Load Locations
+// ==========================
+function loadLocations() {
+  const select = document.getElementById("locationFilter");
+  firebase.firestore().collection("businessLocations").get()
+    .then(snapshot => {
+      productManager.locations = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data && data.name) productManager.locations.push(data.name);
+      });
+
+      select.innerHTML = `<option value="all">All Locations</option>`;
+      productManager.locations.forEach(location => {
+        const option = document.createElement("option");
+        option.value = location;
+        option.textContent = location;
+        select.appendChild(option);
+      });
+    })
+    .catch(err => {
+      console.error("Error loading locations:", err);
+      select.innerHTML = `<option value="all">All Locations</option>`;
+    });
+}
+
+// ==========================
+// Load Products
+// ==========================
 function loadProducts() {
+  const tbody = document.getElementById("productsTbody");
+  tbody.setAttribute("aria-busy", "true");
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;"><span class="spinner"></span>Loading...</td></tr>`;
+
   firebase.firestore().collection("products").orderBy("name").get()
     .then(snapshot => {
-      products = [];
+      productManager.products = [];
       snapshot.forEach(doc => {
-        products.push({ id: doc.id, ...doc.data() });
+        productManager.products.push({ id: doc.id, ...doc.data() });
       });
       renderProductsTable();
     })
     .catch(err => {
       console.error("Error loading products:", err);
-      const tbody = document.getElementById("productsTbody");
-      tbody.innerHTML = `<tr><td colspan="9" style="color:red; text-align:center;">Error loading products.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="error-row">Failed to load products: ${escapeHTML(err.message)}</td></tr>`;
+      tbody.setAttribute("aria-busy", "false");
     });
 }
 
-// Render table + totals row
-function renderProductsTable(searchText = "") {
-  const tbody = document.getElementById("productsTbody");
-  let filteredProducts = selectedLocation === "all" ? products : products.filter(p => p.location === selectedLocation);
+// ==========================
+// Common filter logic
+// ==========================
+function getFilteredProducts(searchText = "") {
+  // Filter by location
+  let filtered = productManager.selectedLocation === "all"
+    ? productManager.products
+    : productManager.products.filter(p => p.location === productManager.selectedLocation);
 
-  if (searchText) {
-    filteredProducts = filteredProducts.filter(p =>
-      (p.name && p.name.toLowerCase().includes(searchText)) ||
-      (p.sku && p.sku.toLowerCase().includes(searchText))
+  // Apply search only when length >= MIN_SEARCH_CHARS
+  const q = (searchText || "").toLowerCase();
+  if (q.length >= MIN_SEARCH_CHARS) {
+    filtered = filtered.filter(p =>
+      (p.name && String(p.name).toLowerCase().includes(q)) ||
+      (p.sku && String(p.sku).toLowerCase().includes(q))
     );
   }
+  return filtered;
+}
 
-  if (filteredProducts.length === 0) {
-    tbody.innerHTML = "<tr><td colspan='9' style='text-align:center;'>No products found.</td></tr>";
+// ==========================
+// Render Products + Totals
+// ==========================
+function renderProductsTable(searchText = "") {
+  const tbody = document.getElementById("productsTbody");
+  tbody.setAttribute("aria-busy", "true");
+
+  const filteredProducts = getFilteredProducts(searchText);
+
+  if (!filteredProducts.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No products found.</td></tr>`;
+    tbody.setAttribute("aria-busy", "false");
     return;
   }
 
-  tbody.innerHTML = "";
+  const fragment = document.createDocumentFragment();
   let totalStock = 0;
   let totalBuying = 0;
   let totalSelling = 0;
 
   filteredProducts.forEach(product => {
-    tbody.appendChild(createProductRow(product));
+    fragment.appendChild(createProductRow(product));
 
     const stock = Number(product.openingStock) || 0;
     const buy = Number(product.buyingPrice) || 0;
@@ -945,82 +1063,108 @@ function renderProductsTable(searchText = "") {
   tr.style.fontWeight = "bold";
   tr.innerHTML = `
     <td colspan="4" style="text-align:right;">Totals:</td>
-    <td>KES ${totalBuying.toFixed(2)}</td>
-    <td>KES ${totalSelling.toFixed(2)}</td>
+    <td>${fmtKES(totalBuying)}</td>
+    <td>${fmtKES(totalSelling)}</td>
     <td>${totalStock}</td>
     <td colspan="2"></td>
   `;
-  tbody.appendChild(tr);
+  fragment.appendChild(tr);
+
+  tbody.innerHTML = "";
+  tbody.appendChild(fragment);
+  tbody.setAttribute("aria-busy", "false");
 }
 
-// Create product row
+// ==========================
+// Create Row
+// ==========================
 function createProductRow(product) {
+  const buying = fmtKES(product.buyingPrice);
+  const selling = fmtKES(product.sellingPrice);
+  const stock = Number(product.openingStock) || 0;
+
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td>${escapeHTML(product.name)}</td>
-    <td>${escapeHTML(product.sku)}</td>
-    <td>${escapeHTML(product.category)}</td>
-    <td>${escapeHTML(product.brand)}</td>
-    <td class="buying-price-cell">KES ${product.buyingPrice?.toFixed(2) ?? "0.00"}</td>
-    <td class="selling-price-cell">KES ${product.sellingPrice?.toFixed(2) ?? "0.00"}</td>
-    <td>${product.openingStock ?? 0}</td>
-    <td>${escapeHTML(product.location)}</td>
-    <td>
-      <button class="btn-edit" aria-label="Edit prices for ${escapeHTML(product.name)}">Edit</button>
+    <td class="name-cell">${escapeHTML(product.name)}</td>
+    <td class="sku-cell">${escapeHTML(product.sku)}</td>
+    <td class="category-cell">${escapeHTML(product.category)}</td>
+    <td class="brand-cell">${escapeHTML(product.brand)}</td>
+    <td class="buying-price-cell">${buying}</td>
+    <td class="selling-price-cell">${selling}</td>
+    <td class="stock-cell">${stock}</td>
+    <td class="location-cell">${escapeHTML(product.location)}</td>
+    <td class="actions-cell">
+      <button class="btn-edit" aria-label="Edit product ${escapeHTML(product.name)}">Edit</button>
     </td>
   `;
+
   tr.querySelector(".btn-edit").addEventListener("click", () => {
     enterEditMode(tr, product);
   });
+
   return tr;
 }
 
-// Escape HTML
-function escapeHTML(str) {
-  if (!str) return "";
-  return str.replace(/[&<>"']/g, m => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  })[m]);
-}
-
-// Edit mode
+// ==========================
+// Edit Mode
+// ==========================
 function enterEditMode(row, product) {
-  const buyingCell = row.querySelector(".buying-price-cell");
-  const sellingCell = row.querySelector(".selling-price-cell");
-  buyingCell.innerHTML = `<input type="number" min="0" step="0.01" class="edit-input" value="${product.buyingPrice?.toFixed(2) ?? "0.00"}" aria-label="Edit Buying Price" />`;
-  sellingCell.innerHTML = `<input type="number" min="0" step="0.01" class="edit-input" value="${product.sellingPrice?.toFixed(2) ?? "0.00"}" aria-label="Edit Selling Price" />`;
+  row.querySelector(".name-cell").innerHTML = `<input type="text" class="edit-input name-input" value="${escapeHTML(product.name)}" aria-label="Edit Product Name" />`;
+  row.querySelector(".sku-cell").innerHTML = `<input type="text" class="edit-input sku-input" value="${escapeHTML(product.sku)}" aria-label="Edit SKU" />`;
+  row.querySelector(".category-cell").innerHTML = `<input type="text" class="edit-input category-input" value="${escapeHTML(product.category)}" aria-label="Edit Category" />`;
+  row.querySelector(".brand-cell").innerHTML = `<input type="text" class="edit-input brand-input" value="${escapeHTML(product.brand)}" aria-label="Edit Brand" />`;
+  row.querySelector(".buying-price-cell").innerHTML = `<input type="number" min="0" step="0.01" class="edit-input buying-input" value="${Number(product.buyingPrice) || 0}" aria-label="Edit Buying Price" />`;
+  row.querySelector(".selling-price-cell").innerHTML = `<input type="number" min="0" step="0.01" class="edit-input selling-input" value="${Number(product.sellingPrice) || 0}" aria-label="Edit Selling Price" />`;
+  row.querySelector(".stock-cell").innerHTML = `<input type="number" min="0" step="1" class="edit-input stock-input" value="${Number(product.openingStock) || 0}" aria-label="Edit Opening Stock" />`;
+  row.querySelector(".location-cell").innerHTML = `
+    <select class="edit-input location-input" aria-label="Edit Location">
+      <option value="">Select Location</option>
+      ${productManager.locations.map(loc => `<option value="${escapeHTML(loc)}" ${loc === product.location ? "selected" : ""}>${escapeHTML(loc)}</option>`).join("")}
+    </select>
+  `;
 
-  const actionsCell = row.querySelector("td:last-child");
+  const actionsCell = row.querySelector(".actions-cell");
   actionsCell.innerHTML = `
     <button class="btn-save">Save</button>
     <button class="btn-cancel">Cancel</button>
   `;
+  row.querySelector(".name-input").focus();
 
   actionsCell.querySelector(".btn-save").addEventListener("click", async () => {
-    const newBuying = parseFloat(buyingCell.querySelector("input").value);
-    const newSelling = parseFloat(sellingCell.querySelector("input").value);
+    const newData = {
+      name: row.querySelector(".name-input").value.trim(),
+      sku: row.querySelector(".sku-input").value.trim(),
+      category: row.querySelector(".category-input").value.trim(),
+      brand: row.querySelector(".brand-input").value.trim(),
+      buyingPrice: Number(row.querySelector(".buying-input").value),
+      sellingPrice: Number(row.querySelector(".selling-input").value),
+      openingStock: parseInt(row.querySelector(".stock-input").value, 10),
+      location: row.querySelector(".location-input").value,
+    };
 
-    if (isNaN(newBuying) || newBuying < 0 || isNaN(newSelling) || newSelling < 0) {
-      alert("Please enter valid non-negative numbers for prices.");
+    if (!newData.name || !newData.sku || !newData.category || !newData.brand || !newData.location) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    if (isNaN(newData.buyingPrice) || newData.buyingPrice < 0) {
+      alert("Buying price must be a valid non-negative number.");
+      return;
+    }
+    if (isNaN(newData.sellingPrice) || newData.sellingPrice < 0) {
+      alert("Selling price must be a valid non-negative number.");
+      return;
+    }
+    if (isNaN(newData.openingStock) || newData.openingStock < 0) {
+      alert("Opening stock must be a valid non-negative number.");
       return;
     }
 
     try {
-      await firebase.firestore().collection("products").doc(product.id).update({
-        buyingPrice: newBuying,
-        sellingPrice: newSelling
-      });
-      product.buyingPrice = newBuying;
-      product.sellingPrice = newSelling;
-
-      // Refresh row
-      const newRow = createProductRow(product);
-      row.replaceWith(newRow);
-
-      // ✅ Re-render totals row
+      await firebase.firestore().collection("products").doc(product.id).update(newData);
+      Object.assign(product, newData);
       renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
     } catch (err) {
-      alert("Error updating prices: " + err.message);
+      alert(`Error updating product: ${err.message}`);
     }
   });
 
@@ -1030,77 +1174,70 @@ function enterEditMode(row, product) {
   });
 }
 
+// ==========================
+// Export CSV with Current Filters
+// ==========================
+function exportProductsCSV(searchText = "") {
+  const headers = ["Name", "SKU", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
+  const csvRows = [headers.join(",")];
 
+  const list = getFilteredProducts(searchText);
 
-async function showBusinessLocations() {
-  saveLastPage("showBusinessLocations");
+  let totalStock = 0;
+  let totalBuying = 0;
+  let totalSelling = 0;
 
-  const locations = await loadCollection("businessLocations");
+  list.forEach(product => {
+    const stock = Number(product.openingStock) || 0;
+    const buy = Number(product.buyingPrice) || 0;
+    const sell = Number(product.sellingPrice) || 0;
 
-  document.getElementById("content").innerHTML = `
-    <h2>Manage Business Locations</h2>
-    <input type="text" id="newLocationName" placeholder="Location name" />
-    <input type="text" id="newLocationAddress" placeholder="Address (optional)" />
-    <button onclick="addBusinessLocation()">Add Location</button>
-    <div id="locationMessage" style="margin-top:10px;"></div>
+    totalStock += stock;
+    totalBuying += stock * buy;
+    totalSelling += stock * sell;
 
-    <h3>Existing Locations</h3>
-    <ul id="locationList" style="list-style:none; padding-left:0;"></ul>
-  `;
-
-  renderLocationList(locations);
-}
-
-function renderLocationList(locations) {
-  const ul = document.getElementById("locationList");
-  ul.innerHTML = "";
-  if (locations.length === 0) {
-    ul.innerHTML = "<li>No locations found.</li>";
-    return;
-  }
-  locations.forEach(loc => {
-    ul.innerHTML += `
-      <li style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
-        <div>
-          <strong>${loc.name}</strong><br/>
-          <small>${loc.address || ""}</small>
-        </div>
-        <button style="background:red;color:white; border:none; cursor:pointer;" onclick="deleteBusinessLocation('${loc.id}')">Delete</button>
-      </li>`;
+    const row = [
+      `"${(product.name ?? "").replace(/"/g, '""')}"`,
+      `"${(product.sku ?? "").replace(/"/g, '""')}"`,
+      `"${(product.category ?? "").replace(/"/g, '""')}"`,
+      `"${(product.brand ?? "").replace(/"/g, '""')}"`,
+      (Number(product.buyingPrice) || 0).toFixed(2),
+      (Number(product.sellingPrice) || 0).toFixed(2),
+      stock,
+      `"${(product.location ?? "").replace(/"/g, '""')}"`,
+    ];
+    csvRows.push(row.join(","));
   });
-}
-function exportProductsCSV() {
-  // Prepare CSV header
-  const headers = ["Product Name", "SKU", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
-  
-  // Filter products according to selected location
-  const filteredProducts = selectedLocation === "all" ? products : products.filter(p => p.location === selectedLocation);
 
-  // Prepare rows
-  const rows = filteredProducts.map(p => [
-    `"${p.name}"`,
-    `"${p.sku}"`,
-    `"${p.category}"`,
-    `"${p.brand}"`,
-    p.buyingPrice?.toFixed(2) ?? "0.00",
-    p.sellingPrice?.toFixed(2) ?? "0.00",
-    p.openingStock ?? 0,
-    `"${p.location}"`
+  // Totals row
+  csvRows.push([
+    "Totals", "", "", "",
+    totalBuying.toFixed(2),
+    totalSelling.toFixed(2),
+    totalStock,
+    ""
   ].join(","));
 
-  const csvContent = [headers.join(","), ...rows].join("\n");
-
-  // Create a blob and trigger download
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "products_export.csv";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const csvContent = csvRows.join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "products.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
+
+// ==========================
+// Escape HTML
+// ==========================
+function escapeHTML(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[m]);
+}
+
+
 
 
 async function addBusinessLocation() {
