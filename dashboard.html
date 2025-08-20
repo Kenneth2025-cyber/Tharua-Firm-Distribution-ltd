@@ -861,7 +861,7 @@ async function addProductSubmit() {
 }
 
 
-// Initialize productManager with default filter values
+// Initialize productManager with default filter values and pagination
 const productManager = {
   products: [],
   locations: [],
@@ -869,7 +869,9 @@ const productManager = {
   brands: [],
   selectedLocation: "all",
   selectedCategory: "all",
-  selectedBrand: "all"
+  selectedBrand: "all",
+  currentPage: 1, // Track current page
+  itemsPerPage: 10 // Default items per page
 };
 
 function showListProducts() {
@@ -955,6 +957,45 @@ function showListProducts() {
         padding: 8px;
         border: 1px solid #ddd;
       }
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+      .pagination-section button {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      .pagination-section button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .pagination-section .prev-btn {
+        background: #007bff;
+        color: white;
+      }
+      .pagination-section .prev-btn:hover:not(:disabled) {
+        background: #0056b3;
+      }
+      .pagination-section .next-btn {
+        background: #007bff;
+        color: white;
+      }
+      .pagination-section .next-btn:hover:not(:disabled) {
+        background: #0056b3;
+      }
+      .pagination-section select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
       @media (max-width: 600px) {
         .filter-section select, .filter-section input[type="text"] {
           min-width: 100%;
@@ -962,6 +1003,10 @@ function showListProducts() {
         .filter-section {
           flex-direction: column;
           align-items: stretch;
+        }
+        .pagination-section {
+          flex-direction: column;
+          gap: 10px;
         }
       }
     </style>
@@ -1018,6 +1063,23 @@ function showListProducts() {
         </tbody>
       </table>
     </div>
+
+    <!-- Pagination Section -->
+    <div class="pagination-section">
+      <div>
+        <label for="itemsPerPage">Show:</label>
+        <select id="itemsPerPage" aria-label="Select items per page">
+          <option value="10" selected>10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+        <span id="paginationInfo"></span>
+      </div>
+      <div>
+        <button id="prevPageBtn" class="prev-btn" disabled>Previous</button>
+        <button id="nextPageBtn" class="next-btn">Next</button>
+      </div>
+    </div>
   `;
 
   // Load all data and then render the table
@@ -1040,6 +1102,7 @@ function showListProducts() {
   document.getElementById("searchProduct").addEventListener("input", () => {
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
+      productManager.currentPage = 1; // Reset to first page on search
       const searchText = document.getElementById("searchProduct").value.toLowerCase();
       renderProductsTable(searchText);
     }, 300);
@@ -1051,12 +1114,14 @@ function showListProducts() {
     productManager.selectedLocation = document.getElementById("locationFilter").value;
     productManager.selectedCategory = document.getElementById("categoryFilter").value;
     productManager.selectedBrand = document.getElementById("brandFilter").value;
+    productManager.currentPage = 1; // Reset to first page on filter
     renderProductsTable(searchText);
   });
 
   // Instant filter on location change
   document.getElementById("locationFilter").addEventListener("change", () => {
     productManager.selectedLocation = document.getElementById("locationFilter").value;
+    productManager.currentPage = 1; // Reset to first page
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     renderProductsTable(searchText);
   });
@@ -1064,6 +1129,7 @@ function showListProducts() {
   // Instant filter on category change
   document.getElementById("categoryFilter").addEventListener("change", () => {
     productManager.selectedCategory = document.getElementById("categoryFilter").value;
+    productManager.currentPage = 1; // Reset to first page
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     renderProductsTable(searchText);
   });
@@ -1071,8 +1137,37 @@ function showListProducts() {
   // Instant filter on brand change
   document.getElementById("brandFilter").addEventListener("change", () => {
     productManager.selectedBrand = document.getElementById("brandFilter").value;
+    productManager.currentPage = 1; // Reset to first page
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     renderProductsTable(searchText);
+  });
+
+  // Items per page change
+  document.getElementById("itemsPerPage").addEventListener("change", () => {
+    productManager.itemsPerPage = parseInt(document.getElementById("itemsPerPage").value, 10);
+    productManager.currentPage = 1; // Reset to first page
+    const searchText = document.getElementById("searchProduct").value.toLowerCase();
+    renderProductsTable(searchText);
+  });
+
+  // Previous page button
+  document.getElementById("prevPageBtn").addEventListener("click", () => {
+    if (productManager.currentPage > 1) {
+      productManager.currentPage--;
+      const searchText = document.getElementById("searchProduct").value.toLowerCase();
+      renderProductsTable(searchText);
+    }
+  });
+
+  // Next page button
+  document.getElementById("nextPageBtn").addEventListener("click", () => {
+    const searchText = document.getElementById("searchProduct").value.toLowerCase();
+    const filteredProducts = getFilteredProducts(searchText);
+    const maxPage = Math.ceil(filteredProducts.length / productManager.itemsPerPage);
+    if (productManager.currentPage < maxPage) {
+      productManager.currentPage++;
+      renderProductsTable(searchText);
+    }
   });
 
   // Export (uses filtered + searched list)
@@ -1238,8 +1333,26 @@ function renderProductsTable(searchText = "") {
   tbody.setAttribute("aria-busy", "true");
 
   const filteredProducts = getFilteredProducts(searchText);
+  const totalItems = filteredProducts.length;
+  const itemsPerPage = productManager.itemsPerPage;
+  const currentPage = productManager.currentPage;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
-  if (!filteredProducts.length) {
+  // Update pagination info
+  const paginationInfo = document.getElementById("paginationInfo");
+  paginationInfo.textContent = totalItems > 0
+    ? `Showing ${startIndex + 1} to ${endIndex} of ${totalItems}`
+    : "No products found.";
+
+  // Enable/disable pagination buttons
+  const prevBtn = document.getElementById("prevPageBtn");
+  const nextBtn = document.getElementById("nextPageBtn");
+  prevBtn.disabled = currentPage === 1;
+  nextBtn.disabled = currentPage >= Math.ceil(totalItems / itemsPerPage);
+
+  if (!paginatedProducts.length) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No products found.</td></tr>`;
     tbody.setAttribute("aria-busy", "false");
     return;
@@ -1250,7 +1363,7 @@ function renderProductsTable(searchText = "") {
   let totalBuying = 0;
   let totalSelling = 0;
 
-  filteredProducts.forEach(product => {
+  paginatedProducts.forEach(product => {
     fragment.appendChild(createProductRow(product));
 
     const stock = Number(product.openingStock) || 0;
@@ -1262,17 +1375,20 @@ function renderProductsTable(searchText = "") {
     totalSelling += stock * sell;
   });
 
-  const tr = document.createElement("tr");
-  tr.style.background = "#f9f9f9";
-  tr.style.fontWeight = "bold";
-  tr.innerHTML = `
-    <td colspan="3" style="text-align:right;">Totals:</td>
-    <td>${fmtKES(totalBuying)}</td>
-    <td>${fmtKES(totalSelling)}</td>
-    <td>${totalStock}</td>
-    <td colspan="2"></td>
-  `;
-  fragment.appendChild(tr);
+  // Add totals row only if there are products on the current page
+  if (paginatedProducts.length > 0) {
+    const tr = document.createElement("tr");
+    tr.style.background = "#f9f9f9";
+    tr.style.fontWeight = "bold";
+    tr.innerHTML = `
+      <td colspan="3" style="text-align:right;">Totals:</td>
+      <td>${fmtKES(totalBuying)}</td>
+      <td>${fmtKES(totalSelling)}</td>
+      <td>${totalStock}</td>
+      <td colspan="2"></td>
+    `;
+    fragment.appendChild(tr);
+  }
 
   tbody.innerHTML = "";
   tbody.appendChild(fragment);
@@ -1328,7 +1444,14 @@ function createProductRow(product) {
       try {
         await firebase.firestore().collection("products").doc(product.id).delete();
         productManager.products = productManager.products.filter(p => p.id !== product.id);
-        renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
+        const searchText = document.getElementById("searchProduct").value.toLowerCase();
+        // Adjust current page if necessary
+        const filteredProducts = getFilteredProducts(searchText);
+        const maxPage = Math.ceil(filteredProducts.length / productManager.itemsPerPage);
+        if (productManager.currentPage > maxPage && maxPage > 0) {
+          productManager.currentPage = maxPage;
+        }
+        renderProductsTable(searchText);
       } catch (err) {
         alert(`Error deleting product: ${err.message}`);
       }
