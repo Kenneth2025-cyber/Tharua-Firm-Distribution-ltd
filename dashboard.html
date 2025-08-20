@@ -877,49 +877,237 @@ function showListProducts() {
   if (typeof saveLastPage === "function") saveLastPage("showListProducts");
 
   document.getElementById("content").innerHTML = `
-    <h2>List of Products</h2>
+    <h2 style="margin-bottom: 20px; font-size: 24px; color: #333;">Product Inventory</h2>
 
     <!-- Filter Section -->
-    <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <label for="locationFilter" style="font-weight:bold;">Filter by Location:</label>
-      <select id="locationFilter" style="min-width:160px; padding:5px;" aria-label="Filter by location">
-        <option value="all">All Locations</option>
-      </select>
-
-      <label for="searchProduct" style="font-weight:bold;">Search Product:</label>
-      <input
-        type="text"
-        id="searchProduct"
-        placeholder="Type at least 3 characters..."
-        style="min-width:220px; padding:6px;"
-        aria-label="Search products by name"
-        aria-describedby="searchHelpText"
-      />
-      <span id="searchHelpText" style="font-size:12px; opacity:.8;">Search activates at 3+ characters</span>
-
-      <button id="applyProductFilterBtn" style="padding:6px 12px; cursor:pointer; background:#2c3e50; color:white;">Apply Filter</button>
-      <button id="exportBtn" style="margin-left:auto; padding:4px 8px; font-size:12px; cursor:pointer;">Export</button>
+    <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+      <div style="flex: 1; min-width: 200px;">
+        <label for="locationFilter" class="filter-label">Location:</label>
+        <select id="locationFilter" class="filter-select" multiple aria-label="Filter by locations">
+          <option value="all">All Locations</option>
+        </select>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <label for="categoryFilter" class="filter-label">Category:</label>
+        <select id="categoryFilter" class="filter-select" multiple aria-label="Filter by categories">
+          <option value="all">All Categories</option>
+        </select>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <label for="brandFilter" class="filter-label">Brand:</label>
+        <select id="brandFilter" class="filter-select" multiple aria-label="Filter by brands">
+          <option value="all">All Brands</option>
+        </select>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <label for="searchProduct" class="filter-label">Search:</label>
+        <input
+          type="text"
+          id="searchProduct"
+          placeholder="Search products..."
+          class="filter-input"
+          aria-label="Search products by name"
+        />
+      </div>
+      <button id="applyProductFilterBtn" class="btn btn-primary">Apply Filters</button>
+      <button id="exportBtn" class="btn btn-secondary">Export to CSV</button>
     </div>
 
     <!-- Products Table -->
-    <table role="grid" border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead style="background:#f0f0f0;">
+    <table role="grid" class="product-table">
+      <thead>
         <tr>
           <th scope="col">Product Name</th>
-          <th scope="col">Category</th>
-          <th scope="col">Brand</th>
+          <th scope="col">Categories</th>
+          <th scope="col">Brands</th>
           <th scope="col">Buying Price (KES)</th>
           <th scope="col">Selling Price (KES)</th>
-          <th scope="col">Opening Stock</th>
-          <th scope="col">Location</th>
+          <th scope="col">Stock</th>
+          <th scope="col">Locations</th>
           <th scope="col">Actions</th>
         </tr>
       </thead>
       <tbody id="productsTbody" aria-live="polite" aria-busy="true">
-        <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+        <tr><td colspan="8" class="loading">Loading...</td></tr>
       </tbody>
     </table>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+      <div class="modal-content">
+        <h3 style="margin-top: 0; color: #333;">Edit Product</h3>
+        <form id="editForm">
+          <div class="form-group">
+            <label for="editName">Name:</label>
+            <input type="text" id="editName" required class="form-input" aria-label="Product Name" />
+          </div>
+          <div class="form-group">
+            <label for="editCategories">Categories:</label>
+            <select id="editCategories" multiple required class="form-select" aria-label="Product Categories"></select>
+          </div>
+          <div class="form-group">
+            <label for="editBrands">Brands:</label>
+            <select id="editBrands" multiple required class="form-select" aria-label="Product Brands"></select>
+          </div>
+          <div class="form-group">
+            <label for="editBuyingPrice">Buying Price (KES):</label>
+            <input type="number" id="editBuyingPrice" min="0" step="0.01" required class="form-input" aria-label="Buying Price" />
+          </div>
+          <div class="form-group">
+            <label for="editSellingPrice">Selling Price (KES):</label>
+            <input type="number" id="editSellingPrice" min="0" step="0.01" required class="form-input" aria-label="Selling Price" />
+          </div>
+          <div class="form-group">
+            <label for="editStock">Opening Stock:</label>
+            <input type="number" id="editStock" min="0" step="1" required class="form-input" aria-label="Opening Stock" />
+          </div>
+          <div class="form-group">
+            <label for="editLocations">Locations:</label>
+            <select id="editLocations" multiple required class="form-select" aria-label="Product Locations"></select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="cancelEdit" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Inline CSS -->
+    <style>
+      .filter-label {
+        font-weight: 600;
+        color: #333;
+        display: block;
+        margin-bottom: 5px;
+      }
+      .filter-select, .form-select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        background: white;
+      }
+      .filter-input, .form-input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+      .btn-primary {
+        background: #007bff;
+        color: white;
+      }
+      .btn-primary:hover {
+        background: #0056b3;
+      }
+      .btn-secondary {
+        background: #6c757d;
+        color: white;
+      }
+      .btn-secondary:hover {
+        background: #545b62;
+      }
+      .product-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .product-table th, .product-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .product-table th {
+        background: #f0f0f0;
+        font-weight: 600;
+        color: #333;
+      }
+      .product-table tr:hover {
+        background: #f8f9fa;
+      }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-content {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #333;
+      }
+      .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+      }
+      .actions-cell button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 8px;
+        color: #007bff;
+      }
+      .actions-cell button:hover {
+        color: #0056b3;
+      }
+      .actions-cell button.delete {
+        color: #dc3545;
+      }
+      .actions-cell button.delete:hover {
+        color: #b02a37;
+      }
+    </style>
   `;
+
+  // Initialize select2 for multi-select dropdowns (assuming select2 is included)
+  $(document).ready(() => {
+    $('.filter-select, .form-select').select2({
+      width: '100%',
+      placeholder: 'Select options',
+      allowClear: true
+    });
+  });
 
   loadLocations();
   loadProducts();
@@ -954,316 +1142,6 @@ function showListProducts() {
     exportProductsCSV(searchText);
   });
 }
-
-// ==========================
-// Helpers / Config
-// ==========================
-const MIN_SEARCH_CHARS = 3;
-const fmtKES = (v) => (Number(v) || 0).toLocaleString("en-KE", { style: "currency", currency: "KES" });
-
-// ==========================
-// Load Locations
-// ==========================
-function loadLocations() {
-  const select = document.getElementById("locationFilter");
-  firebase.firestore().collection("businessLocations").get()
-    .then(snapshot => {
-      productManager.locations = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data && data.name) productManager.locations.push(data.name);
-      });
-
-      select.innerHTML = `<option value="all">All Locations</option>`;
-      productManager.locations.forEach(location => {
-        const option = document.createElement("option");
-        option.value = location;
-        option.textContent = location;
-        select.appendChild(option);
-      });
-    })
-    .catch(err => {
-      console.error("Error loading locations:", err);
-      select.innerHTML = `<option value="all">All Locations</option>`;
-    });
-}
-
-// ==========================
-// Load Products
-// ==========================
-function loadProducts() {
-  const tbody = document.getElementById("productsTbody");
-  tbody.setAttribute("aria-busy", "true");
-  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;"><span class="spinner"></span>Loading...</td></tr>`;
-
-  firebase.firestore().collection("products").orderBy("name").get()
-    .then(snapshot => {
-      productManager.products = [];
-      snapshot.forEach(doc => {
-        productManager.products.push({ id: doc.id, ...doc.data() });
-      });
-      renderProductsTable();
-    })
-    .catch(err => {
-      console.error("Error loading products:", err);
-      tbody.innerHTML = `<tr><td colspan="8" class="error-row">Failed to load products: ${escapeHTML(err.message)}</td></tr>`;
-      tbody.setAttribute("aria-busy", "false");
-    });
-}
-
-// ==========================
-// Common filter logic
-// ==========================
-function getFilteredProducts(searchText = "") {
-  let filtered = productManager.selectedLocation === "all"
-    ? productManager.products
-    : productManager.products.filter(p => p.location === productManager.selectedLocation);
-
-  const q = (searchText || "").toLowerCase();
-  if (q.length >= MIN_SEARCH_CHARS) {
-    filtered = filtered.filter(p =>
-      (p.name && String(p.name).toLowerCase().includes(q))
-    );
-  }
-  return filtered;
-}
-
-// ==========================
-// Render Products + Totals
-// ==========================
-function renderProductsTable(searchText = "") {
-  const tbody = document.getElementById("productsTbody");
-  tbody.setAttribute("aria-busy", "true");
-
-  const filteredProducts = getFilteredProducts(searchText);
-
-  if (!filteredProducts.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No products found.</td></tr>`;
-    tbody.setAttribute("aria-busy", "false");
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  let totalStock = 0;
-  let totalBuying = 0;
-  let totalSelling = 0;
-
-  filteredProducts.forEach(product => {
-    fragment.appendChild(createProductRow(product));
-
-    const stock = Number(product.openingStock) || 0;
-    const buy = Number(product.buyingPrice) || 0;
-    const sell = Number(product.sellingPrice) || 0;
-
-    totalStock += stock;
-    totalBuying += stock * buy;
-    totalSelling += stock * sell;
-  });
-
-  const tr = document.createElement("tr");
-  tr.style.background = "#f9f9f9";
-  tr.style.fontWeight = "bold";
-  tr.innerHTML = `
-    <td colspan="3" style="text-align:right;">Totals:</td>
-    <td>${fmtKES(totalBuying)}</td>
-    <td>${fmtKES(totalSelling)}</td>
-    <td>${totalStock}</td>
-    <td colspan="2"></td>
-  `;
-  fragment.appendChild(tr);
-
-  tbody.innerHTML = "";
-  tbody.appendChild(fragment);
-  tbody.setAttribute("aria-busy", "false");
-}
-
-// ==========================
-// Create Row (emoji icons)
-// ==========================
-function createProductRow(product) {
-  const buying = fmtKES(product.buyingPrice);
-  const selling = fmtKES(product.sellingPrice);
-  const stock = Number(product.openingStock) || 0;
-
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td class="name-cell">${escapeHTML(product.name)}</td>
-    <td class="category-cell">${escapeHTML(product.category)}</td>
-    <td class="brand-cell">${escapeHTML(product.brand)}</td>
-    <td class="buying-price-cell">${buying}</td>
-    <td class="selling-price-cell">${selling}</td>
-    <td class="stock-cell">${stock}</td>
-    <td class="location-cell">${escapeHTML(product.location)}</td>
-    <td class="actions-cell" style="white-space:nowrap;">
-      <span title="View" style="cursor:pointer; color:green; margin-right:6px;">👁</span>
-      <span title="Edit" style="cursor:pointer; color:#2980b9; margin-right:6px;">✏</span>
-      <span title="Delete" style="cursor:pointer; color:red;">🗑</span>
-    </td>
-  `;
-
-  // View action
-  tr.querySelector('[title="View"]').addEventListener("click", () => {
-    alert(`
-      Product Details:
-      Name: ${escapeHTML(product.name)}
-      Category: ${escapeHTML(product.category)}
-      Brand: ${escapeHTML(product.brand)}
-      Buying Price: ${buying}
-      Selling Price: ${selling}
-      Opening Stock: ${stock}
-      Location: ${escapeHTML(product.location)}
-    `);
-  });
-
-  // Edit action
-  tr.querySelector('[title="Edit"]').addEventListener("click", () => {
-    enterEditMode(tr, product);
-  });
-
-  // Delete action
-  tr.querySelector('[title="Delete"]').addEventListener("click", async () => {
-    if (confirm(`Are you sure you want to delete ${escapeHTML(product.name)}?`)) {
-      try {
-        await firebase.firestore().collection("products").doc(product.id).delete();
-        productManager.products = productManager.products.filter(p => p.id !== product.id);
-        renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
-      } catch (err) {
-        alert(`Error deleting product: ${err.message}`);
-      }
-    }
-  });
-
-  return tr;
-}
-
-// ==========================
-// Edit Mode (emoji save/cancel)
-// ==========================
-function enterEditMode(row, product) {
-  row.querySelector(".name-cell").innerHTML = `<input type="text" class="edit-input name-input" value="${escapeHTML(product.name)}" aria-label="Edit Product Name" />`;
-  row.querySelector(".category-cell").innerHTML = `<input type="text" class="edit-input category-input" value="${escapeHTML(product.category)}" aria-label="Edit Category" />`;
-  row.querySelector(".brand-cell").innerHTML = `<input type="text" class="edit-input brand-input" value="${escapeHTML(product.brand)}" aria-label="Edit Brand" />`;
-  row.querySelector(".buying-price-cell").innerHTML = `<input type="number" min="0" step="0.01" class="edit-input buying-input" value="${Number(product.buyingPrice) || 0}" aria-label="Edit Buying Price" />`;
-  row.querySelector(".selling-price-cell").innerHTML = `<input type="number" min="0" step="0.01" class="edit-input selling-input" value="${Number(product.sellingPrice) || 0}" aria-label="Edit Selling Price" />`;
-  row.querySelector(".stock-cell").innerHTML = `<input type="number" min="0" step="1" class="edit-input stock-input" value="${Number(product.openingStock) || 0}" aria-label="Edit Opening Stock" />`;
-  row.querySelector(".location-cell").innerHTML = `
-    <select class="edit-input location-input" aria-label="Edit Location">
-      <option value="">Select Location</option>
-      ${productManager.locations.map(loc => `<option value="${escapeHTML(loc)}" ${loc === product.location ? "selected" : ""}>${escapeHTML(loc)}</option>`).join("")}
-    </select>
-  `;
-
-  const actionsCell = row.querySelector(".actions-cell");
-  actionsCell.innerHTML = `
-    <span class="btn-save" title="Save" style="cursor:pointer; color:green; margin-right:6px;">💾</span>
-    <span class="btn-cancel" title="Cancel" style="cursor:pointer; color:red;">❌</span>
-  `;
-  row.querySelector(".name-input").focus();
-
-  actionsCell.querySelector(".btn-save").addEventListener("click", async () => {
-    const newData = {
-      name: row.querySelector(".name-input").value.trim(),
-      category: row.querySelector(".category-input").value.trim(),
-      brand: row.querySelector(".brand-input").value.trim(),
-      buyingPrice: Number(row.querySelector(".buying-input").value),
-      sellingPrice: Number(row.querySelector(".selling-input").value),
-      openingStock: parseInt(row.querySelector(".stock-input").value, 10),
-      location: row.querySelector(".location-input").value,
-    };
-
-    if (!newData.name || !newData.category || !newData.brand || !newData.location) {
-      alert("Please fill in all required fields.");
-      return;
-    }
-    if (isNaN(newData.buyingPrice) || newData.buyingPrice < 0) {
-      alert("Buying price must be a valid non-negative number.");
-      return;
-    }
-    if (isNaN(newData.sellingPrice) || newData.sellingPrice < 0) {
-      alert("Selling price must be a valid non-negative number.");
-      return;
-    }
-    if (isNaN(newData.openingStock) || newData.openingStock < 0) {
-      alert("Opening stock must be a valid non-negative number.");
-      return;
-    }
-
-    try {
-      await firebase.firestore().collection("products").doc(product.id).update(newData);
-      Object.assign(product, newData);
-      renderProductsTable(document.getElementById("searchProduct").value.toLowerCase());
-    } catch (err) {
-      alert(`Error updating product: ${err.message}`);
-    }
-  });
-
-  actionsCell.querySelector(".btn-cancel").addEventListener("click", () => {
-    const newRow = createProductRow(product);
-    row.replaceWith(newRow);
-  });
-}
-
-// ==========================
-// Export CSV with Current Filters
-// ==========================
-function exportProductsCSV(searchText = "") {
-  const headers = ["Name", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
-  const csvRows = [headers.join(",")];
-
-  const list = getFilteredProducts(searchText);
-
-  let totalStock = 0;
-  let totalBuying = 0;
-  let totalSelling = 0;
-
-  list.forEach(product => {
-    const stock = Number(product.openingStock) || 0;
-    const buy = Number(product.buyingPrice) || 0;
-    const sell = Number(product.sellingPrice) || 0;
-
-    totalStock += stock;
-    totalBuying += stock * buy;
-    totalSelling += stock * sell;
-
-    const row = [
-      `"${(product.name ?? "").replace(/"/g, '""')}"`,
-      `"${(product.category ?? "").replace(/"/g, '""')}"`,
-      `"${(product.brand ?? "").replace(/"/g, '""')}"`,
-      (Number(product.buyingPrice) || 0).toFixed(2),
-      (Number(product.sellingPrice) || 0).toFixed(2),
-      stock,
-      `"${(product.location ?? "").replace(/"/g, '""')}"`,
-    ];
-    csvRows.push(row.join(","));
-  });
-
-  csvRows.push([
-    "Totals", "", "",
-    totalBuying.toFixed(2),
-    totalSelling.toFixed(2),
-    totalStock,
-    ""
-  ].join(","));
-
-  const csvContent = csvRows.join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "products.csv";
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
-
-// ==========================
-// Escape HTML
-// ==========================
-function escapeHTML(str) {
-  if (str === null || str === undefined) return "";
-  return String(str).replace(/[&<>"']/g, m => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  })[m]);
-}
-
 
 
 async function addBusinessLocation() {
