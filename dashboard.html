@@ -746,52 +746,189 @@ function toggleProducts() {
 }
 
 async function showAddProduct() {
-  saveLastPage("showAddProduct");
+  // Show loading overlay
+  document.getElementById("content").innerHTML = `
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading product form...</p>
+    </div>
+  `;
 
   // Load categories, brands, and locations from Firestore
   const categories = await getCollectionOptions("categories");
   const brands = await getCollectionOptions("brands");
   const locations = await getCollectionOptions("businessLocations");
 
+  // Render professional form
   document.getElementById("content").innerHTML = `
-    <h2>Add Product</h2>
-    <form id="addProductForm">
-      <label>Product Name *</label>
-      <input type="text" id="productName" placeholder="Enter product name" required />
+    <style>
+      .loading-overlay {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+      }
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 10px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .form-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .form-container h2 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+      }
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+      .form-group select[multiple] {
+        height: 100px;
+      }
+      .form-group input[type="checkbox"],
+      .form-group input[type="radio"] {
+        width: auto;
+        margin-right: 10px;
+      }
+      .form-group .radio-group {
+        display: flex;
+        gap: 20px;
+      }
+      .submit-btn {
+        background: #3498db;
+        color: #fff;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        width: 100%;
+        transition: background 0.3s;
+      }
+      .submit-btn:hover {
+        background: #2980b9;
+      }
+      #addProductMessage {
+        margin-top: 15px;
+        text-align: center;
+        font-size: 14px;
+      }
+    </style>
+    <div class="form-container">
+      <h2>Add New Product</h2>
+      <form id="addProductForm">
+        <div class="form-group">
+          <label for="productName">Product Name *</label>
+          <input type="text" id="productName" placeholder="Enter product name" required aria-label="Product Name" />
+        </div>
 
-      <!-- SKU will be generated automatically, no input -->
+        <div class="form-group">
+          <label for="category">Category *</label>
+          <select id="category" required aria-label="Category">
+            <option value="">Select category</option>
+            ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
+          </select>
+        </div>
 
-      <label>Category *</label>
-      <select id="category" required>
-        <option value="">Select category</option>
-        ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
-      </select>
+        <div class="form-group">
+          <label for="brand">Brand *</label>
+          <select id="brand" required aria-label="Brand">
+            <option value="">Select brand</option>
+            ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
+          </select>
+        </div>
 
-      <label>Brand *</label>
-      <select id="brand" required>
-        <option value="">Select brand</option>
-        ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
-      </select>
+        <div class="form-group">
+          <label for="buyingPrice">Buying Price (KES) *</label>
+          <input type="number" id="buyingPrice" min="0" step="0.01" placeholder="Enter buying price" required aria-label="Buying Price" />
+        </div>
 
-      <label>Buying Price (KES) *</label>
-      <input type="number" id="buyingPrice" min="0" step="0.01" placeholder="Enter buying price" required />
+        <div class="form-group">
+          <label for="sellingPrice">Selling Price (KES) *</label>
+          <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="Enter selling price" required aria-label="Selling Price" />
+        </div>
 
-      <label>Selling Price (KES) *</label>
-      <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="Enter selling price" required />
+        <div class="form-group">
+          <label for="openingStock">Opening Stock</label>
+          <input type="number" id="openingStock" min="0" step="1" placeholder="Enter opening stock" aria-label="Opening Stock" />
+        </div>
 
-      <label>Opening Stock</label>
-      <input type="number" id="openingStock" min="0" step="1" placeholder="Enter opening stock" />
+        <div class="form-group">
+          <label for="businessLocations">Business Locations *</label>
+          <select id="businessLocations" multiple required aria-label="Business Locations">
+            ${locations.map(l => `<option value="${l}">${l}</option>`).join("")}
+          </select>
+        </div>
 
-      <label>Business Location *</label>
-      <select id="businessLocation" required>
-        <option value="">Select location</option>
-        ${locations.map(l => `<option value="${l}">${l}</option>`).join("")}
-      </select>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="vatable" aria-label="Vatable Product" /> Vatable Product (16% VAT)
+          </label>
+        </div>
 
-      <button type="submit">Add Product</button>
-    </form>
-    <div id="addProductMessage" style="color: red; margin-top: 10px;"></div>
+        <div class="form-group" id="vatOptions" style="display: none;">
+          <label>VAT Inclusion *</label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="vatInclusion" value="inclusive" checked /> Inclusive of Buying Price
+            </label>
+            <label>
+              <input type="radio" name="vatInclusion" value="exclusive" /> Exclusive of Buying Price
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">Add Product</button>
+      </form>
+      <div id="addProductMessage" style="color: red;"></div>
+    </div>
   `;
+
+  // Show/hide VAT options based on vatable checkbox
+  const vatableCheckbox = document.getElementById("vatable");
+  const vatOptions = document.getElementById("vatOptions");
+  vatableCheckbox.addEventListener("change", () => {
+    vatOptions.style.display = vatableCheckbox.checked ? "block" : "none";
+  });
 
   document.getElementById("addProductForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -816,13 +953,17 @@ async function addProductSubmit() {
   const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
   const sellingPrice = parseFloat(document.getElementById("sellingPrice").value);
   const openingStock = parseInt(document.getElementById("openingStock").value) || 0;
-  const location = document.getElementById("businessLocation").value;
+  const locationSelect = document.getElementById("businessLocations");
+  const locations = Array.from(locationSelect.selectedOptions).map(option => option.value);
+  const vatable = document.getElementById("vatable").checked;
+  const vatInclusion = vatable ? document.querySelector('input[name="vatInclusion"]:checked').value : null;
+  const vatRate = vatable ? 0.16 : 0;
 
   const messageEl = document.getElementById("addProductMessage");
   messageEl.style.color = "red";
 
   // Basic validation
-  if (!name || !category || !brand || isNaN(buyingPrice) || isNaN(sellingPrice) || !location) {
+  if (!name || !category || !brand || isNaN(buyingPrice) || isNaN(sellingPrice) || locations.length === 0) {
     messageEl.textContent = "Please fill in all required fields correctly.";
     return;
   }
@@ -832,26 +973,30 @@ async function addProductSubmit() {
     return;
   }
 
-  // Validate selling price > buying price
-  if (sellingPrice <= buyingPrice) {
-    messageEl.textContent = "Selling price must be greater than buying price.";
+  // Validate selling price >= buying price
+  if (sellingPrice < buyingPrice) {
+    messageEl.textContent = "Selling price cannot be less than buying price.";
     return;
   }
 
-  // Check for duplicate product
+  // Validate VAT inclusion selection
+  if (vatable && !vatInclusion) {
+    messageEl.textContent = "Please select whether VAT is inclusive or exclusive.";
+    return;
+  }
+
+  // Check for duplicate product by name
   const existing = await firebase.firestore().collection("products")
     .where("name", "==", name)
-    .where("location", "==", location)
     .get();
   if (!existing.empty) {
-    messageEl.textContent = "Product already exists at this location.";
+    messageEl.textContent = "Product name already exists.";
     return;
   }
 
-  // Generate SKU with category and location codes
+  // Generate SKU with category code
   const catCode = category.substring(0, 3).toUpperCase();
-  const locCode = location.substring(0, 3).toUpperCase();
-  const sku = `PROD-${catCode}-${locCode}-${Date.now()}`;
+  const sku = `PROD-${catCode}-${Date.now()}`;
 
   const productData = {
     name,
@@ -861,7 +1006,10 @@ async function addProductSubmit() {
     buyingPrice,
     sellingPrice,
     openingStock,
-    location,
+    locations, // Store as array
+    vatable,
+    vatRate,
+    vatInclusion: vatable ? vatInclusion : null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
@@ -872,6 +1020,7 @@ async function addProductSubmit() {
     messageEl.textContent = `Product added successfully with SKU: ${sku}`;
     showSuccessNotification(`Product added successfully with SKU: ${sku}`);
     document.getElementById("addProductForm").reset();
+    document.getElementById("vatOptions").style.display = "none"; // Reset VAT options visibility
   } catch (error) {
     messageEl.style.color = "red";
     messageEl.textContent = error.code === "permission-denied"
