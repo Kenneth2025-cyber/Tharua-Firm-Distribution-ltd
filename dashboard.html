@@ -13,14 +13,55 @@
   left: 0;
   height: 100vh;
   width: 230px;
-  background-color: #2c3e50;
+  background-color: transparent; /* Transparent to avoid background when collapsed */
   color: white;
-  padding-top: 20px;
-  overflow-y: auto;
-  transition: transform 0.3s ease;
+  overflow-y: visible; /* Ensure toggle button is visible when collapsed */
+  transition: none; /* Remove transform transition */
 }
-.sidebar.collapsed {
-  transform: translateX(-100%);
+
+.sidebar-content {
+  background-color: #2c3e50; /* Move sidebar background to content */
+  height: 100%;
+  padding-top: 50px; /* Space for toggle button */
+  transition: transform 0.4s ease-in-out;
+}
+
+.sidebar.collapsed .sidebar-content {
+  transform: translateX(-100%); /* Only sidebar content slides out */
+}
+
+.toggle-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #2c3e50; /* Match sidebar background */
+  color: white;
+  padding: 8px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  z-index: 1000; /* Ensure button stays above content */
+  transition: background-color 0.2s ease;
+  min-height: 44px; /* Accessibility for touch */
+}
+
+.toggle-btn:hover {
+  background-color: #34495e;
+}
+
+.toggle-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+  .toggle-btn {
+    padding: 10px;
+  }
+  .toggle-btn svg {
+    width: 28px;
+    height: 28px;
+  }
 }
 .sidebar h2 {
   text-align: center;
@@ -58,28 +99,6 @@
   transition: transform 0.2s ease;
 }
 .toggle-btn:focus {
-  outline: none;
-}
-.toggle-btn-main {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background-color: transparent;
-  color: #333;
-  padding: 8px;
-  cursor: pointer;
-  border: none;
-  z-index: 10;
-  transition: transform 0.2s ease;
-  display: none;
-}
-.toggle-btn-main.collapsed {
-  display: block;
-}
-.main-content:not(.collapsed) .toggle-btn-main {
-  display: none;
-}
-.toggle-btn-main:focus {
   outline: none;
 }
 
@@ -352,13 +371,19 @@ button {
 </div>
 
 <div class="main-content" id="mainContent">
-  <button class="toggle-btn-main collapsed" onclick="toggleSidebar()">
+ 
+ <div class="sidebar" id="sidebar">
+  <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Menu">
     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="3" y1="6" x2="21" y2="6"></line>
       <line x1="3" y1="12" x2="21" y2="12"></line>
       <line x1="3" y1="18" x2="21" y2="18"></line>
     </svg>
   </button>
+  <div class="sidebar-content" id="sidebarContent">
+    <h2>THARUA</h2>
+    <a onclick="showHome()"><i class="fas fa-home"></i> <span>Home</span></a>
+ 
   <div id="content" class="content-section">
     <h1>Welcome to Tharua Firm</h1>
     <p>Click a menu item on the left to view more details.</p>
@@ -475,11 +500,11 @@ function showSuccessNotification(message = "Success") {
       }).catch(err => alert("Error logging out: " + err.message));
     }
 
-    function toggleSidebar() {
-      document.getElementById("sidebar").classList.toggle("collapsed");
-      document.getElementById("mainContent").classList.toggle("collapsed");
-      saveSidebarState(document.getElementById("sidebar").classList.contains("collapsed") ? "collapsed" : "expanded");
-    }
+  function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("collapsed");
+  document.getElementById("mainContent").classList.toggle("collapsed");
+  saveSidebarState(document.getElementById("sidebar").classList.contains("collapsed") ? "collapsed" : "expanded");
+}
 
     function showHome() {
       saveLastPage("showHome");
