@@ -48,17 +48,30 @@
 .toggle-btn {
   position: absolute;
   top: 20px;
-  left: 0;
-  background-color: transparent;
-  color: #333;
+  right: -40px;
+  background-color: #2c3e50;
+  color: white;
   padding: 8px;
   cursor: pointer;
   border: none;
-  z-index: 10;
-  transition: transform 0.2s ease;
+  z-index: 1000;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 4px 4px 0;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  will-change: transform;
+  outline: none;
 }
 .toggle-btn:hover {
-  transform: scale(1.2);
+  background-color: #34495e;
+  transform: translateX(5px);
+}
+.toggle-btn i.rotate-90 {
+  transform: rotate(90deg);
+  transition: transform 0.3s ease;
 }
     .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; }
@@ -3332,6 +3345,29 @@ function deleteSupplier(id) {
   firebase.firestore().collection("suppliers").doc(id).delete()
     .then(() => loadSuppliers())
     .catch(err => alert("Error deleting: " + err.message));
+}
+
+document.querySelector(".toggle-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleSidebar();
+});
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const mainContent = document.getElementById("mainContent");
+  const toggleBtn = document.querySelector(".toggle-btn i");
+
+  sidebar.classList.toggle("collapsed");
+  mainContent.classList.toggle("collapsed");
+
+  if (sidebar.classList.contains("collapsed")) {
+    toggleBtn.classList.remove("fa-arrows-alt-h");
+    toggleBtn.classList.add("fa-arrows-alt-h", "rotate-90");
+  } else {
+    toggleBtn.classList.remove("rotate-90");
+  }
+
+  saveSidebarState(sidebar.classList.contains("collapsed") ? "collapsed" : "expanded");
 }
 
     
