@@ -2183,60 +2183,404 @@ function escapeHTML(str) {
 
 
 
+// Initialize locationManager for pagination
+const locationManager = {
+  locations: [],
+  currentPage: 1,
+  itemsPerPage: 10
+};
+
 async function showBusinessLocations() {
   saveLastPage("showBusinessLocations");
+
+  // Show loading state
+  document.getElementById("content").innerHTML = `
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading business locations...</p>
+    </div>
+  `;
 
   // Load existing business locations
   const locations = await loadCollection("businessLocations");
 
   // Render the business locations management interface
   document.getElementById("content").innerHTML = `
-    <h2>Manage Business Locations</h2>
-    <div class="form-group">
-      <input type="text" id="newLocationName" placeholder="Location Name" required aria-label="Location Name">
-      <input type="text" id="newLocationAddress" placeholder="Address (Optional)" aria-label="Location Address">
-      <button onclick="addBusinessLocation()" class="submit-btn">Add Location</button>
+    <style>
+      .loading-overlay {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+      }
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 10px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .form-container {
+        max-width: 600px;
+        width: 90%;
+        margin: 20px auto;
+        padding: 20px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .form-container h2 {
+        color: #333;
+        font-size: 24px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .form-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+      .form-group button {
+        padding: 10px;
+        background: #3498db;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .form-group button:hover {
+        background: #2980b9;
+      }
+      #locationMessage {
+        text-align: center;
+        font-size: 14px;
+      }
+      .table-container {
+        max-height: 400px;
+        overflow-y: auto;
+        width: 100%;
+        position: relative;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .table-container table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .table-container thead {
+        position: sticky;
+        top: 0;
+        background: #f0f0f0;
+        z-index: 1;
+      }
+      .table-container th, .table-container td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      .table-container th {
+        font-weight: 600;
+        color: #333;
+      }
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 15px;
+        font-size: 14px;
+      }
+      .pagination-section button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      .pagination-section button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .pagination-section .prev-btn, .pagination-section .next-btn {
+        background: #007bff;
+        color: white;
+      }
+      .pagination-section .prev-btn:hover:not(:disabled), .pagination-section .next-btn:hover:not(:disabled) {
+        background: #0056b3;
+      }
+      .pagination-section select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-content {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        position: relative;
+      }
+      .modal-content h2 {
+        margin-top: 0;
+        color: #333;
+        font-size: 20px;
+      }
+      .modal-content p {
+        font-size: 14px;
+        color: #333;
+        margin: 10px 0;
+      }
+      .modal-content .modal-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      .modal-content button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      .modal-content .btn-danger {
+        background: #dc3545;
+        color: white;
+      }
+      .modal-content .btn-danger:hover {
+        background: #c82333;
+      }
+      .modal-content .btn-secondary {
+        background: #6c757d;
+        color: white;
+      }
+      .modal-content .btn-secondary:hover {
+        background: #5a6268;
+      }
+      .modal-content .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 20px;
+        cursor: pointer;
+        color: #333;
+      }
+      @media (max-width: 600px) {
+        .form-container {
+          width: 95%;
+          padding: 15px;
+        }
+        .form-container h2 {
+          font-size: 20px;
+        }
+        .form-group {
+          flex-direction: column;
+        }
+        .form-group input {
+          font-size: 12px;
+          padding: 8px;
+        }
+        .form-group button {
+          font-size: 14px;
+          padding: 10px;
+        }
+        .table-container th, .table-container td {
+          font-size: 12px;
+          padding: 8px;
+        }
+        .pagination-section {
+          flex-direction: column;
+          gap: 10px;
+        }
+      }
+    </style>
+    <div class="form-container">
+      <h2>Manage Business Locations</h2>
+      <form id="addLocationForm">
+        <div class="form-group">
+          <div>
+            <label for="newLocationName">Location Name *</label>
+            <input type="text" id="newLocationName" placeholder="Location Name" required aria-label="Location Name">
+          </div>
+          <div>
+            <label for="newLocationAddress">Address (Optional)</label>
+            <input type="text" id="newLocationAddress" placeholder="Address" aria-label="Location Address">
+          </div>
+          <button type="submit" class="submit-btn">Add Location</button>
+        </div>
+      </form>
+      <div id="locationMessage" style="color: red;"></div>
     </div>
-    <div id="locationMessage" style="margin-top:10px; color:red;"></div>
-
     <h3>Existing Locations</h3>
     <div class="table-container">
-      <table class="users-table" border="1" cellpadding="8" cellspacing="0">
+      <table class="users-table" role="grid" border="1" cellpadding="8" cellspacing="0">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Address</th>
-            <th>Actions</th>
+            <th scope="col">Name</th>
+            <th scope="col">Address</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
-        <tbody id="locationsTable"></tbody>
+        <tbody id="locationsTable" aria-live="polite" aria-busy="true"></tbody>
       </table>
+    </div>
+    <div class="pagination-section">
+      <div>
+        <label for="locationsPerPage">Show:</label>
+        <select id="locationsPerPage" aria-label="Select items per page">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+        <span id="paginationInfo"></span>
+      </div>
+      <div>
+        <button id="prevPageBtn" class="prev-btn" disabled>Previous</button>
+        <button id="nextPageBtn" class="next-btn">Next</button>
+      </div>
+    </div>
+    <div id="deleteLocationModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('deleteLocationModal')">&times;</span>
+        <h2>Confirm Delete</h2>
+        <p id="deleteLocationMessage"></p>
+        <div class="modal-buttons">
+          <button id="confirmDeleteLocationBtn" class="btn-danger">Delete</button>
+          <button class="btn-secondary" onclick="closeModal('deleteLocationModal')">Cancel</button>
+        </div>
+      </div>
     </div>
   `;
 
+  // Initialize pagination controls
+  document.getElementById("locationsPerPage").addEventListener("change", () => {
+    const value = document.getElementById("locationsPerPage").value;
+    locationManager.itemsPerPage = value === "all" ? Infinity : parseInt(value, 10);
+    locationManager.currentPage = 1;
+    renderLocationList(locations);
+  });
+
+  document.getElementById("prevPageBtn").addEventListener("click", () => {
+    if (locationManager.currentPage > 1) {
+      locationManager.currentPage--;
+      renderLocationList(locations);
+    }
+  });
+
+  document.getElementById("nextPageBtn").addEventListener("click", () => {
+    const maxPage = Math.ceil(locationManager.locations.length / locationManager.itemsPerPage);
+    if (locationManager.currentPage < maxPage) {
+      locationManager.currentPage++;
+      renderLocationList(locations);
+    }
+  });
+
+  // Initialize form submission
+  document.getElementById("addLocationForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await addBusinessLocation();
+  });
+
   // Render the list of locations
+  locationManager.locations = locations;
   renderLocationList(locations);
 }
 
-// Render the list of business locations
+// Render the list of business locations with pagination
 function renderLocationList(locations) {
   const tbody = document.getElementById("locationsTable");
+  tbody.setAttribute("aria-busy", "true");
+
+  const totalItems = locations.length;
+  const itemsPerPage = locationManager.itemsPerPage;
+  const currentPage = locationManager.currentPage;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const paginatedLocations = locations.slice(startIndex, endIndex);
+
+  const paginationInfo = document.getElementById("paginationInfo");
+  paginationInfo.textContent = totalItems > 0
+    ? `Showing ${startIndex + 1} to ${endIndex} of ${totalItems}`
+    : "No locations found.";
+
+  const prevBtn = document.getElementById("prevPageBtn");
+  const nextBtn = document.getElementById("nextPageBtn");
+  prevBtn.disabled = currentPage === 1;
+  nextBtn.disabled = currentPage >= Math.ceil(totalItems / itemsPerPage);
+
   tbody.innerHTML = "";
-  if (locations.length === 0) {
+  if (paginatedLocations.length === 0) {
     tbody.innerHTML = "<tr><td colspan='3'>No locations found.</td></tr>";
+    tbody.setAttribute("aria-busy", "false");
     return;
   }
-  locations.forEach(loc => {
-    tbody.innerHTML += `
-      <tr data-id="${loc.id}">
-        <td class="desktop-cell">${loc.name || ""}</td>
-        <td class="desktop-cell">${loc.address || ""}</td>
-        <td class="desktop-actions">
-          <span title="Delete" style="cursor:pointer; color:red;" onclick="deleteBusinessLocation('${loc.id}')">🗑</span>
-        </td>
-      </tr>
+
+  const fragment = document.createDocumentFragment();
+  paginatedLocations.forEach(loc => {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-id", loc.id);
+    tr.innerHTML = `
+      <td class="desktop-cell">${escapeHTML(loc.name || "")}</td>
+      <td class="desktop-cell">${escapeHTML(loc.address || "")}</td>
+      <td class="desktop-actions">
+        <span title="Delete" style="cursor:pointer; color:red;" onclick="deleteBusinessLocation('${loc.id}', '${escapeHTML(loc.name)}')">🗑</span>
+      </td>
     `;
+    fragment.appendChild(tr);
   });
+
+  tbody.appendChild(fragment);
+  tbody.setAttribute("aria-busy", "false");
 }
 
 // Add a new business location
@@ -2251,6 +2595,7 @@ async function addBusinessLocation() {
   messageEl.style.color = "red";
   if (!name) {
     messageEl.textContent = "Location name is required.";
+    showToast("Location name is required.", "error");
     return;
   }
 
@@ -2261,6 +2606,7 @@ async function addBusinessLocation() {
       .get();
     if (!existing.empty) {
       messageEl.textContent = "Location name already exists.";
+      showToast("Location name already exists.", "error");
       return;
     }
 
@@ -2280,26 +2626,38 @@ async function addBusinessLocation() {
 
     // Reload and render the updated list
     const locations = await loadCollection("businessLocations");
+    locationManager.locations = locations;
     renderLocationList(locations);
   } catch (error) {
     console.error("Error adding location:", error);
     messageEl.textContent = `Error adding location: ${error.message}`;
+    showToast(`Error adding location: ${error.message}`, "error");
   }
 }
 
 // Delete a business location
-async function deleteBusinessLocation(id) {
-  if (!confirm("Are you sure you want to delete this location?")) return;
+async function deleteBusinessLocation(id, name) {
+  document.getElementById("deleteLocationMessage").textContent = `Are you sure you want to delete the location "${name}"?`;
+  openModal("deleteLocationModal");
 
-  try {
-    await firebase.firestore().collection("businessLocations").doc(id).delete();
-    showSuccessNotification("Location deleted successfully.");
-    const locations = await loadCollection("businessLocations");
-    renderLocationList(locations);
-  } catch (error) {
-    console.error("Error deleting location:", error);
-    alert(`Error deleting location: ${error.message}`);
-  }
+  const confirmDeleteBtn = document.getElementById("confirmDeleteLocationBtn");
+  const newConfirmDeleteBtn = confirmDeleteBtn.cloneNode(true);
+  confirmDeleteBtn.replaceWith(newConfirmDeleteBtn);
+
+  newConfirmDeleteBtn.addEventListener("click", async () => {
+    try {
+      await firebase.firestore().collection("businessLocations").doc(id).delete();
+      closeModal("deleteLocationModal");
+      showSuccessNotification("Location deleted successfully.");
+      const locations = await loadCollection("businessLocations");
+      locationManager.locations = locations;
+      renderLocationList(locations);
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      closeModal("deleteLocationModal");
+      showToast(`Error deleting location: ${error.message}`, "error");
+    }
+  });
 }
 
 async function showCategory() {
