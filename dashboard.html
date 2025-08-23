@@ -47,18 +47,15 @@
 }
 .toggle-btn {
   position: absolute;
-  top: 10px; /* Adjust as needed to align with sidebar */
-  left: 10px; /* Adjust as needed to align with sidebar */
+  top: 10px;
+  right: 10px; /* Changed to right to place it in the top-right corner of sidebar */
   background-color: transparent;
-  color: #333;
+  color: white; /* Changed to white to be visible against the sidebar's dark background */
   padding: 8px;
   cursor: pointer;
   border: none;
   z-index: 10;
   transition: transform 0.2s ease;
-}
-.toggle-btn:hover {
-  transform: scale(1.2);
 }
 .toggle-btn:focus {
   outline: none; /* Removes the dark line when focused */
@@ -271,8 +268,15 @@ button {
 </head>
 <body>
 <div class="sidebar" id="sidebar">
-    <h2>THARUA</h2>
-    <a onclick="showHome()"><i class="fas fa-home"></i> <span>Home</span></a>
+  <button class="toggle-btn" onclick="toggleSidebar()">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </button>
+  <h2>THARUA</h2>
+  <a onclick="showHome()"><i class="fas fa-home"></i> <span>Home</span></a>
     <div class="dropdown">
       <a onclick="toggleUserManagement()" id="userMgmtMenu"><i class="fas fa-users-cog"></i> <span>User Management</span> <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
       <div id="userMgmtSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
@@ -325,17 +329,11 @@ button {
 </div>
 
  <div class="main-content" id="mainContent">
-  <button class="toggle-btn" onclick="toggleSidebar()">
-  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="3" y1="6" x2="21" y2="6"></line>
-    <line x1="3" y1="12" x2="21" y2="12"></line>
-    <line x1="3" y1="18" x2="21" y2="18"></line>
-  </svg>
-</button>
-    <div id="content" class="content-section">
-      <h1>Welcome to Tharua Firm</h1>
-      <p>Click a menu item on the left to view more details.</p>
-    </div>
+ <div class="main-content" id="mainContent">
+  <div id="content" class="content-section">
+    <h1>Welcome to Tharua Firm</h1>
+    <p>Click a menu item on the left to view more details.</p>
+  </div>
 </div>
 
   <!-- Firebase SDKs -->
