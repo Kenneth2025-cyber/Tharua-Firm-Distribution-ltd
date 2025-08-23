@@ -46,32 +46,34 @@
   margin-left: 0;
 }
 .toggle-btn {
-  position: absolute;
+  position: fixed; /* Changed to fixed to ensure visibility regardless of main-content position */
   top: 20px;
-  right: -40px;
+  left: 10px; /* Positioned on the left side of the screen when sidebar is collapsed */
   background-color: #2c3e50;
   color: white;
-  padding: 8px;
+  padding: 4px;
   cursor: pointer;
   border: none;
-  z-index: 1000;
-  width: 40px;
-  height: 40px;
+  z-index: 2000; /* Increased z-index to ensure it’s above other elements */
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
   transition: transform 0.2s ease, background-color 0.2s ease;
-  will-change: transform;
-  outline: none;
+  outline: 2px solid red; /* Temporary outline for debugging visibility */
 }
 .toggle-btn:hover {
   background-color: #34495e;
-  transform: translateX(5px);
+  transform: scale(1.1); /* Slightly enlarge on hover for visibility */
 }
 .toggle-btn i.rotate-90 {
   transform: rotate(90deg);
   transition: transform 0.3s ease;
+}
+.sidebar.collapsed ~ .main-content .toggle-btn {
+  left: 10px; /* Ensure button stays visible when sidebar is collapsed */
 }
     .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; }
@@ -334,14 +336,14 @@ button {
     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
 
- <div class="main-content" id="mainContent">
- <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
-  <i class="fas fa-arrows-alt-h"></i>
-</button>
-    <div id="content" class="content-section">
-      <h1>Welcome to Tharua Firm</h1>
-      <p>Click a menu item on the left to view more details.</p>
-    </div>
+<div class="main-content" id="mainContent">
+  <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+    <i class="fas fa-arrows-alt-h"></i>
+  </button>
+  <div id="content" class="content-section">
+    <h1>Welcome to Tharua Firm</h1>
+    <p>Click a menu item on the left to view more details.</p>
+  </div>
 </div>
 
   <!-- Firebase SDKs -->
@@ -454,11 +456,22 @@ function showSuccessNotification(message = "Success") {
       }).catch(err => alert("Error logging out: " + err.message));
     }
 
-    function toggleSidebar() {
-      document.getElementById("sidebar").classList.toggle("collapsed");
-      document.getElementById("mainContent").classList.toggle("collapsed");
-      saveSidebarState(document.getElementById("sidebar").classList.contains("collapsed") ? "collapsed" : "expanded");
-    }
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const mainContent = document.getElementById("mainContent");
+  const toggleBtn = document.querySelector(".toggle-btn i");
+
+  sidebar.classList.toggle("collapsed");
+  mainContent.classList.toggle("collapsed");
+
+  if (sidebar.classList.contains("collapsed")) {
+    toggleBtn.classList.add("rotate-90");
+  } else {
+    toggleBtn.classList.remove("rotate-90");
+  }
+
+  saveSidebarState(sidebar.classList.contains("collapsed") ? "collapsed" : "expanded");
+}
 
     function showHome() {
       saveLastPage("showHome");
@@ -3346,31 +3359,7 @@ function deleteSupplier(id) {
     .then(() => loadSuppliers())
     .catch(err => alert("Error deleting: " + err.message));
 }
-
-document.querySelector(".toggle-btn").addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleSidebar();
-});
-
-function toggleSidebar() {
-  const sidebar = document.getElementById("sidebar");
-  const mainContent = document.getElementById("mainContent");
-  const toggleBtn = document.querySelector(".toggle-btn i");
-
-  sidebar.classList.toggle("collapsed");
-  mainContent.classList.toggle("collapsed");
-
-  if (sidebar.classList.contains("collapsed")) {
-    toggleBtn.classList.remove("fa-arrows-alt-h");
-    toggleBtn.classList.add("fa-arrows-alt-h", "rotate-90");
-  } else {
-    toggleBtn.classList.remove("rotate-90");
-  }
-
-  saveSidebarState(sidebar.classList.contains("collapsed") ? "collapsed" : "expanded");
-}
-
-    
+ 
 	function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
   </script>
 </body>
