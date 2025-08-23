@@ -1595,39 +1595,40 @@ function showListProducts() {
     </div>
 
     <!-- Edit Modal -->
-    <div id="editModal" class="modal">
-      <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('editModal')">&times;</span>
-        <h2>Edit Product</h2>
-        <form id="editProductForm">
-          <label for="editName">Product Name:</label>
-          <input type="text" id="editName" required>
-          <label for="editCategory">Category:</label>
-          <select id="editCategory" required>
-            <option value="">Select Category</option>
-          </select>
-          <label for="editBrand">Brand:</label>
-          <select id="editBrand" required>
-            <option value="">Select Brand</option>
-          </select>
-          <label for="editBuyingPrice">Buying Price (KES):</label>
-          <input type="number" id="editBuyingPrice" min="0" step="0.01" required>
-          <label for="editSellingPrice">Selling Price (KES):</label>
-          <input type="number" id="editSellingPrice" min="0" step="0.01" required>
-          <span id="priceError" class="error-text">Selling price must be greater than buying price.</span>
-          <label for="editStock">Opening Stock:</label>
-          <input type="number" id="editStock" min="0" step="1" required>
-          <label for="editLocation">Location:</label>
-          <select id="editLocation" required>
-            <option value="">Select Location</option>
-          </select>
-          <div class="modal-buttons">
-            <button type="submit" class="btn-primary">Save</button>
-            <button type="button" class="btn-secondary" onclick="closeModal('editModal')">Cancel</button>
-          </div>
-        </form>
+  // Update the edit modal HTML in showListProducts
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeModal('editModal')">&times;</span>
+    <h2>Edit Product</h2>
+    <form id="editProductForm">
+      <label for="editName">Product Name:</label>
+      <input type="text" id="editName" required>
+      <label for="editCategory">Category:</label>
+      <select id="editCategory" required>
+        <option value="">Select Category</option>
+      </select>
+      <label for="editBrand">Brand:</label>
+      <select id="editBrand" required>
+        <option value="">Select Brand</option>
+      </select>
+      <label for="editBuyingPrice">Buying Price (KES):</label>
+      <input type="number" id="editBuyingPrice" min="0" step="0.01" required>
+      <label for="editSellingPrice">Selling Price (KES):</label>
+      <input type="number" id="editSellingPrice" min="0" step="0.01" required>
+      <span id="priceError" class="error-text">Selling price must be greater than buying price.</span>
+      <label for="editStock">Opening Stock:</label>
+      <input type="number" id="editStock" min="0" step="1" required>
+      <label for="editLocation">Locations:</label>
+      <select id="editLocation" multiple required>
+        <option value="">Select Locations</option>
+      </select>
+      <div class="modal-buttons">
+        <button type="submit" class="btn-primary">Save</button>
+        <button type="button" class="btn-secondary" onclick="closeModal('editModal')">Cancel</button>
       </div>
-    </div>
+    </form>
+  </div>
+</div>
 
     <!-- Delete Confirmation Modal -->
     <div id="deleteModal" class="modal">
@@ -1905,7 +1906,7 @@ function getFilteredProducts(searchText = "") {
   let filtered = productManager.products;
 
   if (productManager.selectedLocation) {
-    filtered = filtered.filter(p => p.location === productManager.selectedLocation);
+    filtered = filtered.filter(p => Array.isArray(p.locations) && p.locations.includes(productManager.selectedLocation));
   }
 
   if (productManager.selectedCategory) {
@@ -1995,6 +1996,8 @@ function createProductRow(product) {
   const buying = fmtKES(product.buyingPrice);
   const selling = fmtKES(product.sellingPrice);
   const stock = Number(product.openingStock) || 0;
+  // Join the locations array into a comma-separated string
+  const locationsDisplay = Array.isArray(product.locations) ? product.locations.join(", ") : product.location || "";
 
   const tr = document.createElement("tr");
   tr.innerHTML = `
@@ -2004,7 +2007,7 @@ function createProductRow(product) {
     <td class="buying-price-cell">${buying}</td>
     <td class="selling-price-cell">${selling}</td>
     <td class="stock-cell">${stock}</td>
-    <td class="location-cell">${escapeHTML(product.location)}</td>
+    <td class="location-cell">${escapeHTML(locationsDisplay)}</td>
     <td class="actions-cell" style="white-space:nowrap;">
       <span title="View" style="cursor:pointer; color:green; margin-right:8px;">👁</span>
       <span title="Edit" style="cursor:pointer; color:#2980b9; margin-right:8px;">✏</span>
@@ -2022,7 +2025,7 @@ function createProductRow(product) {
       <p><strong>Buying Price:</strong> ${buying}</p>
       <p><strong>Selling Price:</strong> ${selling}</p>
       <p><strong>Opening Stock:</strong> ${stock}</p>
-      <p><strong>Location:</strong> ${escapeHTML(product.location)}</p>
+      <p><strong>Locations:</strong> ${escapeHTML(locationsDisplay)}</p>
     `;
     openModal("viewModal");
   });
@@ -2035,7 +2038,11 @@ function createProductRow(product) {
     document.getElementById("editBuyingPrice").value = Number(product.buyingPrice) || 0;
     document.getElementById("editSellingPrice").value = Number(product.sellingPrice) || 0;
     document.getElementById("editStock").value = Number(product.openingStock) || 0;
-    document.getElementById("editLocation").value = product.location;
+    // Update editLocation to support multiple selections
+    const editLocationSelect = document.getElementById("editLocation");
+    editLocationSelect.innerHTML = productManager.locations.map(loc => `
+      <option value="${loc}" ${Array.isArray(product.locations) && product.locations.includes(loc) ? "selected" : ""}>${loc}</option>
+    `).join("");
     document.getElementById("priceError").style.display = "none";
 
     const editForm = document.getElementById("editProductForm");
@@ -2048,10 +2055,10 @@ function createProductRow(product) {
         buyingPrice: Number(document.getElementById("editBuyingPrice").value),
         sellingPrice: Number(document.getElementById("editSellingPrice").value),
         openingStock: parseInt(document.getElementById("editStock").value, 10),
-        location: document.getElementById("editLocation").value,
+        locations: Array.from(document.getElementById("editLocation").selectedOptions).map(opt => opt.value),
       };
 
-      if (!newData.name || !newData.category || !newData.brand || !newData.location) {
+      if (!newData.name || !newData.category || !newData.brand || newData.locations.length === 0) {
         showToast("Please fill in all required fields.", "error");
         return;
       }
@@ -2119,7 +2126,7 @@ function createProductRow(product) {
 
 // Export CSV with Current Filters
 function exportProductsCSV(searchText = "") {
-  const headers = ["Name", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Location"];
+  const headers = ["Name", "Category", "Brand", "Buying Price", "Selling Price", "Opening Stock", "Locations"];
   const csvRows = [headers.join(",")];
 
   const list = getFilteredProducts(searchText);
@@ -2144,7 +2151,7 @@ function exportProductsCSV(searchText = "") {
       (Number(product.buyingPrice) || 0).toFixed(2),
       (Number(product.sellingPrice) || 0).toFixed(2),
       stock,
-      `"${(product.location ?? "").replace(/"/g, '""')}"`,
+      `"${(Array.isArray(product.locations) ? product.locations.join(";") : product.location ?? "").replace(/"/g, '""')}"`,
     ];
     csvRows.push(row.join(","));
   });
@@ -2176,6 +2183,63 @@ function escapeHTML(str) {
 
 
 
+async function showBusinessLocations() {
+  saveLastPage("showBusinessLocations");
+
+  // Load existing business locations
+  const locations = await loadCollection("businessLocations");
+
+  // Render the business locations management interface
+  document.getElementById("content").innerHTML = `
+    <h2>Manage Business Locations</h2>
+    <div class="form-group">
+      <input type="text" id="newLocationName" placeholder="Location Name" required aria-label="Location Name">
+      <input type="text" id="newLocationAddress" placeholder="Address (Optional)" aria-label="Location Address">
+      <button onclick="addBusinessLocation()" class="submit-btn">Add Location</button>
+    </div>
+    <div id="locationMessage" style="margin-top:10px; color:red;"></div>
+
+    <h3>Existing Locations</h3>
+    <div class="table-container">
+      <table class="users-table" border="1" cellpadding="8" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Address</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="locationsTable"></tbody>
+      </table>
+    </div>
+  `;
+
+  // Render the list of locations
+  renderLocationList(locations);
+}
+
+// Render the list of business locations
+function renderLocationList(locations) {
+  const tbody = document.getElementById("locationsTable");
+  tbody.innerHTML = "";
+  if (locations.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='3'>No locations found.</td></tr>";
+    return;
+  }
+  locations.forEach(loc => {
+    tbody.innerHTML += `
+      <tr data-id="${loc.id}">
+        <td class="desktop-cell">${loc.name || ""}</td>
+        <td class="desktop-cell">${loc.address || ""}</td>
+        <td class="desktop-actions">
+          <span title="Delete" style="cursor:pointer; color:red;" onclick="deleteBusinessLocation('${loc.id}')">🗑</span>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// Add a new business location
 async function addBusinessLocation() {
   const nameInput = document.getElementById("newLocationName");
   const addressInput = document.getElementById("newLocationAddress");
@@ -2186,48 +2250,55 @@ async function addBusinessLocation() {
 
   messageEl.style.color = "red";
   if (!name) {
-    messageEl.textContent = "Location name cannot be empty.";
-    return;
-  }
-
-  const existing = await firebase.firestore().collection("businessLocations").where("name", "==", name).get();
-  if (!existing.empty) {
-    messageEl.textContent = "Location already exists.";
+    messageEl.textContent = "Location name is required.";
     return;
   }
 
   try {
+    // Check for duplicate location name
+    const existing = await firebase.firestore().collection("businessLocations")
+      .where("name", "==", name)
+      .get();
+    if (!existing.empty) {
+      messageEl.textContent = "Location name already exists.";
+      return;
+    }
+
+    // Add new location to Firebase
     await firebase.firestore().collection("businessLocations").add({
       name,
       address: address || null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+
+    // Show success message and reset form
     messageEl.style.color = "green";
     messageEl.textContent = `Location "${name}" added successfully.`;
+    showSuccessNotification(`Location "${name}" added successfully.`);
     nameInput.value = "";
     addressInput.value = "";
 
+    // Reload and render the updated list
     const locations = await loadCollection("businessLocations");
     renderLocationList(locations);
   } catch (error) {
     console.error("Error adding location:", error);
-    messageEl.textContent = "Error adding location: " + error.message;
+    messageEl.textContent = `Error adding location: ${error.message}`;
   }
 }
 
+// Delete a business location
 async function deleteBusinessLocation(id) {
   if (!confirm("Are you sure you want to delete this location?")) return;
 
   try {
     await firebase.firestore().collection("businessLocations").doc(id).delete();
-    const messageEl = document.getElementById("locationMessage");
-    messageEl.style.color = "green";
-    messageEl.textContent = "Location deleted.";
-
+    showSuccessNotification("Location deleted successfully.");
     const locations = await loadCollection("businessLocations");
     renderLocationList(locations);
   } catch (error) {
-    alert("Error deleting location: " + error.message);
+    console.error("Error deleting location:", error);
+    alert(`Error deleting location: ${error.message}`);
   }
 }
 
