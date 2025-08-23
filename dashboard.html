@@ -48,9 +48,9 @@
 .toggle-btn {
   position: absolute;
   top: 10px;
-  right: 10px; /* Changed to right to place it in the top-right corner of sidebar */
+  right: 10px;
   background-color: transparent;
-  color: white; /* Changed to white to be visible against the sidebar's dark background */
+  color: white;
   padding: 8px;
   cursor: pointer;
   border: none;
@@ -58,8 +58,31 @@
   transition: transform 0.2s ease;
 }
 .toggle-btn:focus {
-  outline: none; /* Removes the dark line when focused */
+  outline: none;
 }
+.toggle-btn-main {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: transparent;
+  color: #333;
+  padding: 8px;
+  cursor: pointer;
+  border: none;
+  z-index: 10;
+  transition: transform 0.2s ease;
+  display: none;
+}
+.toggle-btn-main.collapsed {
+  display: block;
+}
+.main-content:not(.collapsed) .toggle-btn-main {
+  display: none;
+}
+.toggle-btn-main:focus {
+  outline: none;
+}
+
     .content-section { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     input, select, button { width: 100%; padding: 8px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 4px; }
     button { background-color: #2c3e50; color: white; cursor: pointer; }
@@ -328,8 +351,14 @@ button {
     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
 
- <div class="main-content" id="mainContent">
- <div class="main-content" id="mainContent">
+<div class="main-content" id="mainContent">
+  <button class="toggle-btn-main collapsed" onclick="toggleSidebar()">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </button>
   <div id="content" class="content-section">
     <h1>Welcome to Tharua Firm</h1>
     <p>Click a menu item on the left to view more details.</p>
