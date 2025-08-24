@@ -4757,7 +4757,8 @@ async function confirmDeleteGroup() {
   }
 }
 
- // ==========================
+ 
+// ==========================
 // Customers Management
 // ==========================
 async function showCustomers() {
@@ -4766,66 +4767,139 @@ async function showCustomers() {
   document.getElementById("content").innerHTML = `
     <style>
       .top-controls {
-        margin-bottom:15px;
-        display:flex;
-        gap:10px;
-        flex-wrap:wrap;
-        align-items:center;
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
       }
       .top-controls select, .top-controls input {
-        padding:6px;
-        border:1px solid #ccc;
-        border-radius:4px;
+        padding: 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
       }
       .btn-primary {
-        background:#3498db;
-        color:#fff;
-        border:none;
-        padding:8px 14px;
-        border-radius:4px;
-        cursor:pointer;
+        background: #3498db;
+        color: #fff;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
       }
-      .btn-primary:hover { background:#2980b9; }
+      .btn-primary:hover { background: #2980b9; }
       .btn-danger {
-        background:#e74c3c;
-        color:#fff;
-        border:none;
-        padding:8px 14px;
-        border-radius:4px;
-        cursor:pointer;
+        background: #e74c3c;
+        color: #fff;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
       }
-      .btn-danger:hover { background:#c0392b; }
+      .btn-danger:hover { background: #c0392b; }
       .btn-secondary {
-        background:#95a5a6;
-        color:#fff;
-        border:none;
-        padding:8px 14px;
-        border-radius:4px;
-        cursor:pointer;
+        background: #95a5a6;
+        color: #fff;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
       }
-      .btn-secondary:hover { background:#7f8c8d; }
+      .btn-secondary:hover { background: #7f8c8d; }
       .table-container {
-        background:#fff;
-        border-radius:8px;
-        box-shadow:0 2px 8px rgba(0,0,0,0.1);
-        overflow-x:auto;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow-x: auto;
       }
-      table { width:100%; border-collapse:collapse; }
+      table { width: 100%; border-collapse: collapse; }
       th, td {
-        padding:10px;
-        border:1px solid #ddd;
-        text-align:left;
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: left;
       }
-      th { background:#f4f4f4; }
+      th { background: #f4f4f4; }
       .desktop-actions span {
-        cursor:pointer;
-        margin:0 6px;
+        cursor: pointer;
+        margin: 0 6px;
       }
       .pagination {
-        margin-top:10px;
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease-in-out;
+      }
+      .modal-box {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: slideIn 0.3s ease-in-out;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+      }
+      .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      .form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      .form-group .error {
+        border-color: #e74c3c;
+      }
+      .error-message {
+        color: #e74c3c;
+        font-size: 12px;
+        margin-top: 5px;
+        display: none;
+      }
+      .btn-circle {
+        background: #3498db;
+        color: #fff;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .btn-circle:hover { background: #2980b9; }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideIn {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
       }
     </style>
 
@@ -4840,7 +4914,7 @@ async function showCustomers() {
       <select id="locationFilter" onchange="loadCustomers()">
         <option value="">All Locations</option>
       </select>
-      <button class="btn-primary" onclick="openCustomerModal()">+ Add Customer</button>
+      <button class="btn-circle" title="Add Customer" onclick="openCustomerModal()">+</button>
       <button class="btn-secondary" onclick="exportCustomers()">Export</button>
     </div>
 
@@ -4878,31 +4952,40 @@ async function showCustomers() {
       <div class="modal-box">
         <h3 id="customerModalTitle">Add Customer</h3>
         <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" id="custName" />
+          <label for="custName">Full Name <span style="color:#e74c3c;">*</span></label>
+          <input type="text" id="custName" placeholder="Enter full name" />
+          <div id="custNameError" class="error-message">Name is required</div>
         </div>
         <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="custEmail" />
+          <label for="custEmail">Email</label>
+          <input type="email" id="custEmail" placeholder="Enter email" />
+          <div id="custEmailError" class="error-message">Invalid email format</div>
         </div>
         <div class="form-group">
-          <label>Phone</label>
-          <input type="text" id="custPhone" />
+          <label for="custPhone">Phone</label>
+          <input type="text" id="custPhone" placeholder="Enter phone number" />
         </div>
         <div class="form-group">
-          <label>Customer Group</label>
-          <select id="custGroup"></select>
+          <label for="custGroup">Customer Group <span style="color:#e74c3c;">*</span></label>
+          <select id="custGroup">
+            <option value="">Select Group</option>
+          </select>
+          <div id="custGroupError" class="error-message">Group is required</div>
         </div>
         <div class="form-group">
-          <label>Location</label>
-          <input type="text" id="custLocation" />
+          <label for="custLocation">Location</label>
+          <input type="text" id="custLocation" placeholder="Enter location" />
         </div>
         <div class="form-group">
-          <label>Status</label>
+          <label for="custStatus">Status <span style="color:#e74c3c;">*</span></label>
           <select id="custStatus">
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label for="custNotes">Notes</label>
+          <textarea id="custNotes" placeholder="Enter any additional notes"></textarea>
         </div>
         <div style="margin-top:15px; text-align:right;">
           <button class="btn-secondary" onclick="closeCustomerModal()">Cancel</button>
@@ -5032,10 +5115,30 @@ function prevCustomersPage() { loadCustomers("prev"); }
 // CRUD
 // ------------------------------
 function openCustomerModal() {
+  // Clear form fields
+  document.getElementById("custName").value = "";
+  document.getElementById("custEmail").value = "";
+  document.getElementById("custPhone").value = "";
+  document.getElementById("custGroup").value = "";
+  document.getElementById("custLocation").value = "";
+  document.getElementById("custStatus").value = "active";
+  document.getElementById("custNotes").value = "";
+  
+  // Reset error states
+  document.getElementById("custName").classList.remove("error");
+  document.getElementById("custNameError").style.display = "none";
+  document.getElementById("custEmail").classList.remove("error");
+  document.getElementById("custEmailError").style.display = "none";
+  document.getElementById("custGroup").classList.remove("error");
+  document.getElementById("custGroupError").style.display = "none";
+
   document.getElementById("customerModalTitle").textContent = "Add Customer";
   document.getElementById("customerModal").style.display = "flex";
 }
-function closeCustomerModal() { document.getElementById("customerModal").style.display = "none"; }
+
+function closeCustomerModal() { 
+  document.getElementById("customerModal").style.display = "none"; 
+}
 
 async function saveCustomer() {
   const name = document.getElementById("custName").value.trim();
@@ -5044,13 +5147,40 @@ async function saveCustomer() {
   const groupId = document.getElementById("custGroup").value;
   const location = document.getElementById("custLocation").value.trim();
   const status = document.getElementById("custStatus").value;
+  const notes = document.getElementById("custNotes").value.trim();
 
-  if (!name || !groupId) {
-    showErrorNotification("Name and Group are required.");
+  // Reset error states
+  document.getElementById("custName").classList.remove("error");
+  document.getElementById("custNameError").style.display = "none";
+  document.getElementById("custEmail").classList.remove("error");
+  document.getElementById("custEmailError").style.display = "none";
+  document.getElementById("custGroup").classList.remove("error");
+  document.getElementById("custGroupError").style.display = "none";
+
+  // Validation
+  let isValid = true;
+  if (!name) {
+    document.getElementById("custName").classList.add("error");
+    document.getElementById("custNameError").style.display = "block";
+    isValid = false;
+  }
+  if (!groupId) {
+    document.getElementById("custGroup").classList.add("error");
+    document.getElementById("custGroupError").style.display = "block";
+    isValid = false;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById("custEmail").classList.add("error");
+    document.getElementById("custEmailError").style.display = "block";
+    isValid = false;
+  }
+
+  if (!isValid) {
+    showErrorNotification("Please correct the errors in the form.");
     return;
   }
 
-  // Lookup group name for display
+  // Lookup group name
   let groupName = "";
   if (groupId) {
     const groupDoc = await firebase.firestore().collection("customerGroups").doc(groupId).get();
@@ -5059,13 +5189,19 @@ async function saveCustomer() {
 
   try {
     await firebase.firestore().collection("customers").add({
-      name, email, phone, groupId, groupName,
-      location, status,
+      name,
+      email,
+      phone,
+      groupId,
+      groupName,
+      location,
+      status,
+      notes,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     showSuccessNotification("Customer saved.");
     closeCustomerModal();
-    loadCustomers();
+    loadCustomers(); // Refresh table to show new customer
   } catch (err) {
     showErrorNotification("Error: " + err.message);
   }
@@ -5086,7 +5222,10 @@ function openDeleteCustomerModal(id) {
   document.getElementById("deleteCustomerModal").style.display = "flex";
   document.getElementById("confirmDeleteCustomerBtn").onclick = confirmDeleteCustomer;
 }
-function closeDeleteCustomerModal() { document.getElementById("deleteCustomerModal").style.display = "none"; }
+
+function closeDeleteCustomerModal() { 
+  document.getElementById("deleteCustomerModal").style.display = "none"; 
+}
 
 async function confirmDeleteCustomer() {
   try {
@@ -5105,8 +5244,6 @@ async function confirmDeleteCustomer() {
 function exportCustomers() {
   alert("Export not implemented yet");
 }
-
-
 
 function toggleSell() {
   const submenu = document.getElementById("sellSubmenu");
