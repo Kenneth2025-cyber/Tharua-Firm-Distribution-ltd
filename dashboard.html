@@ -4769,14 +4769,35 @@ async function showCustomers() {
       .top-controls {
         margin-bottom: 15px;
         display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .filter-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .filter-row input, .filter-row select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        flex: 1;
+        min-width: 150px;
+        box-sizing: border-box;
+      }
+      .button-row {
+        display: flex;
         gap: 10px;
         flex-wrap: wrap;
         align-items: center;
       }
-      .top-controls select, .top-controls input {
-        padding: 6px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
+      .add-button-row {
+        display: flex;
+        justify-content: flex-start;
+        width: 100%;
       }
       .btn-primary {
         background: #3498db;
@@ -4903,23 +4924,34 @@ async function showCustomers() {
         from { transform: translateY(-20px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
       }
+      @media (max-width: 600px) {
+        .filter-row input, .filter-row select {
+          min-width: 100%;
+        }
+      }
     </style>
 
     <h2>Customers</h2>
 
     <!-- Filters and Actions -->
     <div class="top-controls">
-      <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
-      <select id="groupFilter">
-        <option value="">All Groups</option>
-      </select>
-      <select id="locationFilter">
-        <option value="">All Locations</option>
-      </select>
-      <button class="btn-primary" onclick="applyFilters()">Apply Filter</button>
-      <button class="btn-secondary" onclick="resetFilters()">Reset Filters</button>
-      <button class="btn-circle" title="Add Customer" onclick="openCustomerModal()">+</button>
-      <button class="btn-secondary" onclick="exportCustomers()">Export</button>
+      <div class="filter-row">
+        <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
+        <select id="groupFilter">
+          <option value="">All Groups</option>
+        </select>
+        <select id="locationFilter">
+          <option value="">All Locations</option>
+        </select>
+      </div>
+      <div class="button-row">
+        <button class="btn-primary" onclick="applyFilters()">Apply Filter</button>
+        <button class="btn-secondary" onclick="resetFilters()">Reset Filters</button>
+        <button class="btn-secondary" onclick="exportCustomers()">Export</button>
+      </div>
+      <div class="add-button-row">
+        <button class="btn-circle" title="Add Customer" onclick="openCustomerModal()">+</button>
+      </div>
     </div>
 
     <!-- Table -->
