@@ -2661,940 +2661,187 @@ async function deleteBusinessLocation(id, name) {
   });
 }
 
-// Initialize categoryManager for pagination
-const categoryManager = {
-  categories: [],
-  currentPage: 1,
-  itemsPerPage: 10
-};
-
 async function showCategory() {
   saveLastPage("showCategory");
-
-  // Show loading state
-  document.getElementById("content").innerHTML = `
-    <div class="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading categories...</p>
-    </div>
-  `;
 
   // Load existing categories
   const categories = await loadCollection("categories");
 
-  // Render the categories management interface
   document.getElementById("content").innerHTML = `
-    <style>
-      .loading-overlay {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.9);
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1000;
-      }
-      .spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #3498db;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin-bottom: 10px;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      .form-container {
-        max-width: 600px;
-        width: 90%;
-        margin: 20px auto;
-        padding: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      }
-      .form-container h2 {
-        color: #333;
-        font-size: 24px;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-      .form-group {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-bottom: 15px;
-      }
-      .form-group label {
-        display: block;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 5px;
-        font-size: 14px;
-      }
-      .form-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        box-sizing: border-box;
-      }
-      .form-group button {
-        padding: 10px;
-        background: #3498db;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-      }
-      .form-group button:hover {
-        background: #2980b9;
-      }
-      #categoryMessage {
-        text-align: center;
-        font-size: 14px;
-      }
-      .table-container {
-        max-height: 400px;
-        overflow-y: auto;
-        width: 100%;
-        position: relative;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-      .table-container table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .table-container thead {
-        position: sticky;
-        top: 0;
-        background: #f0f0f0;
-        z-index: 1;
-      }
-      .table-container th, .table-container td {
-        padding: 12px;
-        border: 1px solid #ddd;
-        font-size: 14px;
-      }
-      .table-container th {
-        font-weight: 600;
-        color: #333;
-      }
-      .pagination-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 15px;
-        font-size: 14px;
-      }
-      .pagination-section button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-      .pagination-section button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-      .pagination-section .prev-btn, .pagination-section .next-btn {
-        background: #007bff;
-        color: white;
-      }
-      .pagination-section .prev-btn:hover:not(:disabled), .pagination-section .next-btn:hover:not(:disabled) {
-        background: #0056b3;
-      }
-      .pagination-section select {
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-      }
-      .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        justify-content: center;
-        align-items: center;
-      }
-      .modal-content {
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 500px;
-        width: 90%;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        position: relative;
-      }
-      .modal-content h2 {
-        margin-top: 0;
-        color: #333;
-        font-size: 20px;
-      }
-      .modal-content p {
-        font-size: 14px;
-        color: #333;
-        margin: 10px 0;
-      }
-      .modal-content .modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 20px;
-      }
-      .modal-content button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-      .modal-content .btn-danger {
-        background: #dc3545;
-        color: white;
-      }
-      .modal-content .btn-danger:hover {
-        background: #c82333;
-      }
-      .modal-content .btn-secondary {
-        background: #6c757d;
-        color: white;
-      }
-      .modal-content .btn-secondary:hover {
-        background: #5a6268;
-      }
-      .modal-content .close-btn {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        font-size: 20px;
-        cursor: pointer;
-        color: #333;
-      }
-      @media (max-width: 600px) {
-        .form-container {
-          width: 95%;
-          padding: 15px;
-        }
-        .form-container h2 {
-          font-size: 20px;
-        }
-        .form-group {
-          flex-direction: column;
-        }
-        .form-group input {
-          font-size: 12px;
-          padding: 8px;
-        }
-        .form-group button {
-          font-size: 14px;
-          padding: 10px;
-        }
-        .table-container th, .table-container td {
-          font-size: 12px;
-          padding: 8px;
-        }
-        .pagination-section {
-          flex-direction: column;
-          gap: 10px;
-        }
-      }
-    </style>
-    <div class="form-container">
-      <h2>Manage Categories</h2>
-      <form id="addCategoryForm">
-        <div class="form-group">
-          <div>
-            <label for="newCategoryName">Category Name *</label>
-            <input type="text" id="newCategoryName" placeholder="Category Name" required aria-label="Category Name">
-          </div>
-          <button type="submit" class="submit-btn">Add Category</button>
-        </div>
-      </form>
-      <div id="categoryMessage" style="color: red;"></div>
-    </div>
+    <h2>Manage Categories</h2>
+    <input type="text" id="newCategoryName" placeholder="New category name" />
+    <button onclick="addCategory()">Add Category</button>
+    <div id="categoryMessage" style="margin-top:10px;"></div>
+
     <h3>Existing Categories</h3>
-    <div class="table-container">
-      <table class="users-table" role="grid" border="1" cellpadding="8" cellspacing="0">
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="categoriesTable" aria-live="polite" aria-busy="true"></tbody>
-      </table>
-    </div>
-    <div class="pagination-section">
-      <div>
-        <label for="categoriesPerPage">Show:</label>
-        <select id="categoriesPerPage" aria-label="Select items per page">
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-          <option value="all">All</option>
-        </select>
-        <span id="paginationInfo"></span>
-      </div>
-      <div>
-        <button id="prevPageBtn" class="prev-btn" disabled>Previous</button>
-        <button id="nextPageBtn" class="next-btn">Next</button>
-      </div>
-    </div>
-    <div id="deleteCategoryModal" class="modal">
-      <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('deleteCategoryModal')">&times;</span>
-        <h2>Confirm Delete</h2>
-        <p id="deleteCategoryMessage"></p>
-        <div class="modal-buttons">
-          <button id="confirmDeleteCategoryBtn" class="btn-danger">Delete</button>
-          <button class="btn-secondary" onclick="closeModal('deleteCategoryModal')">Cancel</button>
-        </div>
-      </div>
-    </div>
+    <ul id="categoryList" style="list-style:none; padding-left:0;"></ul>
   `;
 
-  // Initialize pagination controls
-  document.getElementById("categoriesPerPage").addEventListener("change", () => {
-    const value = document.getElementById("categoriesPerPage").value;
-    categoryManager.itemsPerPage = value === "all" ? Infinity : parseInt(value, 10);
-    categoryManager.currentPage = 1;
-    renderCategoryList(categories);
-  });
-
-  document.getElementById("prevPageBtn").addEventListener("click", () => {
-    if (categoryManager.currentPage > 1) {
-      categoryManager.currentPage--;
-      renderCategoryList(categories);
-    }
-  });
-
-  document.getElementById("nextPageBtn").addEventListener("click", () => {
-    const maxPage = Math.ceil(categoryManager.categories.length / categoryManager.itemsPerPage);
-    if (categoryManager.currentPage < maxPage) {
-      categoryManager.currentPage++;
-      renderCategoryList(categories);
-    }
-  });
-
-  // Initialize form submission
-  document.getElementById("addCategoryForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await addCategory();
-  });
-
-  // Render the list of categories
-  categoryManager.categories = categories;
   renderCategoryList(categories);
 }
 
-// Render the list of categories with pagination
-function renderCategoryList(categories) {
-  const tbody = document.getElementById("categoriesTable");
-  tbody.setAttribute("aria-busy", "true");
-
-  const totalItems = categories.length;
-  const itemsPerPage = categoryManager.itemsPerPage;
-  const currentPage = categoryManager.currentPage;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const paginatedCategories = categories.slice(startIndex, endIndex);
-
-  const paginationInfo = document.getElementById("paginationInfo");
-  paginationInfo.textContent = totalItems > 0
-    ? `Showing ${startIndex + 1} to ${endIndex} of ${totalItems}`
-    : "No categories found.";
-
-  const prevBtn = document.getElementById("prevPageBtn");
-  const nextBtn = document.getElementById("nextPageBtn");
-  prevBtn.disabled = currentPage === 1;
-  nextBtn.disabled = currentPage >= Math.ceil(totalItems / itemsPerPage);
-
-  tbody.innerHTML = "";
-  if (paginatedCategories.length === 0) {
-    tbody.innerHTML = "<tr><td colspan='2'>No categories found.</td></tr>";
-    tbody.setAttribute("aria-busy", "false");
-    return;
+async function loadCollection(collectionName) {
+  try {
+    const snapshot = await firebase.firestore().collection(collectionName).orderBy("name").get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    console.error(`Error loading ${collectionName}:`, err);
+    return [];
   }
-
-  const fragment = document.createDocumentFragment();
-  paginatedCategories.forEach(cat => {
-    const tr = document.createElement("tr");
-    tr.setAttribute("data-id", cat.id);
-    tr.innerHTML = `
-      <td class="desktop-cell">${escapeHTML(cat.name || "")}</td>
-      <td class="desktop-actions">
-        <span title="Delete" style="cursor:pointer; color:red;" onclick="deleteCategory('${cat.id}', '${escapeHTML(cat.name)}')">🗑</span>
-      </td>
-    `;
-    fragment.appendChild(tr);
-  });
-
-  tbody.appendChild(fragment);
-  tbody.setAttribute("aria-busy", "false");
 }
 
-// Add a new category
+function renderCategoryList(categories) {
+  const ul = document.getElementById("categoryList");
+  ul.innerHTML = "";
+  if (categories.length === 0) {
+    ul.innerHTML = "<li>No categories found.</li>";
+    return;
+  }
+  categories.forEach(cat => {
+    ul.innerHTML += `
+      <li style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        ${cat.name} 
+        <button style="background:red;color:white; border:none; cursor:pointer;" onclick="deleteCategory('${cat.id}')">Delete</button>
+      </li>`;
+  });
+}
+
 async function addCategory() {
   const nameInput = document.getElementById("newCategoryName");
   const messageEl = document.getElementById("categoryMessage");
-
   const name = nameInput.value.trim();
 
   messageEl.style.color = "red";
   if (!name) {
-    messageEl.textContent = "Category name is required.";
-    showToast("Category name is required.", "error");
+    messageEl.textContent = "Category name cannot be empty.";
+    return;
+  }
+
+  // Check if category already exists (optional)
+  const existing = await firebase.firestore().collection("categories").where("name", "==", name).get();
+  if (!existing.empty) {
+    messageEl.textContent = "Category already exists.";
     return;
   }
 
   try {
-    // Check for duplicate category name
-    const existing = await firebase.firestore().collection("categories")
-      .where("name", "==", name)
-      .get();
-    if (!existing.empty) {
-      messageEl.textContent = "Category name already exists.";
-      showToast("Category name already exists.", "error");
-      return;
-    }
-
-    // Add new category to Firebase
     await firebase.firestore().collection("categories").add({
       name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-
-    // Show success message and reset form
     messageEl.style.color = "green";
     messageEl.textContent = `Category "${name}" added successfully.`;
-    showSuccessNotification(`Category "${name}" added successfully.`);
     nameInput.value = "";
 
-    // Reload and render the updated list
+    // Reload list
     const categories = await loadCollection("categories");
-    categoryManager.categories = categories;
     renderCategoryList(categories);
   } catch (error) {
     console.error("Error adding category:", error);
-    messageEl.textContent = `Error adding category: ${error.message}`;
-    showToast(`Error adding category: ${error.message}`, "error");
+    messageEl.textContent = "Error adding category: " + error.message;
   }
 }
 
-// Delete a category
-async function deleteCategory(id, name) {
-  document.getElementById("deleteCategoryMessage").textContent = `Are you sure you want to delete the category "${name}"?`;
-  openModal("deleteCategoryModal");
+async function deleteCategory(id) {
+  if (!confirm("Are you sure you want to delete this category?")) return;
 
-  const confirmDeleteBtn = document.getElementById("confirmDeleteCategoryBtn");
-  const newConfirmDeleteBtn = confirmDeleteBtn.cloneNode(true);
-  confirmDeleteBtn.replaceWith(newConfirmDeleteBtn);
+  try {
+    await firebase.firestore().collection("categories").doc(id).delete();
+    const messageEl = document.getElementById("categoryMessage");
+    messageEl.style.color = "green";
+    messageEl.textContent = "Category deleted.";
 
-  newConfirmDeleteBtn.addEventListener("click", async () => {
-    try {
-      await firebase.firestore().collection("categories").doc(id).delete();
-      closeModal("deleteCategoryModal");
-      showSuccessNotification("Category deleted successfully.");
-      const categories = await loadCollection("categories");
-      categoryManager.categories = categories;
-      renderCategoryList(categories);
-    } catch (error) {
-      console.error("Error deleting category:", error);
-      closeModal("deleteCategoryModal");
-      showToast(`Error deleting category: ${error.message}`, "error");
-    }
-  });
+    // Reload list
+    const categories = await loadCollection("categories");
+    renderCategoryList(categories);
+  } catch (error) {
+    alert("Error deleting category: " + error.message);
+  }
 }
 
-// Initialize brandManager for pagination
-const brandManager = {
-  brands: [],
-  currentPage: 1,
-  itemsPerPage: 10
-};
 
 async function showBrand() {
   saveLastPage("showBrand");
-
-  // Show loading state
-  document.getElementById("content").innerHTML = `
-    <div class="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading brands...</p>
-    </div>
-  `;
-
-  // Load existing brands
   const brands = await loadCollection("brands");
 
-  // Render the brands management interface
   document.getElementById("content").innerHTML = `
-    <style>
-      .loading-overlay {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.9);
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1000;
-      }
-      .spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #3498db;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin-bottom: 10px;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      .form-container {
-        max-width: 600px;
-        width: 90%;
-        margin: 20px auto;
-        padding: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      }
-      .form-container h2 {
-        color: #333;
-        font-size: 24px;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-      .form-group {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-bottom: 15px;
-      }
-      .form-group label {
-        display: block;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 5px;
-        font-size: 14px;
-      }
-      .form-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        box-sizing: border-box;
-      }
-      .form-group button {
-        padding: 10px;
-        background: #3498db;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-      }
-      .form-group button:hover {
-        background: #2980b9;
-      }
-      #brandMessage {
-        text-align: center;
-        font-size: 14px;
-      }
-      .table-container {
-        max-height: 400px;
-        overflow-y: auto;
-        width: 100%;
-        position: relative;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-      .table-container table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .table-container thead {
-        position: sticky;
-        top: 0;
-        background: #f0f0f0;
-        z-index: 1;
-      }
-      .table-container th, .table-container td {
-        padding: 12px;
-        border: 1px solid #ddd;
-        font-size: 14px;
-      }
-      .table-container th {
-        font-weight: 600;
-        color: #333;
-      }
-      .pagination-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 15px;
-        font-size: 14px;
-      }
-      .pagination-section button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-      .pagination-section button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-      .pagination-section .prev-btn, .pagination-section .next-btn {
-        background: #007bff;
-        color: white;
-      }
-      .pagination-section .prev-btn:hover:not(:disabled), .pagination-section .next-btn:hover:not(:disabled) {
-        background: #0056b3;
-      }
-      .pagination-section select {
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-      }
-      .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        justify-content: center;
-        align-items: center;
-      }
-      .modal-content {
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 500px;
-        width: 90%;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        position: relative;
-      }
-      .modal-content h2 {
-        margin-top: 0;
-        color: #333;
-        font-size: 20px;
-      }
-      .modal-content p {
-        font-size: 14px;
-        color: #333;
-        margin: 10px 0;
-      }
-      .modal-content .modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 20px;
-      }
-      .modal-content button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-      .modal-content .btn-danger {
-        background: #dc3545;
-        color: white;
-      }
-      .modal-content .btn-danger:hover {
-        background: #c82333;
-      }
-      .modal-content .btn-secondary {
-        background: #6c757d;
-        color: white;
-      }
-      .modal-content .btn-secondary:hover {
-        background: #5a6268;
-      }
-      .modal-content .close-btn {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        font-size: 20px;
-        cursor: pointer;
-        color: #333;
-      }
-      @media (max-width: 600px) {
-        .form-container {
-          width: 95%;
-          padding: 15px;
-        }
-        .form-container h2 {
-          font-size: 20px;
-        }
-        .form-group {
-          flex-direction: column;
-        }
-        .form-group input {
-          font-size: 12px;
-          padding: 8px;
-        }
-        .form-group button {
-          font-size: 14px;
-          padding: 10px;
-        }
-        .table-container th, .table-container td {
-          font-size: 12px;
-          padding: 8px;
-        }
-        .pagination-section {
-          flex-direction: column;
-          gap: 10px;
-        }
-      }
-    </style>
-    <div class="form-container">
-      <h2>Manage Brands</h2>
-      <form id="addBrandForm">
-        <div class="form-group">
-          <div>
-            <label for="newBrandName">Brand Name *</label>
-            <input type="text" id="newBrandName" placeholder="Brand Name" required aria-label="Brand Name">
-          </div>
-          <button type="submit" class="submit-btn">Add Brand</button>
-        </div>
-      </form>
-      <div id="brandMessage" style="color: red;"></div>
-    </div>
+    <h2>Manage Brands</h2>
+    <input type="text" id="newBrandName" placeholder="New brand name" />
+    <button onclick="addBrand()">Add Brand</button>
+    <div id="brandMessage" style="margin-top:10px;"></div>
+
     <h3>Existing Brands</h3>
-    <div class="table-container">
-      <table class="users-table" role="grid" border="1" cellpadding="8" cellspacing="0">
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="brandsTable" aria-live="polite" aria-busy="true"></tbody>
-      </table>
-    </div>
-    <div class="pagination-section">
-      <div>
-        <label for="brandsPerPage">Show:</label>
-        <select id="brandsPerPage" aria-label="Select items per page">
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-          <option value="all">All</option>
-        </select>
-        <span id="paginationInfo"></span>
-      </div>
-      <div>
-        <button id="prevPageBtn" class="prev-btn" disabled>Previous</button>
-        <button id="nextPageBtn" class="next-btn">Next</button>
-      </div>
-    </div>
-    <div id="deleteBrandModal" class="modal">
-      <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('deleteBrandModal')">&times;</span>
-        <h2>Confirm Delete</h2>
-        <p id="deleteBrandMessage"></p>
-        <div class="modal-buttons">
-          <button id="confirmDeleteBrandBtn" class="btn-danger">Delete</button>
-          <button class="btn-secondary" onclick="closeModal('deleteBrandModal')">Cancel</button>
-        </div>
-      </div>
-    </div>
+    <ul id="brandList" style="list-style:none; padding-left:0;"></ul>
   `;
 
-  // Initialize pagination controls
-  document.getElementById("brandsPerPage").addEventListener("change", () => {
-    const value = document.getElementById("brandsPerPage").value;
-    brandManager.itemsPerPage = value === "all" ? Infinity : parseInt(value, 10);
-    brandManager.currentPage = 1;
-    renderBrandList(brands);
-  });
-
-  document.getElementById("prevPageBtn").addEventListener("click", () => {
-    if (brandManager.currentPage > 1) {
-      brandManager.currentPage--;
-      renderBrandList(brands);
-    }
-  });
-
-  document.getElementById("nextPageBtn").addEventListener("click", () => {
-    const maxPage = Math.ceil(brandManager.brands.length / brandManager.itemsPerPage);
-    if (brandManager.currentPage < maxPage) {
-      brandManager.currentPage++;
-      renderBrandList(brands);
-    }
-  });
-
-  // Initialize form submission
-  document.getElementById("addBrandForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await addBrand();
-  });
-
-  // Render the list of brands
-  brandManager.brands = brands;
   renderBrandList(brands);
 }
 
-// Render the list of brands with pagination
 function renderBrandList(brands) {
-  const tbody = document.getElementById("brandsTable");
-  tbody.setAttribute("aria-busy", "true");
-
-  const totalItems = brands.length;
-  const itemsPerPage = brandManager.itemsPerPage;
-  const currentPage = brandManager.currentPage;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const paginatedBrands = brands.slice(startIndex, endIndex);
-
-  const paginationInfo = document.getElementById("paginationInfo");
-  paginationInfo.textContent = totalItems > 0
-    ? `Showing ${startIndex + 1} to ${endIndex} of ${totalItems}`
-    : "No brands found.";
-
-  const prevBtn = document.getElementById("prevPageBtn");
-  const nextBtn = document.getElementById("nextPageBtn");
-  prevBtn.disabled = currentPage === 1;
-  nextBtn.disabled = currentPage >= Math.ceil(totalItems / itemsPerPage);
-
-  tbody.innerHTML = "";
-  if (paginatedBrands.length === 0) {
-    tbody.innerHTML = "<tr><td colspan='2'>No brands found.</td></tr>";
-    tbody.setAttribute("aria-busy", "false");
+  const ul = document.getElementById("brandList");
+  ul.innerHTML = "";
+  if (brands.length === 0) {
+    ul.innerHTML = "<li>No brands found.</li>";
     return;
   }
-
-  const fragment = document.createDocumentFragment();
-  paginatedBrands.forEach(brand => {
-    const tr = document.createElement("tr");
-    tr.setAttribute("data-id", brand.id);
-    tr.innerHTML = `
-      <td class="desktop-cell">${escapeHTML(brand.name || "")}</td>
-      <td class="desktop-actions">
-        <span title="Delete" style="cursor:pointer; color:red;" onclick="deleteBrand('${brand.id}', '${escapeHTML(brand.name)}')">🗑</span>
-      </td>
-    `;
-    fragment.appendChild(tr);
+  brands.forEach(brand => {
+    ul.innerHTML += `
+      <li style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+        ${brand.name}
+        <button style="background:red;color:white; border:none; cursor:pointer;" onclick="deleteBrand('${brand.id}')">Delete</button>
+      </li>`;
   });
-
-  tbody.appendChild(fragment);
-  tbody.setAttribute("aria-busy", "false");
 }
 
-// Add a new brand
 async function addBrand() {
   const nameInput = document.getElementById("newBrandName");
   const messageEl = document.getElementById("brandMessage");
-
   const name = nameInput.value.trim();
 
   messageEl.style.color = "red";
   if (!name) {
-    messageEl.textContent = "Brand name is required.";
-    showToast("Brand name is required.", "error");
+    messageEl.textContent = "Brand name cannot be empty.";
+    return;
+  }
+
+  const existing = await firebase.firestore().collection("brands").where("name", "==", name).get();
+  if (!existing.empty) {
+    messageEl.textContent = "Brand already exists.";
     return;
   }
 
   try {
-    // Check for duplicate brand name
-    const existing = await firebase.firestore().collection("brands")
-      .where("name", "==", name)
-      .get();
-    if (!existing.empty) {
-      messageEl.textContent = "Brand name already exists.";
-      showToast("Brand name already exists.", "error");
-      return;
-    }
-
-    // Add new brand to Firebase
     await firebase.firestore().collection("brands").add({
       name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-
-    // Show success message and reset form
     messageEl.style.color = "green";
     messageEl.textContent = `Brand "${name}" added successfully.`;
-    showSuccessNotification(`Brand "${name}" added successfully.`);
     nameInput.value = "";
 
-    // Reload and render the updated list
     const brands = await loadCollection("brands");
-    brandManager.brands = brands;
     renderBrandList(brands);
   } catch (error) {
     console.error("Error adding brand:", error);
-    messageEl.textContent = `Error adding brand: ${error.message}`;
-    showToast(`Error adding brand: ${error.message}`, "error");
+    messageEl.textContent = "Error adding brand: " + error.message;
   }
 }
 
-// Delete a brand
-async function deleteBrand(id, name) {
-  document.getElementById("deleteBrandMessage").textContent = `Are you sure you want to delete the brand "${name}"?`;
-  openModal("deleteBrandModal");
+async function deleteBrand(id) {
+  if (!confirm("Are you sure you want to delete this brand?")) return;
 
-  const confirmDeleteBtn = document.getElementById("confirmDeleteBrandBtn");
-  const newConfirmDeleteBtn = confirmDeleteBtn.cloneNode(true);
-  confirmDeleteBtn.replaceWith(newConfirmDeleteBtn);
+  try {
+    await firebase.firestore().collection("brands").doc(id).delete();
+    const messageEl = document.getElementById("brandMessage");
+    messageEl.style.color = "green";
+    messageEl.textContent = "Brand deleted.";
 
-  newConfirmDeleteBtn.addEventListener("click", async () => {
-    try {
-      await firebase.firestore().collection("brands").doc(id).delete();
-      closeModal("deleteBrandModal");
-      showSuccessNotification("Brand deleted successfully.");
-      const brands = await loadCollection("brands");
-      brandManager.brands = brands;
-      renderBrandList(brands);
-    } catch (error) {
-      console.error("Error deleting brand:", error);
-      closeModal("deleteBrandModal");
-      showToast(`Error deleting brand: ${error.message}`, "error");
-    }
-  });
+    const brands = await loadCollection("brands");
+    renderBrandList(brands);
+  } catch (error) {
+    alert("Error deleting brand: " + error.message);
+  }
 }
-
 function togglePurchases() {
   const submenu = document.getElementById("purchasesSubmenu");
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
