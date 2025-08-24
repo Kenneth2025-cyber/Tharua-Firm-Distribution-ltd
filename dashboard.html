@@ -4910,12 +4910,14 @@ async function showCustomers() {
     <!-- Filters and Actions -->
     <div class="top-controls">
       <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
-      <select id="groupFilter" onchange="loadCustomers()">
+      <select id="groupFilter">
         <option value="">All Groups</option>
       </select>
-      <select id="locationFilter" onchange="loadCustomers()">
+      <select id="locationFilter">
         <option value="">All Locations</option>
       </select>
+      <button class="btn-primary" onclick="applyFilters()">Apply Filter</button>
+      <button class="btn-secondary" onclick="resetFilters()">Reset Filters</button>
       <button class="btn-circle" title="Add Customer" onclick="openCustomerModal()">+</button>
       <button class="btn-secondary" onclick="exportCustomers()">Export</button>
     </div>
@@ -5053,6 +5055,20 @@ async function loadCustomerFilters() {
     opt.textContent = loc;
     locSel.appendChild(opt);
   });
+}
+
+// ------------------------------
+// Apply and Reset Filters
+// ------------------------------
+function applyFilters() {
+  loadCustomers("first");
+}
+
+function resetFilters() {
+  document.getElementById("customerSearch").value = "";
+  document.getElementById("groupFilter").value = "";
+  document.getElementById("locationFilter").value = "";
+  loadCustomers("first");
 }
 
 // ------------------------------
