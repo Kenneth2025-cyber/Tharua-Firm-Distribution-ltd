@@ -2710,10 +2710,16 @@ async function showCategory() {
     </div>
   `;
 
-  // Load categories
-  const categories = await loadCollection("categories");
+  // Try to load categories, fallback to []
+  let categories = [];
+  try {
+    categories = await loadCollection("categories");
+  } catch (err) {
+    console.error("Error loading categories:", err);
+    categories = [];
+  }
 
-  // Render layout
+  // Render layout (always, even if error)
   document.getElementById("content").innerHTML = `
     <div class="form-container">
       <h2>Manage Categories</h2>
@@ -2910,6 +2916,21 @@ async function deleteCategory(id, name) {
       alert("Error deleting category: " + error.message);
     }
   });
+}
+
+// Load Firestore collection safely
+async function loadCollection(collectionName) {
+  try {
+    const snapshot = await firebase.firestore()
+      .collection(collectionName)
+      .orderBy("name")
+      .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    console.error(`Error loading ${collectionName}:`, err);
+    return []; // Prevent blocking UI
+  }
 }
 
 
