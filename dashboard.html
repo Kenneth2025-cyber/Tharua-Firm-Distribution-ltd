@@ -5040,7 +5040,11 @@ async function loadCustomerFilters() {
   locSel.innerHTML = `<option value="">All Locations</option>`;
   const locSnap = await firebase.firestore().collection("customers").get();
   const locations = new Set();
-  locSnap.forEach(d => { if (d.data().location) locations.add(d.data().location); });
+  locSnap.forEach(d => { 
+    if (d.data().location && d.data().location.trim()) { // Ensure non-empty locations
+      locations.add(d.data().location.trim());
+    }
+  });
   [...locations].sort().forEach(loc => {
     const opt = document.createElement("option");
     opt.value = loc;
@@ -5201,6 +5205,7 @@ async function saveCustomer() {
     });
     showSuccessNotification("Customer saved.");
     closeCustomerModal();
+    await loadCustomerFilters(); // Refresh filters to include new location
     loadCustomers(); // Refresh table to show new customer
   } catch (err) {
     showErrorNotification("Error: " + err.message);
@@ -5232,6 +5237,7 @@ async function confirmDeleteCustomer() {
     await firebase.firestore().collection("customers").doc(deleteCustomerId).delete();
     showSuccessNotification("Customer deleted.");
     closeDeleteCustomerModal();
+    await loadCustomerFilters(); // Refresh filters in case location is no longer used
     loadCustomers();
   } catch (err) {
     showErrorNotification("Error: " + err.message);
