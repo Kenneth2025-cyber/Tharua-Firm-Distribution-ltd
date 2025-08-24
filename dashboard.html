@@ -4847,8 +4847,6 @@ async function showCustomers() {
         padding: 20px;
         width: 100%;
         max-width: 500px;
-        max-height: 80vh;
-        overflow-y: auto;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         animation: slideIn 0.3s ease-in-out;
       }
@@ -4909,7 +4907,7 @@ async function showCustomers() {
 
     <!-- Filters and Actions -->
     <div class="top-controls">
-      <input type="text" id="customerSearch" placeholder="Search customers..." />
+      <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
       <select id="groupFilter" onchange="loadCustomers()">
         <option value="">All Groups</option>
       </select>
@@ -5009,14 +5007,6 @@ async function showCustomers() {
     </div>
   `;
 
-  // Add debounced event listener for search input
-  const searchInput = document.getElementById("customerSearch");
-  let debounceTimeout;
-  searchInput.addEventListener("input", () => {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => loadCustomers(), 300); // 300ms debounce
-  });
-
   await loadCustomerFilters();
   loadCustomers();
 }
@@ -5045,15 +5035,17 @@ async function loadCustomerFilters() {
     custGroupSel.appendChild(opt2);
   });
 
-  // Locations (from a cached document)
+  // Locations (from existing customers)
   const locSel = document.getElementById("locationFilter");
   locSel.innerHTML = `<option value="">All Locations</option>`;
-  const locDoc = await firebase.firestore().collection("metadata").doc("customerLocations").get();
-  let locations = [];
-  if (locDoc.exists && locDoc.data().locations) {
-    locations = locDoc.data().locations;
-  }
-  locations.sort().forEach(loc => {
+  const locSnap = await firebase.firestore().collection("customers").get();
+  const locations = new Set();
+  locSnap.forEach(d => { 
+    if (d.data().location && d.data().location.trim()) { // Ensure non-empty locations
+      locations.add(d.data().location.trim());
+    }
+  });
+  [...locations].sort().forEach(loc => {
     const opt = document.createElement("option");
     opt.value = loc;
     opt.textContent = loc;
@@ -5078,56 +5070,46 @@ async function loadCustomers(direction = "first") {
   const groupFilter = document.getElementById("groupFilter").value;
   const locationFilter = document.getElementById("locationFilter").value;
 
-  // Apply filters
   if (groupFilter) query = query.where("groupId", "==", groupFilter);
   if (locationFilter) query = query.where("location", "==", locationFilter);
-  if (search) {
-    // Use startAt/endAt for prefix-based search on name
-    query = query.where("name", ">=", search).where("name", "<=", search + "\uf8ff");
-    // Note: Email search requires a separate query due to Firestore limitations
-  }
 
   if (direction === "next" && customersLastDoc) query = query.startAfter(customersLastDoc);
   if (direction === "prev" && customersFirstDoc) query = query.endBefore(customersFirstDoc).limitToLast(customersPageSize);
 
-  try {
-    const snapshot = await query.get();
+  const snapshot = await query.get();
 
-    if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='7'>No customers found.</td></tr>";
-      document.getElementById("customersInfo").textContent = "Showing 0 customers";
-      return;
-    }
-
-    customersFirstDoc = snapshot.docs[0];
-    customersLastDoc = snapshot.docs[snapshot.docs.length - 1];
-
-    tbody.innerHTML = "";
-    snapshot.forEach(doc => {
-      const c = doc.data();
-      tbody.innerHTML += `
-        <tr>
-          <td>${c.name || ""}</td>
-          <td>${c.groupName || ""}</td>
-          <td>${c.email || ""}</td>
-          <td>${c.phone || ""}</td>
-          <td>${c.location || ""}</td>
-          <td>${c.status || ""}</td>
-          <td class="desktop-actions">
-            <span style="color:#2980b9;" onclick="viewCustomer('${doc.id}')">👁</span>
-            <span style="color:#27ae60;" onclick="editCustomer('${doc.id}')">✏</span>
-            <span style="color:red;" onclick="openDeleteCustomerModal('${doc.id}')">🗑</span>
-          </td>
-        </tr>
-      `;
-    });
-
-    document.getElementById("customersInfo").textContent =
-      `Showing ${snapshot.size} customers (paged)`;
-  } catch (err) {
-    showErrorNotification("Error loading customers: " + err.message);
-    tbody.innerHTML = "<tr><td colspan='7'>Error loading customers.</td></tr>";
+  if (snapshot.empty) {
+    tbody.innerHTML = "<tr><td colspan='7'>No customers found.</td></tr>";
+    return;
   }
+
+  customersFirstDoc = snapshot.docs[0];
+  customersLastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+  tbody.innerHTML = "";
+  snapshot.forEach(doc => {
+    const c = doc.data();
+    if (search && !c.name?.toLowerCase().includes(search) && !c.email?.toLowerCase().includes(search)) return;
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${c.name || ""}</td>
+        <td>${c.groupName || ""}</td>
+        <td>${c.email || ""}</td>
+        <td>${c.phone || ""}</td>
+        <td>${c.location || ""}</td>
+        <td>${c.status || ""}</td>
+        <td class="desktop-actions">
+          <span style="color:#2980b9;" onclick="viewCustomer('${doc.id}')">👁</span>
+          <span style="color:#27ae60;" onclick="editCustomer('${doc.id}')">✏</span>
+          <span style="color:red;" onclick="openDeleteCustomerModal('${doc.id}')">🗑</span>
+        </td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("customersInfo").textContent =
+    `Showing ${snapshot.size} customers (paged)`;
 }
 
 function nextCustomersPage() { loadCustomers("next"); }
@@ -5221,20 +5203,6 @@ async function saveCustomer() {
       notes,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-
-    // Update cached locations
-    if (location) {
-      const locDocRef = firebase.firestore().collection("metadata").doc("customerLocations");
-      await firebase.firestore().runTransaction(async (transaction) => {
-        const locDoc = await transaction.get(locDocRef);
-        let locations = locDoc.exists && locDoc.data().locations ? locDoc.data().locations : [];
-        if (!locations.includes(location)) {
-          locations.push(location);
-          transaction.set(locDocRef, { locations }, { merge: true });
-        }
-      });
-    }
-
     showSuccessNotification("Customer saved.");
     closeCustomerModal();
     await loadCustomerFilters(); // Refresh filters to include new location
@@ -5266,32 +5234,7 @@ function closeDeleteCustomerModal() {
 
 async function confirmDeleteCustomer() {
   try {
-    const customerDoc = await firebase.firestore().collection("customers").doc(deleteCustomerId).get();
-    const location = customerDoc.exists ? customerDoc.data().location : null;
-
     await firebase.firestore().collection("customers").doc(deleteCustomerId).delete();
-
-    // Update cached locations if necessary
-    if (location) {
-      const locDocRef = firebase.firestore().collection("metadata").doc("customerLocations");
-      await firebase.firestore().runTransaction(async (transaction) => {
-        const locDoc = await transaction.get(locDocRef);
-        let locations = locDoc.exists && locDoc.data().locations ? locDoc.data().locations : [];
-        
-        // Check if location is still used by other customers
-        const remainingCustomers = await firebase.firestore()
-          .collection("customers")
-          .where("location", "==", location)
-          .limit(1)
-          .get();
-        
-        if (remainingCustomers.empty) {
-          locations = locations.filter(loc => loc !== location);
-          transaction.set(locDocRef, { locations }, { merge: true });
-        }
-      });
-    }
-
     showSuccessNotification("Customer deleted.");
     closeDeleteCustomerModal();
     await loadCustomerFilters(); // Refresh filters in case location is no longer used
