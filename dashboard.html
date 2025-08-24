@@ -732,7 +732,25 @@ button {
         <a onclick="showPurchaseReturn()"><span>Purchase Return</span></a>
       </div>
     </div>
-    <a onclick="clearContent()"><i class="fas fa-cash-register"></i> <span>Sell</span></a>
+  <div class="dropdown">
+  <a onclick="toggleSell()" id="sellMenu">
+    <i class="fas fa-cash-register"></i>
+    <span>Sell</span>
+    <i class="fas fa-caret-down" style="margin-left:auto;"></i>
+  </a>
+  <div id="sellSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showAddSale()"><span>Add Sale</span></a>
+    <a onclick="showListSales()"><span>List of Sales</span></a>
+    <a onclick="showDraftSales()"><span>Draft Sales / Quotations</span></a>
+    <a onclick="showCashRegister()"><span>POS Register</span></a>
+    <a onclick="showCreditSales()"><span>Credit Sales</span></a>
+    <a onclick="showSalesReturn()"><span>Sales Return</span></a>
+    <a onclick="showInvoices()"><span>Invoices & Receipts</span></a>
+    <a onclick="showDiscounts()"><span>Discounts & Offers</span></a>
+    <a onclick="showImportSales()"><span>Import Sales</span></a>
+  </div>
+</div>
+
     <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> <span>Stock Transfers</span></a>
     <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> <span>Stock Adjustment</span></a>
     <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> <span>Expenses</span></a>
