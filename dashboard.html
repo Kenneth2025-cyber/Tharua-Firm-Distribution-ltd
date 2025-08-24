@@ -4757,23 +4757,182 @@ async function confirmDeleteGroup() {
   }
 }
 
- 
-// ==========================
+ // ==========================
 // Customers Management
 // ==========================
 async function showCustomers() {
   saveLastPage("showCustomers");
 
-  document.getElementById("content").innerHTML = `...` // (same layout as before, unchanged)
+  document.getElementById("content").innerHTML = `
+    <style>
+      .top-controls {
+        margin-bottom:15px;
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+        align-items:center;
+      }
+      .top-controls select, .top-controls input {
+        padding:6px;
+        border:1px solid #ccc;
+        border-radius:4px;
+      }
+      .btn-primary {
+        background:#3498db;
+        color:#fff;
+        border:none;
+        padding:8px 14px;
+        border-radius:4px;
+        cursor:pointer;
+      }
+      .btn-primary:hover { background:#2980b9; }
+      .btn-danger {
+        background:#e74c3c;
+        color:#fff;
+        border:none;
+        padding:8px 14px;
+        border-radius:4px;
+        cursor:pointer;
+      }
+      .btn-danger:hover { background:#c0392b; }
+      .btn-secondary {
+        background:#95a5a6;
+        color:#fff;
+        border:none;
+        padding:8px 14px;
+        border-radius:4px;
+        cursor:pointer;
+      }
+      .btn-secondary:hover { background:#7f8c8d; }
+      .table-container {
+        background:#fff;
+        border-radius:8px;
+        box-shadow:0 2px 8px rgba(0,0,0,0.1);
+        overflow-x:auto;
+      }
+      table { width:100%; border-collapse:collapse; }
+      th, td {
+        padding:10px;
+        border:1px solid #ddd;
+        text-align:left;
+      }
+      th { background:#f4f4f4; }
+      .desktop-actions span {
+        cursor:pointer;
+        margin:0 6px;
+      }
+      .pagination {
+        margin-top:10px;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+      }
+    </style>
+
+    <h2>Customers</h2>
+
+    <!-- Filters and Actions -->
+    <div class="top-controls">
+      <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
+      <select id="groupFilter" onchange="loadCustomers()">
+        <option value="">All Groups</option>
+      </select>
+      <select id="locationFilter" onchange="loadCustomers()">
+        <option value="">All Locations</option>
+      </select>
+      <button class="btn-primary" onclick="openCustomerModal()">+ Add Customer</button>
+      <button class="btn-secondary" onclick="exportCustomers()">Export</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Group</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="customersTable">
+          <tr><td colspan="7" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+      <span id="customersInfo">Showing 0 to 0 of 0 entries</span>
+      <div>
+        <button class="btn-secondary" onclick="prevCustomersPage()">Prev</button>
+        <button class="btn-secondary" onclick="nextCustomersPage()">Next</button>
+      </div>
+    </div>
+
+    <!-- Customer Modal -->
+    <div id="customerModal" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <h3 id="customerModalTitle">Add Customer</h3>
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="custName" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="custEmail" />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" id="custPhone" />
+        </div>
+        <div class="form-group">
+          <label>Customer Group</label>
+          <select id="custGroup"></select>
+        </div>
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" id="custLocation" />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="custStatus">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div style="margin-top:15px; text-align:right;">
+          <button class="btn-secondary" onclick="closeCustomerModal()">Cancel</button>
+          <button class="btn-primary" onclick="saveCustomer()">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div id="deleteCustomerModal" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete this customer?</p>
+        <div class="modal-actions">
+          <button class="btn-danger" id="confirmDeleteCustomerBtn">Delete</button>
+          <button class="btn-secondary" onclick="closeDeleteCustomerModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
 
   await loadCustomerFilters();
   loadCustomers();
 }
 
 // ------------------------------
-// Filters (Customer Groups + Locations)
+// Filters (Groups + Locations)
 // ------------------------------
 async function loadCustomerFilters() {
+  // Customer groups
   const groupSel = document.getElementById("groupFilter");
   const custGroupSel = document.getElementById("custGroup");
   groupSel.innerHTML = `<option value="">All Groups</option>`;
@@ -4808,12 +4967,11 @@ async function loadCustomerFilters() {
 }
 
 // ------------------------------
-// Data Loading with Pagination
+// Pagination
 // ------------------------------
 let customersPageSize = 10;
 let customersLastDoc = null;
 let customersFirstDoc = null;
-let customersDocs = [];
 
 async function loadCustomers(direction = "first") {
   const tbody = document.getElementById("customersTable");
@@ -4838,15 +4996,13 @@ async function loadCustomers(direction = "first") {
     return;
   }
 
-  customersDocs = snapshot.docs;
   customersFirstDoc = snapshot.docs[0];
   customersLastDoc = snapshot.docs[snapshot.docs.length - 1];
 
   tbody.innerHTML = "";
-  for (const doc of snapshot.docs) {
+  snapshot.forEach(doc => {
     const c = doc.data();
-
-    if (search && !c.name.toLowerCase().includes(search) && !c.email?.toLowerCase().includes(search)) continue;
+    if (search && !c.name?.toLowerCase().includes(search) && !c.email?.toLowerCase().includes(search)) return;
 
     tbody.innerHTML += `
       <tr>
@@ -4863,33 +5019,21 @@ async function loadCustomers(direction = "first") {
         </td>
       </tr>
     `;
-  }
+  });
 
   document.getElementById("customersInfo").textContent =
-    `Showing ${snapshot.size} of ${snapshot.size} entries (paged)`;
+    `Showing ${snapshot.size} customers (paged)`;
 }
 
 function nextCustomersPage() { loadCustomers("next"); }
 function prevCustomersPage() { loadCustomers("prev"); }
 
 // ------------------------------
-// CRUD Operations
+// CRUD
 // ------------------------------
-let editingCustomerId = null;
-
-function openCustomerModal(id = null) {
-  document.getElementById("customerModalTitle").textContent = id ? "Edit Customer" : "Add Customer";
+function openCustomerModal() {
+  document.getElementById("customerModalTitle").textContent = "Add Customer";
   document.getElementById("customerModal").style.display = "flex";
-  editingCustomerId = id;
-
-  if (!id) {
-    document.getElementById("custName").value = "";
-    document.getElementById("custEmail").value = "";
-    document.getElementById("custPhone").value = "";
-    document.getElementById("custGroup").value = "";
-    document.getElementById("custLocation").value = "";
-    document.getElementById("custStatus").value = "active";
-  }
 }
 function closeCustomerModal() { document.getElementById("customerModal").style.display = "none"; }
 
@@ -4901,60 +5045,39 @@ async function saveCustomer() {
   const location = document.getElementById("custLocation").value.trim();
   const status = document.getElementById("custStatus").value;
 
-  if (!name) {
-    alert("Name is required.");
+  if (!name || !groupId) {
+    showErrorNotification("Name and Group are required.");
     return;
   }
 
-  // Resolve group name for display
+  // Lookup group name for display
   let groupName = "";
   if (groupId) {
-    const gSnap = await firebase.firestore().collection("customerGroups").doc(groupId).get();
-    if (gSnap.exists) groupName = gSnap.data().name;
+    const groupDoc = await firebase.firestore().collection("customerGroups").doc(groupId).get();
+    if (groupDoc.exists) groupName = groupDoc.data().name;
   }
 
-  const customerData = {
-    name, email, phone, groupId, groupName, location, status,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-
   try {
-    if (editingCustomerId) {
-      await firebase.firestore().collection("customers").doc(editingCustomerId).update(customerData);
-      showSuccessNotification("Customer updated.");
-    } else {
-      customerData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      await firebase.firestore().collection("customers").add(customerData);
-      showSuccessNotification("Customer added.");
-    }
-
+    await firebase.firestore().collection("customers").add({
+      name, email, phone, groupId, groupName,
+      location, status,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showSuccessNotification("Customer saved.");
     closeCustomerModal();
     loadCustomers();
   } catch (err) {
-    alert("Error saving customer: " + err.message);
+    showErrorNotification("Error: " + err.message);
   }
 }
 
-async function viewCustomer(id) {
-  const doc = await firebase.firestore().collection("customers").doc(id).get();
-  if (!doc.exists) return alert("Customer not found");
-  const c = doc.data();
-
-  alert(`Customer Details:\n\nName: ${c.name}\nEmail: ${c.email}\nPhone: ${c.phone}\nGroup: ${c.groupName}\nLocation: ${c.location}\nStatus: ${c.status}`);
+function viewCustomer(id) {
+  alert("View details for " + id);
 }
 
-async function editCustomer(id) {
-  const doc = await firebase.firestore().collection("customers").doc(id).get();
-  if (!doc.exists) return alert("Customer not found");
-  const c = doc.data();
-
-  openCustomerModal(id);
-  document.getElementById("custName").value = c.name || "";
-  document.getElementById("custEmail").value = c.email || "";
-  document.getElementById("custPhone").value = c.phone || "";
-  document.getElementById("custGroup").value = c.groupId || "";
-  document.getElementById("custLocation").value = c.location || "";
-  document.getElementById("custStatus").value = c.status || "active";
+function editCustomer(id) {
+  // TODO: load data into modal for editing
+  openCustomerModal();
 }
 
 let deleteCustomerId = null;
@@ -4972,27 +5095,17 @@ async function confirmDeleteCustomer() {
     closeDeleteCustomerModal();
     loadCustomers();
   } catch (err) {
-    alert("Error deleting customer: " + err.message);
+    showErrorNotification("Error: " + err.message);
   }
 }
 
 // ------------------------------
-// Export (placeholder)
+// Export
 // ------------------------------
-async function exportCustomers() {
-  const snapshot = await firebase.firestore().collection("customers").orderBy("name").get();
-  let csv = "Name,Group,Email,Phone,Location,Status\\n";
-  snapshot.forEach(doc => {
-    const c = doc.data();
-    csv += `"${c.name || ""}","${c.groupName || ""}","${c.email || ""}","${c.phone || ""}","${c.location || ""}","${c.status || ""}"\\n`;
-  });
-
-  const blob = new Blob([csv], { type: "text/csv" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "customers.csv";
-  link.click();
+function exportCustomers() {
+  alert("Export not implemented yet");
 }
+
 
 
 function toggleSell() {
