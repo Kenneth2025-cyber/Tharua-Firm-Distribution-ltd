@@ -279,6 +279,42 @@ button {
   line-height: 1;     /* keep buttons compact */
 }
 
+/* Category Page Styles */
+.table-container {
+  overflow-x: auto;
+  margin-top: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.categories-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.categories-table th,
+.categories-table td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: left;
+  font-size: 14px;
+}
+
+.categories-table th {
+  background: #f4f4f4;
+  font-weight: 600;
+}
+
+.action-btn {
+  cursor: pointer;
+  font-size: 16px;
+  margin: 0 5px;
+}
+
+.action-btn.delete { color: #dc3545; }
+.action-btn.delete:hover { color: #a71d2a; }
+
 
   </style>
 </head>
@@ -2668,38 +2704,6 @@ async function showCategory() {
   const categories = await loadCollection("categories");
 
   document.getElementById("content").innerHTML = `
-    <style>
-      .table-container {
-        overflow-x: auto;
-        margin-top: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      }
-      .categories-table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .categories-table th,
-      .categories-table td {
-        padding: 10px;
-        border: 1px solid #ddd;
-        text-align: left;
-        font-size: 14px;
-      }
-      .categories-table th {
-        background: #f4f4f4;
-        font-weight: 600;
-      }
-      .action-btn {
-        cursor: pointer;
-        font-size: 16px;
-        margin: 0 5px;
-      }
-      .action-btn.delete { color: #dc3545; }
-      .action-btn.delete:hover { color: #a71d2a; }
-    </style>
-
     <h2>Manage Categories</h2>
     <div style="margin-bottom:20px;">
       <input type="text" id="newCategoryName" placeholder="New category name" />
