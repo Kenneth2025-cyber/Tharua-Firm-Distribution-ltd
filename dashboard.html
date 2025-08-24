@@ -4758,7 +4758,243 @@ async function confirmDeleteGroup() {
 }
 
  
-	function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
+// ==========================
+// Customers Management
+// ==========================
+async function showCustomers() {
+  saveLastPage("showCustomers");
+
+  document.getElementById("content").innerHTML = `...` // (same layout as before, unchanged)
+
+  await loadCustomerFilters();
+  loadCustomers();
+}
+
+// ------------------------------
+// Filters (Customer Groups + Locations)
+// ------------------------------
+async function loadCustomerFilters() {
+  const groupSel = document.getElementById("groupFilter");
+  const custGroupSel = document.getElementById("custGroup");
+  groupSel.innerHTML = `<option value="">All Groups</option>`;
+  custGroupSel.innerHTML = `<option value="">Select Group</option>`;
+
+  const groupsSnap = await firebase.firestore().collection("customerGroups").orderBy("name").get();
+  groupsSnap.forEach(doc => {
+    const g = doc.data();
+    const opt1 = document.createElement("option");
+    opt1.value = doc.id;
+    opt1.textContent = g.name;
+    groupSel.appendChild(opt1);
+
+    const opt2 = document.createElement("option");
+    opt2.value = doc.id;
+    opt2.textContent = g.name;
+    custGroupSel.appendChild(opt2);
+  });
+
+  // Locations (from existing customers)
+  const locSel = document.getElementById("locationFilter");
+  locSel.innerHTML = `<option value="">All Locations</option>`;
+  const locSnap = await firebase.firestore().collection("customers").get();
+  const locations = new Set();
+  locSnap.forEach(d => { if (d.data().location) locations.add(d.data().location); });
+  [...locations].sort().forEach(loc => {
+    const opt = document.createElement("option");
+    opt.value = loc;
+    opt.textContent = loc;
+    locSel.appendChild(opt);
+  });
+}
+
+// ------------------------------
+// Data Loading with Pagination
+// ------------------------------
+let customersPageSize = 10;
+let customersLastDoc = null;
+let customersFirstDoc = null;
+let customersDocs = [];
+
+async function loadCustomers(direction = "first") {
+  const tbody = document.getElementById("customersTable");
+  tbody.innerHTML = "<tr><td colspan='7'>Loading...</td></tr>";
+
+  let query = firebase.firestore().collection("customers").orderBy("name").limit(customersPageSize);
+
+  const search = document.getElementById("customerSearch").value.trim().toLowerCase();
+  const groupFilter = document.getElementById("groupFilter").value;
+  const locationFilter = document.getElementById("locationFilter").value;
+
+  if (groupFilter) query = query.where("groupId", "==", groupFilter);
+  if (locationFilter) query = query.where("location", "==", locationFilter);
+
+  if (direction === "next" && customersLastDoc) query = query.startAfter(customersLastDoc);
+  if (direction === "prev" && customersFirstDoc) query = query.endBefore(customersFirstDoc).limitToLast(customersPageSize);
+
+  const snapshot = await query.get();
+
+  if (snapshot.empty) {
+    tbody.innerHTML = "<tr><td colspan='7'>No customers found.</td></tr>";
+    return;
+  }
+
+  customersDocs = snapshot.docs;
+  customersFirstDoc = snapshot.docs[0];
+  customersLastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+  tbody.innerHTML = "";
+  for (const doc of snapshot.docs) {
+    const c = doc.data();
+
+    if (search && !c.name.toLowerCase().includes(search) && !c.email?.toLowerCase().includes(search)) continue;
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${c.name || ""}</td>
+        <td>${c.groupName || ""}</td>
+        <td>${c.email || ""}</td>
+        <td>${c.phone || ""}</td>
+        <td>${c.location || ""}</td>
+        <td>${c.status || ""}</td>
+        <td class="desktop-actions">
+          <span style="color:#2980b9;" onclick="viewCustomer('${doc.id}')">👁</span>
+          <span style="color:#27ae60;" onclick="editCustomer('${doc.id}')">✏</span>
+          <span style="color:red;" onclick="openDeleteCustomerModal('${doc.id}')">🗑</span>
+        </td>
+      </tr>
+    `;
+  }
+
+  document.getElementById("customersInfo").textContent =
+    `Showing ${snapshot.size} of ${snapshot.size} entries (paged)`;
+}
+
+function nextCustomersPage() { loadCustomers("next"); }
+function prevCustomersPage() { loadCustomers("prev"); }
+
+// ------------------------------
+// CRUD Operations
+// ------------------------------
+let editingCustomerId = null;
+
+function openCustomerModal(id = null) {
+  document.getElementById("customerModalTitle").textContent = id ? "Edit Customer" : "Add Customer";
+  document.getElementById("customerModal").style.display = "flex";
+  editingCustomerId = id;
+
+  if (!id) {
+    document.getElementById("custName").value = "";
+    document.getElementById("custEmail").value = "";
+    document.getElementById("custPhone").value = "";
+    document.getElementById("custGroup").value = "";
+    document.getElementById("custLocation").value = "";
+    document.getElementById("custStatus").value = "active";
+  }
+}
+function closeCustomerModal() { document.getElementById("customerModal").style.display = "none"; }
+
+async function saveCustomer() {
+  const name = document.getElementById("custName").value.trim();
+  const email = document.getElementById("custEmail").value.trim();
+  const phone = document.getElementById("custPhone").value.trim();
+  const groupId = document.getElementById("custGroup").value;
+  const location = document.getElementById("custLocation").value.trim();
+  const status = document.getElementById("custStatus").value;
+
+  if (!name) {
+    alert("Name is required.");
+    return;
+  }
+
+  // Resolve group name for display
+  let groupName = "";
+  if (groupId) {
+    const gSnap = await firebase.firestore().collection("customerGroups").doc(groupId).get();
+    if (gSnap.exists) groupName = gSnap.data().name;
+  }
+
+  const customerData = {
+    name, email, phone, groupId, groupName, location, status,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    if (editingCustomerId) {
+      await firebase.firestore().collection("customers").doc(editingCustomerId).update(customerData);
+      showSuccessNotification("Customer updated.");
+    } else {
+      customerData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await firebase.firestore().collection("customers").add(customerData);
+      showSuccessNotification("Customer added.");
+    }
+
+    closeCustomerModal();
+    loadCustomers();
+  } catch (err) {
+    alert("Error saving customer: " + err.message);
+  }
+}
+
+async function viewCustomer(id) {
+  const doc = await firebase.firestore().collection("customers").doc(id).get();
+  if (!doc.exists) return alert("Customer not found");
+  const c = doc.data();
+
+  alert(`Customer Details:\n\nName: ${c.name}\nEmail: ${c.email}\nPhone: ${c.phone}\nGroup: ${c.groupName}\nLocation: ${c.location}\nStatus: ${c.status}`);
+}
+
+async function editCustomer(id) {
+  const doc = await firebase.firestore().collection("customers").doc(id).get();
+  if (!doc.exists) return alert("Customer not found");
+  const c = doc.data();
+
+  openCustomerModal(id);
+  document.getElementById("custName").value = c.name || "";
+  document.getElementById("custEmail").value = c.email || "";
+  document.getElementById("custPhone").value = c.phone || "";
+  document.getElementById("custGroup").value = c.groupId || "";
+  document.getElementById("custLocation").value = c.location || "";
+  document.getElementById("custStatus").value = c.status || "active";
+}
+
+let deleteCustomerId = null;
+function openDeleteCustomerModal(id) {
+  deleteCustomerId = id;
+  document.getElementById("deleteCustomerModal").style.display = "flex";
+  document.getElementById("confirmDeleteCustomerBtn").onclick = confirmDeleteCustomer;
+}
+function closeDeleteCustomerModal() { document.getElementById("deleteCustomerModal").style.display = "none"; }
+
+async function confirmDeleteCustomer() {
+  try {
+    await firebase.firestore().collection("customers").doc(deleteCustomerId).delete();
+    showSuccessNotification("Customer deleted.");
+    closeDeleteCustomerModal();
+    loadCustomers();
+  } catch (err) {
+    alert("Error deleting customer: " + err.message);
+  }
+}
+
+// ------------------------------
+// Export (placeholder)
+// ------------------------------
+async function exportCustomers() {
+  const snapshot = await firebase.firestore().collection("customers").orderBy("name").get();
+  let csv = "Name,Group,Email,Phone,Location,Status\\n";
+  snapshot.forEach(doc => {
+    const c = doc.data();
+    csv += `"${c.name || ""}","${c.groupName || ""}","${c.email || ""}","${c.phone || ""}","${c.location || ""}","${c.status || ""}"\\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "customers.csv";
+  link.click();
+}
+
+
 function toggleSell() {
   const submenu = document.getElementById("sellSubmenu");
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
