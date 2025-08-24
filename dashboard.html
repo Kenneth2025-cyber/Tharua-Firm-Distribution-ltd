@@ -4847,6 +4847,8 @@ async function showCustomers() {
         padding: 20px;
         width: 100%;
         max-width: 500px;
+        max-height: 80vh; /* Limit height to 80% of viewport */
+        overflow-y: auto; /* Enable vertical scrolling */
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         animation: slideIn 0.3s ease-in-out;
       }
@@ -5041,7 +5043,7 @@ async function loadCustomerFilters() {
   const locSnap = await firebase.firestore().collection("customers").get();
   const locations = new Set();
   locSnap.forEach(d => { 
-    if (d.data().location && d.data().location.trim()) { // Ensure non-empty locations
+    if (d.data().location && d.data().location.trim()) {
       locations.add(d.data().location.trim());
     }
   });
