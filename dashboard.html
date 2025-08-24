@@ -2855,6 +2855,7 @@ async function showCategory() {
   } catch (err) {
     console.error("Error loading categories:", err);
     categories = [];
+    showToast("Failed to load categories: " + err.message, "error");
   }
 
   // Render layout (always, even if error)
@@ -2997,19 +2998,17 @@ function renderCategoryList(categories) {
 // Add category
 async function addCategory() {
   const nameInput = document.getElementById("newCategoryName");
-  const messageEl = document.getElementById("categoryMessage");
   const name = nameInput.value.trim();
 
-  messageEl.style.color = "red";
   if (!name) {
-    messageEl.textContent = "Category name cannot be empty.";
+    showToast("Category name cannot be empty.", "error");
     return;
   }
 
   try {
     const existing = await firebase.firestore().collection("categories").where("name", "==", name).get();
     if (!existing.empty) {
-      messageEl.textContent = "Category already exists.";
+      showToast("Category already exists.", "error");
       return;
     }
 
@@ -3018,8 +3017,7 @@ async function addCategory() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    messageEl.style.color = "green";
-    messageEl.textContent = `Category "${name}" added successfully.`;
+    showToast(`Category "${name}" added successfully.`, "success");
     nameInput.value = "";
 
     const categories = await loadCollection("categories");
@@ -3027,11 +3025,11 @@ async function addCategory() {
     renderCategoryList(categories);
   } catch (error) {
     console.error("Error adding category:", error);
-    messageEl.textContent = "Error adding category: " + error.message;
+    showToast("Error adding category: " + error.message, "error");
   }
 }
 
-// Delete category (with modal)
+// Delete category (with modal + toast)
 async function deleteCategory(id, name) {
   document.getElementById("deleteCategoryMessage").textContent =
     `Are you sure you want to delete the category "${name}"?`;
@@ -3045,13 +3043,16 @@ async function deleteCategory(id, name) {
     try {
       await firebase.firestore().collection("categories").doc(id).delete();
       closeModal("deleteCategoryModal");
+
       const categories = await loadCollection("categories");
       categoryManager.categories = categories;
       renderCategoryList(categories);
+
+      showToast(`Category "${name}" deleted successfully.`, "success");
     } catch (error) {
       console.error("Error deleting category:", error);
       closeModal("deleteCategoryModal");
-      alert("Error deleting category: " + error.message);
+      showToast("Error deleting category: " + error.message, "error");
     }
   });
 }
@@ -3067,6 +3068,7 @@ async function loadCollection(collectionName) {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (err) {
     console.error(`Error loading ${collectionName}:`, err);
+    showToast(`Error loading ${collectionName}: ${err.message}`, "error");
     return []; // Prevent blocking UI
   }
 }
