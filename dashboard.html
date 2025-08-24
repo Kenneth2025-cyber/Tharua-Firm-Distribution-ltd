@@ -4272,6 +4272,12 @@ function deleteSupplier(id) {
 }
  
 	function showCustomers() { saveLastPage("showCustomers"); document.getElementById("content").innerHTML = `<h2>Customers</h2><p>View and manage your customer records here.</p>`; }
+function toggleSell() {
+  const submenu = document.getElementById("sellSubmenu");
+  submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+}
+
+
   </script>
 </body>
 </html>
