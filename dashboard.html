@@ -4165,7 +4165,7 @@ function renderPurchasesTable() {
     let calculatedTotal = 0;
     if (p.items && Array.isArray(p.items)) {
       calculatedTotal = p.items.reduce((sum, item) => {
-       const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
         return sum + (Number(item.quantity || 0) * price);
       }, 0);
     }
@@ -4241,7 +4241,7 @@ async function viewPurchase(purchaseId) {
     if (p.items && Array.isArray(p.items) && p.items.length) {
       totalQuantity = p.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
       calculatedTotalAmount = p.items.reduce((sum, item) => {
-     const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
         return sum + (Number(item.quantity || 0) * price);
       }, 0);
 
@@ -4268,7 +4268,7 @@ async function viewPurchase(purchaseId) {
     </thead>
     <tbody>
       ${p.items.map(item => {
-      const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
         const qty = Number(item.quantity || 0);
         return `
           <tr>
@@ -4444,7 +4444,7 @@ async function printPurchase(purchaseId) {
     if (p.items && Array.isArray(p.items) && p.items.length) {
       totalQuantity = p.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
       calculatedTotalAmount = p.items.reduce((sum, item) => {
-      const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
         return sum + (Number(item.quantity || 0) * price);
       }, 0);
 
@@ -4453,7 +4453,7 @@ async function printPurchase(purchaseId) {
       }
 
       itemsHtml = p.items.map(item => {
-     const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
         const qty = Number(item.quantity || 0);
         return `
           <tr>
