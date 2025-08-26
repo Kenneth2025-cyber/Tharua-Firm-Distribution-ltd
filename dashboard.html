@@ -3650,6 +3650,17 @@ async function showListPurchases() {
         position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #333;
       }
       .error-message { color: red; text-align: center; padding: 10px; }
+      .view-details { line-height: 1.6; font-size: 14px; }
+      .view-details table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      .view-details th, .view-details td { border: 1px solid #ddd; padding: 8px; }
+      .view-details th { background: #f0f0f0; }
+      .edit-form div { margin-bottom: 15px; }
+      .edit-form label { display: block; font-weight: 600; margin-bottom: 5px; }
+      .edit-form input, .edit-form select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+      .edit-form .item-row { display: flex; gap: 10px; align-items: center; }
+      .edit-form .item-row input { width: auto; flex: 1; }
+      .edit-form .remove-item { background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; }
+      .edit-form .add-item { background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
     </style>
 
     <h2>List of Purchases</h2>
@@ -3725,8 +3736,55 @@ async function showListPurchases() {
       <div class="modal-content">
         <span class="close-btn" onclick="closeModal('purchaseViewModal')">&times;</span>
         <h2>Purchase Details</h2>
-        <div id="purchaseViewContent"></div>
+        <div id="purchaseViewContent" class="view-details"></div>
         <div style="text-align:right;"><button onclick="closeModal('purchaseViewModal')">Close</button></div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="purchaseEditModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('purchaseEditModal')">&times;</span>
+        <h2>Edit Purchase</h2>
+        <form id="editPurchaseForm" class="edit-form">
+          <div>
+            <label for="editPurchaseDate">Purchase Date:</label>
+            <input type="date" id="editPurchaseDate" required>
+          </div>
+          <div>
+            <label for="editPurchaseLocation">Location:</label>
+            <input type="text" id="editPurchaseLocation" required>
+          </div>
+          <div>
+            <label for="editPurchaseSupplier">Supplier:</label>
+            <input type="text" id="editPurchaseSupplier" required>
+          </div>
+          <div>
+            <label for="editPurchasePaymentMethod">Payment Method:</label>
+            <select id="editPurchasePaymentMethod" required>
+              <option value="Cash">Cash</option>
+              <option value="Credit">Credit</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div>
+            <label for="editPurchaseReferenceNo">Reference No:</label>
+            <input type="text" id="editPurchaseReferenceNo">
+          </div>
+          <div>
+            <label for="editPurchaseAmountPaid">Amount Paid (KES):</label>
+            <input type="number" id="editPurchaseAmountPaid" step="0.01" required>
+          </div>
+          <div>
+            <label>Items:</label>
+            <div id="editPurchaseItems"></div>
+            <button type="button" class="add-item" onclick="addItemRow()">Add Item</button>
+          </div>
+          <div style="text-align:right;">
+            <button type="submit">Save</button>
+            <button type="button" onclick="closeModal('purchaseEditModal')">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
   `;
@@ -3819,12 +3877,12 @@ async function loadPurchases() {
     if (sup) q = q.where("supplier", "==", sup);
     if (start && end) {
       q = q.where("purchaseDate", ">=", new Date(start))
-           .where("purchaseDate", "<=", new Date(`${end}T23:59:59`)); // Include end of day
+           .where("purchaseDate", "<=", new Date(`${end}T23:59:59`));
     }
 
     const timeout = setTimeout(() => {
       tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error: Request timed out</td></tr>`;
-    }, 10000); // 10-second timeout
+    }, 10000);
 
     const snap = await q.orderBy("purchaseDate", "desc").get();
     clearTimeout(timeout);
@@ -3877,7 +3935,6 @@ function renderPurchasesTable() {
 
   tbody.innerHTML = pageData.length ? "" : `<tr><td colspan="10" style="text-align:center;">No purchases found.</td></tr>`;
   pageData.forEach(p => {
-    // Handle date whether it's a Timestamp or string
     let date = "N/A";
     if (p.purchaseDate) {
       if (typeof p.purchaseDate.toDate === "function") {
@@ -3931,6 +3988,340 @@ function renderPurchasesTable() {
 function closeModal(id) {
   const modal = document.getElementById(id);
   if (modal) modal.style.display = "none";
+}
+
+// View purchase details
+async function viewPurchase(purchaseId) {
+  try {
+    const doc = await firebase.firestore().collection("purchases").doc(purchaseId).get();
+    if (!doc.exists) throw new Error("Purchase not found");
+
+    const p = { id: doc.id, ...doc.data() };
+    let date = "N/A";
+    if (p.purchaseDate) {
+      date = typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0];
+    }
+
+    const total = Number(p.totalAmount || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
+
+    let itemsHtml = "<p>No items available.</p>";
+    if (p.items && p.items.length) {
+      itemsHtml = `
+        <table>
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Quantity</th>
+              <th>Unit Price (KES)</th>
+              <th>Total (KES)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${p.items.map(item => `
+              <tr>
+                <td>${item.productName || "N/A"}</td>
+                <td>${item.quantity || 0}</td>
+                <td>${Number(item.unitPrice || 0).toFixed(2)}</td>
+                <td>${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    document.getElementById("purchaseViewContent").innerHTML = `
+      <p><strong>Purchase ID:</strong> ${p.id}</p>
+      <p><strong>Date:</strong> ${date}</p>
+      <p><strong>Location:</strong> ${p.location || "N/A"}</p>
+      <p><strong>Supplier:</strong> ${p.supplier || "N/A"}</p>
+      <p><strong>Payment Method:</strong> ${p.paymentMethod || "N/A"}</p>
+      <p><strong>Reference No:</strong> ${p.referenceNo || "N/A"}</p>
+      <p><strong>Total Amount:</strong> KES ${total.toFixed(2)}</p>
+      <p><strong>Amount Paid:</strong> KES ${paid.toFixed(2)}</p>
+      <p><strong>Balance:</strong> KES ${bal.toFixed(2)}</p>
+      <h3>Items</h3>
+      ${itemsHtml}
+    `;
+    document.getElementById("purchaseViewModal").style.display = "flex";
+  } catch (err) {
+    console.error("Error viewing purchase:", err);
+    alert("Error viewing purchase: " + err.message);
+  }
+}
+
+// Edit purchase
+async function editPurchase(purchaseId) {
+  try {
+    const doc = await firebase.firestore().collection("purchases").doc(purchaseId).get();
+    if (!doc.exists) throw new Error("Purchase not found");
+
+    const p = { id: doc.id, ...doc.data() };
+    const date = p.purchaseDate ?
+      (typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0]) : "";
+
+    // Populate form fields
+    document.getElementById("editPurchaseDate").value = date;
+    document.getElementById("editPurchaseLocation").value = p.location || "";
+    document.getElementById("editPurchaseSupplier").value = p.supplier || "";
+    document.getElementById("editPurchasePaymentMethod").value = p.paymentMethod || "Cash";
+    document.getElementById("editPurchaseReferenceNo").value = p.referenceNo || "";
+    document.getElementById("editPurchaseAmountPaid").value = p.amountPaid || 0;
+
+    // Populate items
+    const itemsContainer = document.getElementById("editPurchaseItems");
+    itemsContainer.innerHTML = "";
+    (p.items || []).forEach((item, index) => {
+      addItemRow(item.productName, item.quantity, item.unitPrice, index);
+    });
+
+    // Handle form submission
+    const form = document.getElementById("editPurchaseForm");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const items = Array.from(document.querySelectorAll(".item-row")).map(row => ({
+          productName: row.querySelector(".item-name").value,
+          quantity: Number(row.querySelector(".item-quantity").value),
+          unitPrice: Number(row.querySelector(".item-unit-price").value)
+        }));
+        const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
+        await firebase.firestore().collection("purchases").doc(purchaseId).update({
+          purchaseDate: new Date(document.getElementById("editPurchaseDate").value),
+          location: document.getElementById("editPurchaseLocation").value,
+          supplier: document.getElementById("editPurchaseSupplier").value,
+          paymentMethod: document.getElementById("editPurchasePaymentMethod").value,
+          referenceNo: document.getElementById("editPurchaseReferenceNo").value,
+          amountPaid: Number(document.getElementById("editPurchaseAmountPaid").value),
+          totalAmount,
+          items
+        });
+
+        closeModal("purchaseEditModal");
+        loadPurchases();
+        Swal.fire({
+          icon: "success",
+          title: "Purchase Updated",
+          text: "The purchase has been updated successfully.",
+          timer: 2000
+        });
+      } catch (err) {
+        console.error("Error updating purchase:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to update purchase: " + err.message
+        });
+      }
+    };
+
+    document.getElementById("purchaseEditModal").style.display = "flex";
+  } catch (err) {
+    console.error("Error loading purchase for edit:", err);
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Failed to load purchase: " + err.message
+    });
+  }
+}
+
+// Add item row for edit form
+function addItemRow(productName = "", quantity = "", unitPrice = "", index = Date.now()) {
+  const itemsContainer = document.getElementById("editPurchaseItems");
+  const row = document.createElement("div");
+  row.className = "item-row";
+  row.id = `item-row-${index}`;
+  row.innerHTML = `
+    <input type="text" class="item-name" placeholder="Product Name" value="${productName}" required>
+    <input type="number" class="item-quantity" placeholder="Quantity" value="${quantity}" min="1" required>
+    <input type="number" class="item-unit-price" placeholder="Unit Price" value="${unitPrice}" step="0.01" min="0" required>
+    <button type="button" class="remove-item" onclick="document.getElementById('item-row-${index}').remove()">Remove</button>
+  `;
+  itemsContainer.appendChild(row);
+}
+
+// Print purchase invoice
+async function printPurchase(purchaseId) {
+  try {
+    const doc = await firebase.firestore().collection("purchases").doc(purchaseId).get();
+    if (!doc.exists) throw new Error("Purchase not found");
+
+    const p = { id: doc.id, ...doc.data() };
+    let date = "N/A";
+    if (p.purchaseDate) {
+      date = typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0];
+    }
+
+    const total = Number(p.totalAmount || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
+
+    let itemsHtml = "<tr><td colspan='4'>No items available.</td></tr>";
+    if (p.items && p.items.length) {
+      itemsHtml = p.items.map(item => `
+        <tr>
+          <td>${item.productName || "N/A"}</td>
+          <td>${item.quantity || 0}</td>
+          <td>${Number(item.unitPrice || 0).toFixed(2)}</td>
+          <td>${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}</td>
+        </tr>
+      `).join("");
+    }
+
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Purchase Invoice - ${p.referenceNo || purchaseId}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .invoice { max-width: 800px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; }
+            .invoice h1 { text-align: center; color: #333; }
+            .invoice-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .invoice-details { margin-bottom: 20px; }
+            .invoice-details p { margin: 5px 0; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f0f0f0; }
+            .total-section { text-align: right; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice">
+            <h1>Purchase Invoice</h1>
+            <div class="invoice-header">
+              <div>
+                <p><strong>Company Name</strong></p>
+                <p>123 Business St, Nairobi, Kenya</p>
+                <p>Email: info@company.com</p>
+              </div>
+              <div>
+                <p><strong>Invoice ID:</strong> ${p.id}</p>
+                <p><strong>Date:</strong> ${date}</p>
+                <p><strong>Reference No:</strong> ${p.referenceNo || "N/A"}</p>
+              </div>
+            </div>
+            <div class="invoice-details">
+              <p><strong>Supplier:</strong> ${p.supplier || "N/A"}</p>
+              <p><strong>Location:</strong> ${p.location || "N/A"}</p>
+              <p><strong>Payment Method:</strong> ${p.paymentMethod || "N/A"}</p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Product Name</th>
+                  <th>Quantity</th>
+                  <th>Unit Price (KES)</th>
+                  <th>Total (KES)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+            <div class="total-section">
+              <p><strong>Total Amount:</strong> KES ${total.toFixed(2)}</p>
+              <p><strong>Amount Paid:</strong> KES ${paid.toFixed(2)}</p>
+              <p><strong>Balance:</strong> KES ${bal.toFixed(2)}</p>
+            </div>
+            <button class="no-print" onclick="window.print()">Print</button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  } catch (err) {
+    console.error("Error printing purchase:", err);
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Failed to generate invoice: " + err.message
+    });
+  }
+}
+
+// Delete purchase
+async function deletePurchase(purchaseId) {
+  Swal.fire({
+    title: "Are you sure?",
+    text: "Do you want to delete this purchase? This action cannot be undone.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Delete",
+    cancelButtonText: "Cancel"
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        await firebase.firestore().collection("purchases").doc(purchaseId).delete();
+        loadPurchases();
+        Swal.fire({
+          icon: "success",
+          title: "Purchase Deleted",
+          text: "The purchase has been deleted successfully.",
+          timer: 2000
+        });
+      } catch (err) {
+        console.error("Error deleting purchase:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to delete purchase: " + err.message
+        });
+      }
+    }
+  });
+}
+
+// Export purchases to CSV
+function exportPurchasesCSV() {
+  const allData = purchasesManager.data;
+  if (!allData.length) {
+    Swal.fire({
+      icon: "warning",
+      title: "No Data",
+      text: "No purchases available to export."
+    });
+    return;
+  }
+
+  const headers = ["Date,Location,Supplier,Total (KES),Paid (KES),Balance (KES),Payment Method,Reference No,Status"];
+  const rows = allData.map(p => {
+    let date = "N/A";
+    if (p.purchaseDate) {
+      date = typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0];
+    }
+    const total = Number(p.totalAmount || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
+    const status = bal > 0 ? "Due" : bal < 0 ? "Overpaid" : "Paid";
+    return `"${date}","${p.location || ""}","${p.supplier || ""}",${total.toFixed(2)},${paid.toFixed(2)},${bal.toFixed(2)},"${p.paymentMethod || ""}","${p.referenceNo || ""}","${status}"`;
+  });
+
+  const csv = headers.concat(rows).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `purchases_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
 }
 
 
