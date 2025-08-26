@@ -3568,18 +3568,6 @@ async function savePurchase() {
 // Track query version to prevent race conditions
 let purchasesQueryVersion = 0;
 
-// State management
-const purchasesManager = { data: [], currentPage: 1, itemsPerPage: 10 };
-
-// Debounce utility to prevent rapid query calls
-function debounce(func, wait) {
-  let timeout;
-  return function (...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-}
-
 async function showListPurchases() {
   saveLastPage("showListPurchases");
 
@@ -3649,7 +3637,6 @@ async function showListPurchases() {
       .modal-content .close-btn {
         position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #333;
       }
-      .error-message { color: red; text-align: center; padding: 10px; }
     </style>
 
     <h2>List of Purchases</h2>
@@ -3731,22 +3718,14 @@ async function showListPurchases() {
     </div>
   `;
 
-  // Verify DOM elements exist
-  if (!document.getElementById("purchasesTbody")) {
-    console.error("Table body not found");
-    return;
-  }
-
   // Load dropdowns
   await loadPurchaseFilterOptions();
 
-  // Listeners with debounced loadPurchases
-  const debouncedLoadPurchases = debounce(() => {
+  // Listeners
+  document.getElementById("applyPurchasesFilterBtn").addEventListener("click", () => {
     purchasesManager.currentPage = 1;
     loadPurchases();
-  }, 300);
-
-  document.getElementById("applyPurchasesFilterBtn").addEventListener("click", debouncedLoadPurchases);
+  });
   document.getElementById("exportPurchasesBtn").addEventListener("click", exportPurchasesCSV);
 
   document.getElementById("purchasesPrevPage").addEventListener("click", () => {
@@ -3764,36 +3743,27 @@ async function showListPurchases() {
     renderPurchasesTable();
   });
 
-  // Initial load
   loadPurchases();
 }
+
+// State
+const purchasesManager = { data: [], currentPage: 1, itemsPerPage: 10 };
 
 // Load filter dropdowns
 async function loadPurchaseFilterOptions() {
   const locSelect = document.getElementById("purchaseLocFilter");
   const supSelect = document.getElementById("purchaseSupFilter");
-  const tbody = document.getElementById("purchasesTbody");
 
-  try {
-    if (!firebase.apps.length) throw new Error("Firebase not initialized");
-    const snapshot = await firebase.firestore().collection("purchases").get();
-    console.log("Filter options snapshot size:", snapshot.size);
+  const snapshot = await firebase.firestore().collection("purchases").get();
+  const locs = new Set(), sups = new Set();
+  snapshot.forEach(d => {
+    const p = d.data();
+    if (p.location) locs.add(p.location);
+    if (p.supplier) sups.add(p.supplier);
+  });
 
-    const locs = new Set(), sups = new Set();
-    snapshot.forEach(d => {
-      const p = d.data();
-      if (p.location) locs.add(p.location);
-      if (p.supplier) sups.add(p.supplier);
-    });
-
-    locSelect.innerHTML = `<option value="">All</option>`;
-    supSelect.innerHTML = `<option value="">All</option>`;
-    locs.forEach(l => locSelect.innerHTML += `<option>${l}</option>`);
-    sups.forEach(s => supSelect.innerHTML += `<option>${s}</option>`);
-  } catch (err) {
-    console.error("Error loading filter options:", err);
-    tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error loading filters: ${err.message}</td></tr>`;
-  }
+  locs.forEach(l => locSelect.innerHTML += `<option>${l}</option>`);
+  sups.forEach(s => supSelect.innerHTML += `<option>${s}</option>`);
 }
 
 // Load purchases
@@ -3803,9 +3773,6 @@ async function loadPurchases() {
   tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Loading...</td></tr>`;
 
   try {
-    if (!firebase.apps.length) throw new Error("Firebase not initialized");
-    if (!firebase.auth().currentUser) throw new Error("User not authenticated");
-
     let q = firebase.firestore().collection("purchases");
     const loc = document.getElementById("purchaseLocFilter").value;
     const sup = document.getElementById("purchaseSupFilter").value;
@@ -3813,49 +3780,26 @@ async function loadPurchases() {
     const end = document.getElementById("purchaseEndDate").value;
     const search = document.getElementById("purchaseSearch").value.toLowerCase();
 
-    console.log("Query filters:", { loc, sup, start, end, search });
-
     if (loc) q = q.where("location", "==", loc);
     if (sup) q = q.where("supplier", "==", sup);
     if (start && end) {
       q = q.where("purchaseDate", ">=", new Date(start))
-           .where("purchaseDate", "<=", new Date(`${end}T23:59:59`)); // Include end of day
+           .where("purchaseDate", "<=", new Date(end));
     }
-
-    const timeout = setTimeout(() => {
-      tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error: Request timed out</td></tr>`;
-    }, 10000); // 10-second timeout
 
     const snap = await q.orderBy("purchaseDate", "desc").get();
-    clearTimeout(timeout);
-
-    console.log("Snapshot size:", snap.size, "Docs:", snap.docs.map(d => d.data()));
-    if (version !== purchasesQueryVersion) {
-      console.log("Discarding outdated query result");
-      return;
-    }
-
-    if (snap.empty) {
-      purchasesManager.data = [];
-      renderPurchasesTable();
-      return;
-    }
+    if (version !== purchasesQueryVersion) return;
 
     purchasesManager.data = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(p => {
-        const matches = !search ||
-          (p.supplier || "").toLowerCase().includes(search) ||
-          (p.referenceNo || "").toLowerCase().includes(search);
-        console.log("Purchase:", p, "Matches search:", matches);
-        return matches;
-      });
+      .filter(p => !search ||
+        (p.supplier || "").toLowerCase().includes(search) ||
+        (p.referenceNo || "").toLowerCase().includes(search)
+      );
 
-    console.log("Filtered purchases:", purchasesManager.data);
     renderPurchasesTable();
   } catch (err) {
-    console.error("Error loading purchases:", err);
-    tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:red;">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -3877,7 +3821,16 @@ function renderPurchasesTable() {
 
   tbody.innerHTML = pageData.length ? "" : `<tr><td colspan="10" style="text-align:center;">No purchases found.</td></tr>`;
   pageData.forEach(p => {
-    const date = p.purchaseDate?.toDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "N/A";
+    // Handle date whether it's a Timestamp or string
+    let date = "";
+    if (p.purchaseDate) {
+      if (typeof p.purchaseDate.toDate === "function") {
+        date = p.purchaseDate.toDate().toISOString().split("T")[0];
+      } else {
+        date = p.purchaseDate.toString().split("T")[0];
+      }
+    }
+
     const total = Number(p.totalAmount || 0);
     const paid = Number(p.amountPaid || 0);
     const bal = total - paid;
@@ -3887,13 +3840,13 @@ function renderPurchasesTable() {
     tbody.innerHTML += `
       <tr>
         <td>${date}</td>
-        <td>${p.location || "N/A"}</td>
-        <td>${p.supplier || "N/A"}</td>
+        <td>${p.location || ""}</td>
+        <td>${p.supplier || ""}</td>
         <td>${total.toFixed(2)}</td>
         <td>${paid.toFixed(2)}</td>
         <td>${bal.toFixed(2)}</td>
-        <td>${p.paymentMethod || "N/A"}</td>
-        <td>${p.referenceNo || "N/A"}</td>
+        <td>${p.paymentMethod || ""}</td>
+        <td>${p.referenceNo || ""}</td>
         <td>${status}</td>
         <td>
           <span style="cursor:pointer; color:green;" onclick="viewPurchase('${p.id}')">👁</span>
@@ -3905,9 +3858,8 @@ function renderPurchasesTable() {
   });
 
   if (perPage !== "all") {
-    const pp = parseInt(perPage);
-    const start = (purchasesManager.currentPage - 1) * pp + 1;
-    const end = Math.min(start + pageData.length - 1, allData.length);
+    const start = (purchasesManager.currentPage - 1) * parseInt(perPage) + 1;
+    const end = start + pageData.length - 1;
     info.textContent = `Showing ${start}-${end} of ${allData.length}`;
   } else {
     info.textContent = `Showing all ${allData.length}`;
@@ -3919,10 +3871,8 @@ function renderPurchasesTable() {
 }
 
 // Close modal
-function closeModal(id) {
-  const modal = document.getElementById(id);
-  if (modal) modal.style.display = "none";
-}
+function closeModal(id) { document.getElementById(id).style.display = "none"; }
+
 
 
 function showPurchaseReturn() {
