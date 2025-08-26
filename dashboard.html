@@ -4216,76 +4216,35 @@ function closeModal(id) {
   if (modal) modal.style.display = "none";
 }
 
-// View purchase details (replace existing viewPurchase)
+// View purchase details
 async function viewPurchase(purchaseId) {
-  // helper to normalize numbers (strip currency symbols, commas, etc.)
-  const normalizeNumber = (v) => {
-    if (v === null || v === undefined) return 0;
-    if (typeof v === "number") return v;
-    if (typeof v === "string") {
-      const cleaned = v.replace(/[^\d.-]/g, "");
-      return Number(cleaned) || 0;
-    }
-    // Firestore Timestamp or other objects
-    if (v && typeof v.toNumber === "function") return Number(v.toNumber()) || 0;
-    return Number(v) || 0;
-  };
-
-  const getItemPrice = (item) => {
-    // prefer unitPrice -> buyingPrice -> price -> subtotal/quantity -> 0
-    const candidates = [
-      item?.unitPrice,
-      item?.buyingPrice,
-      item?.price,
-      // subtotal fallback only if quantity present and > 0
-      (item && item.subtotal && item.quantity) ? (normalizeNumber(item.subtotal) / (normalizeNumber(item.quantity) || 1)) : undefined
-    ];
-    for (const c of candidates) {
-      if (c !== undefined && c !== null && normalizeNumber(c) !== 0) return normalizeNumber(c);
-    }
-    // if everything else 0, still attempt to return numeric form
-    return normalizeNumber(item?.unitPrice ?? item?.buyingPrice ?? item?.price ?? 0);
-  };
-
   try {
-    if (!firebase.apps.length) throw new Error("Firebase not initialized");
     const doc = await firebase.firestore().collection("purchases").doc(purchaseId).get();
     if (!doc.exists) throw new Error("Purchase not found");
 
     const p = { id: doc.id, ...doc.data() };
-
-    // date formatting
     let date = "N/A";
     if (p.purchaseDate) {
-      date = (typeof p.purchaseDate.toDate === "function")
-        ? p.purchaseDate.toDate().toISOString().split("T")[0]
-        : String(p.purchaseDate).split("T")[0];
+      date = typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0];
     }
 
-    // top-level totals (normalize)
-    const total = normalizeNumber(p.totalAmount);
-    const paid  = normalizeNumber(p.amountPaid);
-    const bal   = total - paid;
+    const total = Number(p.totalAmount || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
 
-    // get items array (support different naming patterns)
-    const items = Array.isArray(p.items) ? p.items
-                : Array.isArray(p.purchaseItems) ? p.purchaseItems
-                : [];
-
-    // build item rows
     let itemsHtml = "<p>No items available.</p>";
     let totalQuantity = 0;
     let calculatedTotalAmount = 0;
 
-    if (items.length) {
-      totalQuantity = items.reduce((s, it) => s + normalizeNumber(it.quantity), 0);
-      calculatedTotalAmount = items.reduce((s, it) => {
-        const qty = normalizeNumber(it.quantity);
-        const price = getItemPrice(it);
-        return s + qty * price;
+    if (p.items && Array.isArray(p.items) && p.items.length) {
+      totalQuantity = p.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      calculatedTotalAmount = p.items.reduce((sum, item) => {
+     const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        return sum + (Number(item.quantity || 0) * price);
       }, 0);
 
-      // build table using same layout style as your original
       itemsHtml = `
         <table>
           <thead>
@@ -4297,20 +4256,41 @@ async function viewPurchase(purchaseId) {
             </tr>
           </thead>
           <tbody>
-            ${items.map(item => {
-              const name = item.productName || item.name || "N/A";
-              const qty = normalizeNumber(item.quantity);
-              const price = getItemPrice(item);
-              const line = qty * price;
-              return `
-                <tr>
-                  <td>${name}</td>
-                  <td>${qty}</td>
-                  <td>${price.toFixed(2)}</td>
-                  <td>${line.toFixed(2)}</td>
-                </tr>
-              `;
-            }).join("")}
+          itemsHtml = `
+  <table>
+    <thead>
+      <tr>
+        <th>Product Name</th>
+        <th>Quantity</th>
+        <th>Buying Price (KES)</th>
+        <th>Total (KES)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${p.items.map(item => {
+      const price = Number(item.unitPrice || item.buyingPrice || item.price || 0);
+        const qty = Number(item.quantity || 0);
+        return `
+          <tr>
+            <td>${item.productName || "N/A"}</td>
+            <td>${qty}</td>
+            <td>${price.toFixed(2)}</td>
+            <td>${(qty * price).toFixed(2)}</td>
+          </tr>
+        `;
+      }).join("")}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>Total</td>
+        <td>${totalQuantity}</td>
+        <td></td>
+        <td>${calculatedTotalAmount.toFixed(2)}</td>
+      </tr>
+    </tfoot>
+  </table>
+`;
+
           </tbody>
           <tfoot>
             <tr>
@@ -4324,12 +4304,6 @@ async function viewPurchase(purchaseId) {
       `;
     }
 
-    // warn in console if stored total differs from computed
-    if (Math.abs(calculatedTotalAmount - total) > 0.01) {
-      console.warn(`Total amount mismatch for purchase ${p.id}: Stored=${total}, Calculated=${calculatedTotalAmount}`);
-    }
-
-    // render the same modal content layout you used
     document.getElementById("purchaseViewContent").innerHTML = `
       <p><strong>Purchase ID:</strong> ${p.id}</p>
       <p><strong>Date:</strong> ${date}</p>
@@ -4343,19 +4317,12 @@ async function viewPurchase(purchaseId) {
       <h3>Items</h3>
       ${itemsHtml}
     `;
-    // show modal
-    const modal = document.getElementById("purchaseViewModal");
-    if (modal) modal.style.display = "flex";
+    document.getElementById("purchaseViewModal").style.display = "flex";
   } catch (err) {
     console.error("Error viewing purchase:", err);
-    Swal.fire({
-      icon: "error",
-      title: "Error",
-      text: "Failed to view purchase: " + err.message
-    });
+    Swal.fire({ icon: "error", title: "Error", text: "Failed to view purchase: " + err.message });
   }
 }
-
 
 // Edit purchase
 async function editPurchase(purchaseId) {
