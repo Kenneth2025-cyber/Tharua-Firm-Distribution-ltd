@@ -3565,605 +3565,306 @@ async function savePurchase() {
   }
 }
 
+// Track query version to prevent race conditions
+let purchasesQueryVersion = 0;
+
 async function showListPurchases() {
   saveLastPage("showListPurchases");
 
   document.getElementById("content").innerHTML = `
+    <style>
+      /* Copy from products layout */
+      .filter-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        border: 1px solid #e0e0e0;
+      }
+      .filter-section label { font-weight: 600; color: #333; font-size: 14px; }
+      .filter-section select,
+      .filter-section input[type="text"],
+      .filter-section input[type="date"] {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        background: #fff;
+      }
+      .filter-section button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .filter-section .apply-btn { background: #0056b3; color: white; }
+      .filter-section .export-btn { background: #218838; color: white; }
+      .table-container {
+        max-height: 500px;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .table-container table { width: 100%; border-collapse: collapse; }
+      .table-container th, .table-container td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      .table-container thead { position: sticky; top: 0; background: #f0f0f0; }
+      .pagination-section {
+        display: flex; justify-content: space-between; align-items: center; margin-top: 15px;
+      }
+      .pagination-section button {
+        padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer;
+      }
+      .pagination-section .prev-btn, .pagination-section .next-btn { background: #007bff; color: white; }
+      .modal {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+      }
+      .modal-content {
+        background: #fff; padding: 20px; border-radius: 8px; max-width: 600px; width: 90%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2); position: relative;
+      }
+      .modal-content h2 { margin-top: 0; font-size: 20px; }
+      .modal-content .close-btn {
+        position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #333;
+      }
+    </style>
+
     <h2>List of Purchases</h2>
 
     <!-- Filter Section -->
-    <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <select id="filterLocation" style="min-width:160px; padding:5px;">
-        <option value="all">All Locations</option>
-      </select>
-      <select id="filterSupplier" style="min-width:160px; padding:5px;">
-        <option value="all">All Suppliers</option>
-      </select>
-
-      <!-- Date filter -->
-      <div style="position:relative;">
-        <button id="dateFilterBtn" style="padding:6px 12px; cursor:pointer;">Date: All</button>
-        <div id="dateFilterMenu" 
-          style="display:none; position:absolute; top:35px; left:0; background:white; border:1px solid #ccc; 
-                 box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:100; min-width:180px;">
-          <div class="date-option" data-range="today">Today</div>
-          <div class="date-option" data-range="yesterday">Yesterday</div>
-          <div class="date-option" data-range="thisWeek">This Week</div>
-          <div class="date-option" data-range="lastWeek">Last Week</div>
-          <div class="date-option" data-range="thisMonth">This Month</div>
-          <div class="date-option" data-range="lastMonth">Last Month</div>
-          <div class="date-option" data-range="thisYear">This Year</div>
-          <div class="date-option" data-range="lastYear">Last Year</div>
-          <div class="date-option" data-range="custom">Custom...</div>
-        </div>
+    <div class="filter-section">
+      <div>
+        <label for="purchaseLocFilter">Location:</label>
+        <select id="purchaseLocFilter"><option value="">All</option></select>
       </div>
-
-      <!-- Custom date pickers -->
-      <input type="date" id="startDate" style="display:none;">
-      <input type="date" id="endDate" style="display:none;">
-
-      <button id="applyFilterBtn" style="padding:6px 12px; cursor:pointer; background:#2c3e50; color:white;">Apply Filter</button>
-      <button onclick="exportPurchasesCSV()" style="margin-left:auto; padding:6px 12px; cursor:pointer;">Export</button>
+      <div>
+        <label for="purchaseSupFilter">Supplier:</label>
+        <select id="purchaseSupFilter"><option value="">All</option></select>
+      </div>
+      <div>
+        <label for="purchaseStartDate">From:</label>
+        <input type="date" id="purchaseStartDate">
+      </div>
+      <div>
+        <label for="purchaseEndDate">To:</label>
+        <input type="date" id="purchaseEndDate">
+      </div>
+      <div>
+        <label for="purchaseSearch">Search:</label>
+        <input type="text" id="purchaseSearch" placeholder="Supplier or Ref No">
+      </div>
+      <button id="applyPurchasesFilterBtn" class="apply-btn">Apply</button>
+      <button id="exportPurchasesBtn" class="export-btn">Export</button>
     </div>
 
     <!-- Purchases Table -->
-    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead style="background:#f0f0f0;">
-        <tr>
-          <th>Date</th>
-          <th>Location</th>
-          <th>Supplier</th>
-          <th>Total (KES)</th>
-          <th>Paid (KES)</th>
-          <th>Balance (KES)</th>
-          <th>Payment Method</th>
-          <th>Reference No</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="purchasesTable">
-        <tr><td colspan="10">Loading...</td></tr>
-      </tbody>
-    </table>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Supplier</th>
+            <th>Total (KES)</th>
+            <th>Paid (KES)</th>
+            <th>Balance (KES)</th>
+            <th>Payment Method</th>
+            <th>Reference No</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="purchasesTbody">
+          <tr><td colspan="10" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <!-- Purchase Details Modal -->
-    <div id="purchaseModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-      <div style="background:white; padding:20px; width:500px; max-height:80%; overflow:auto; border-radius:8px;">
-        <h3>Purchase Details</h3>
-        <div id="purchaseModalContent"></div>
-        <div style="text-align:right; margin-top:15px;">
-          <button onclick="closePurchaseModal()">Close</button>
-        </div>
+    <!-- Pagination -->
+    <div class="pagination-section">
+      <div>
+        <label for="purchasesItemsPerPage">Show:</label>
+        <select id="purchasesItemsPerPage">
+          <option value="10">10</option><option value="25">25</option>
+          <option value="50">50</option><option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+        <span id="purchasesPaginationInfo"></span>
+      </div>
+      <div>
+        <button id="purchasesPrevPage" class="prev-btn" disabled>Previous</button>
+        <button id="purchasesNextPage" class="next-btn">Next</button>
+      </div>
+    </div>
+
+    <!-- View Modal -->
+    <div id="purchaseViewModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('purchaseViewModal')">&times;</span>
+        <h2>Purchase Details</h2>
+        <div id="purchaseViewContent"></div>
+        <div style="text-align:right;"><button onclick="closeModal('purchaseViewModal')">Close</button></div>
       </div>
     </div>
   `;
 
-  // Load dropdowns for suppliers & locations
-  loadFilterOptions();
+  // Load dropdowns
+  await loadPurchaseFilterOptions();
 
-  // Setup date filter menu toggle
-  const dateBtn = document.getElementById("dateFilterBtn");
-  const dateMenu = document.getElementById("dateFilterMenu");
-  dateBtn.addEventListener("click", () => {
-    dateMenu.style.display = (dateMenu.style.display === "none" ? "block" : "none");
+  // Listeners
+  document.getElementById("applyPurchasesFilterBtn").addEventListener("click", () => {
+    purchasesManager.currentPage = 1;
+    loadPurchases();
+  });
+  document.getElementById("exportPurchasesBtn").addEventListener("click", exportPurchasesCSV);
+
+  document.getElementById("purchasesPrevPage").addEventListener("click", () => {
+    if (purchasesManager.currentPage > 1) {
+      purchasesManager.currentPage--;
+      renderPurchasesTable();
+    }
+  });
+  document.getElementById("purchasesNextPage").addEventListener("click", () => {
+    purchasesManager.currentPage++;
+    renderPurchasesTable();
+  });
+  document.getElementById("purchasesItemsPerPage").addEventListener("change", () => {
+    purchasesManager.currentPage = 1;
+    renderPurchasesTable();
   });
 
-  // Handle date menu clicks
-  dateMenu.querySelectorAll(".date-option").forEach(opt => {
-    opt.addEventListener("click", (e) => {
-      const range = e.target.dataset.range;
-      selectedDateRange = range;
-      dateBtn.textContent = "Date: " + e.target.textContent;
-      dateMenu.style.display = "none";
-
-      if (range === "custom") {
-        document.getElementById("startDate").style.display = "inline-block";
-        document.getElementById("endDate").style.display = "inline-block";
-      } else {
-        document.getElementById("startDate").style.display = "none";
-        document.getElementById("endDate").style.display = "none";
-      }
-    });
-  });
-
-  // Apply filter button
-  document.getElementById("applyFilterBtn").addEventListener("click", () => {
-    loadFilteredPurchases();
-  });
-
-  // Load all purchases initially
-  loadFilteredPurchases();
+  loadPurchases();
 }
-let selectedDateRange = "all";
 
-async function loadFilterOptions() {
-  const locSelect = document.getElementById("filterLocation");
-  const supSelect = document.getElementById("filterSupplier");
+// State
+const purchasesManager = { data: [], currentPage: 1, itemsPerPage: 10 };
+
+// Load filter dropdowns
+async function loadPurchaseFilterOptions() {
+  const locSelect = document.getElementById("purchaseLocFilter");
+  const supSelect = document.getElementById("purchaseSupFilter");
 
   const snapshot = await firebase.firestore().collection("purchases").get();
-
-  const locations = new Set();
-  const suppliers = new Set();
-
-  snapshot.forEach(doc => {
-    const p = doc.data();
-    if (p.location) locations.add(p.location.trim());
-    if (p.supplier) suppliers.add(p.supplier.trim());
+  const locs = new Set(), sups = new Set();
+  snapshot.forEach(d => {
+    const p = d.data();
+    if (p.location) locs.add(p.location);
+    if (p.supplier) sups.add(p.supplier);
   });
 
-  locations.forEach(loc => {
-    const opt = document.createElement("option");
-    opt.value = loc;
-    opt.textContent = loc;
-    locSelect.appendChild(opt);
-  });
-
-  suppliers.forEach(sup => {
-    const opt = document.createElement("option");
-    opt.value = sup;
-    opt.textContent = sup;
-    supSelect.appendChild(opt);
-  });
+  locs.forEach(l => locSelect.innerHTML += `<option>${l}</option>`);
+  sups.forEach(s => supSelect.innerHTML += `<option>${s}</option>`);
 }
 
-
-async function loadFilteredPurchases() {
-  const table = document.getElementById("purchasesTable");
-  table.innerHTML = "<tr><td colspan='10'>Loading...</td></tr>";
-
-  let query = firebase.firestore().collection("purchases");
-
-  // Apply Location filter
-  const loc = document.getElementById("filterLocation").value;
-  if (loc && loc !== "all") {
-    query = query.where("location", "==", loc);
-  }
-
-  // Apply Supplier filter
-  const sup = document.getElementById("filterSupplier").value;
-  if (sup && sup !== "all") {
-    query = query.where("supplier", "==", sup);
-  }
-
-  // Apply Date filter
-  const { start, end } = getDateRange(selectedDateRange);
-  if (start && end) {
-    query = query.where("purchaseDate", ">=", start).where("purchaseDate", "<=", end);
-  }
-
-  query = query.orderBy("purchaseDate", "desc");
+// Load purchases
+async function loadPurchases() {
+  const version = ++purchasesQueryVersion;
+  const tbody = document.getElementById("purchasesTbody");
+  tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Loading...</td></tr>`;
 
   try {
-    const snapshot = await query.get();
-    table.innerHTML = "";
+    let q = firebase.firestore().collection("purchases");
+    const loc = document.getElementById("purchaseLocFilter").value;
+    const sup = document.getElementById("purchaseSupFilter").value;
+    const start = document.getElementById("purchaseStartDate").value;
+    const end = document.getElementById("purchaseEndDate").value;
+    const search = document.getElementById("purchaseSearch").value.toLowerCase();
 
-    if (snapshot.empty) {
-      table.innerHTML = "<tr><td colspan='10'>No purchases found.</td></tr>";
-      return;
-    }
-
-    // ✅ Totals accumulators
-    let totalSum = 0;
-    let paidSum = 0;
-    let balanceSum = 0;
-
-    snapshot.forEach(doc => {
-      const p = doc.data();
-      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-
-      // ✅ Ensure numeric values
-      const total = Number(p.totalAmount) || 0;
-      const paid = Number(p.amountPaid) || 0;
-      const balance = total - paid;
-
-      totalSum += total;
-      paidSum += paid;
-      balanceSum += balance;
-
-      // ✅ Smarter status handling
-      let status = "";
-      if (balance > 0) {
-        status = `<span style="color:red;font-weight:bold;">Due</span>`;
-      } else if (balance < 0) {
-        status = `<span style="color:#27ae60;font-weight:bold;">Overpaid</span>`; // lighter green
-      } else {
-        status = `<span style="color:green;">Paid</span>`;
-      }
-
-      table.innerHTML += `
-        <tr>
-          <td>${date}</td>
-          <td>${p.location || ""}</td>
-          <td>${p.supplier || ""}</td>
-          <td>${total.toFixed(2)}</td>
-          <td>${paid.toFixed(2)}</td>
-          <td style="color:${balance > 0 ? 'red' : balance < 0 ? '#27ae60' : 'black'};">
-            ${balance.toFixed(2)}
-          </td>
-          <td>${p.paymentMethod || ""}</td>
-          <td>${p.referenceNo || ""}</td>
-          <td>${status}</td>
-          <td>
-            <span title="View" style="cursor:pointer; color:green;" onclick="viewPurchase('${doc.id}')">👁</span>
-            <span title="Print" style="cursor:pointer; color:orange; margin-left:5px;" onclick="printPurchase('${doc.id}')">🖨</span>
-            <span title="Edit" style="cursor:pointer; color:blue; margin-left:5px;" onclick="editPurchase('${doc.id}')">✏</span>
-            <span title="Delete" style="cursor:pointer; color:red; margin-left:5px;" onclick="deletePurchase('${doc.id}')">🗑</span>
-          </td>
-        </tr>
-      `;
-    });
-
-    // ✅ Totals row at bottom
-    table.innerHTML += `
-      <tr style="background:#f9f9f9; font-weight:bold;">
-        <td colspan="3" style="text-align:right;">Totals:</td>
-        <td>${totalSum.toFixed(2)}</td>
-        <td>${paidSum.toFixed(2)}</td>
-        <td>${balanceSum.toFixed(2)}</td>
-        <td colspan="4"></td>
-      </tr>
-    `;
-
-  } catch (err) {
-    table.innerHTML = `<tr><td colspan="10">Error: ${err.message}</td></tr>`;
-  }
-}
-
-
-async function exportPurchasesCSV() {
-  const rows = [];
-  
-  // CSV headers
-  rows.push([
-    "Date",
-    "Location",
-    "Supplier",
-    "Total (KES)",
-    "Paid (KES)",
-    "Balance (KES)",
-    "Payment Method",
-    "Reference No",
-    "Status"
-  ]);
-
-  try {
-    let query = firebase.firestore().collection("purchases");
-
-    // Apply Location filter
-    const loc = document.getElementById("filterLocation").value;
-    if (loc && loc !== "all") {
-      query = query.where("location", "==", loc);
-    }
-
-    // Apply Supplier filter
-    const sup = document.getElementById("filterSupplier").value;
-    if (sup && sup !== "all") {
-      query = query.where("supplier", "==", sup);
-    }
-
-    // Apply Date filter
-    const { start, end } = getDateRange(selectedDateRange);
+    if (loc) q = q.where("location", "==", loc);
+    if (sup) q = q.where("supplier", "==", sup);
     if (start && end) {
-      query = query.where("purchaseDate", ">=", start).where("purchaseDate", "<=", end);
+      q = q.where("purchaseDate", ">=", new Date(start))
+           .where("purchaseDate", "<=", new Date(end));
     }
 
-    query = query.orderBy("purchaseDate", "desc");
+    const snap = await q.orderBy("purchaseDate", "desc").get();
+    if (version !== purchasesQueryVersion) return;
 
-    const snapshot = await query.get();
+    purchasesManager.data = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => !search ||
+        (p.supplier || "").toLowerCase().includes(search) ||
+        (p.referenceNo || "").toLowerCase().includes(search)
+      );
 
-    if (snapshot.empty) {
-      alert("No purchases found to export with current filters.");
-      return;
-    }
-
-    snapshot.forEach(doc => {
-      const p = doc.data();
-      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-
-      const total = Number(p.totalAmount) || 0;
-      const paid = Number(p.amountPaid) || 0;
-      const balance = total - paid;
-
-      let status = "";
-      if (balance > 0) {
-        status = "Due";
-      } else if (balance < 0) {
-        status = "Overpaid";
-      } else {
-        status = "Paid";
-      }
-
-      rows.push([
-        date,
-        p.location || "",
-        p.supplier || "",
-        total.toFixed(2),
-        paid.toFixed(2),
-        balance.toFixed(2),
-        p.paymentMethod || "",
-        p.referenceNo || "",
-        status
-      ]);
-    });
-
-    // Build CSV string
-    const csvContent = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-
-    // Trigger download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "purchases_export.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    // ✅ Show success toast
-    if (typeof showSuccess === "function") {
-      showSuccess("Purchases exported successfully!");
-    }
-
+    renderPurchasesTable();
   } catch (err) {
-    alert("Error exporting purchases: " + err.message);
+    tbody.innerHTML = `<tr><td colspan="10" style="color:red;">Error: ${err.message}</td></tr>`;
   }
 }
 
+// Render table
+function renderPurchasesTable() {
+  const tbody = document.getElementById("purchasesTbody");
+  const info = document.getElementById("purchasesPaginationInfo");
+  const perPage = document.getElementById("purchasesItemsPerPage").value;
+  const allData = purchasesManager.data;
 
-function getDateRange(range) {
-  const today = new Date();
-  let start = null, end = null;
-
-  switch (range) {
-    case "today":
-      start = new Date(today.setHours(0,0,0,0));
-      end = new Date(today.setHours(23,59,59,999));
-      break;
-    case "yesterday":
-      const y = new Date();
-      y.setDate(y.getDate() - 1);
-      start = new Date(y.setHours(0,0,0,0));
-      end = new Date(y.setHours(23,59,59,999));
-      break;
-    case "thisWeek":
-      const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-      start = new Date(firstDay.setHours(0,0,0,0));
-      end = new Date();
-      break;
-    case "lastWeek":
-      const lastWeekStart = new Date();
-      lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
-      start = new Date(lastWeekStart.setHours(0,0,0,0));
-      const lastWeekEnd = new Date(start);
-      lastWeekEnd.setDate(start.getDate() + 6);
-      end = new Date(lastWeekEnd.setHours(23,59,59,999));
-      break;
-    case "thisMonth":
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date();
-      break;
-    case "lastMonth":
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(today.getFullYear(), today.getMonth(), 0, 23,59,59,999);
-      break;
-    case "thisYear":
-      start = new Date(today.getFullYear(), 0, 1);
-      end = new Date();
-      break;
-    case "lastYear":
-      start = new Date(today.getFullYear() - 1, 0, 1);
-      end = new Date(today.getFullYear() - 1, 11, 31, 23,59,59,999);
-      break;
-    case "custom":
-      const s = document.getElementById("startDate").value;
-      const e = document.getElementById("endDate").value;
-      if (s && e) {
-        start = new Date(s);
-        end = new Date(e);
-        end.setHours(23,59,59,999);
-      }
-      break;
+  let pageData = [];
+  if (perPage === "all") {
+    pageData = allData;
+  } else {
+    const pp = parseInt(perPage);
+    const start = (purchasesManager.currentPage - 1) * pp;
+    pageData = allData.slice(start, start + pp);
   }
-  return { start, end };
-}
 
+  tbody.innerHTML = pageData.length ? "" : `<tr><td colspan="10" style="text-align:center;">No purchases found.</td></tr>`;
+  pageData.forEach(p => {
+    const date = p.purchaseDate?.toDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
+    const total = Number(p.totalAmount || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
+    const status = bal > 0 ? `<span style="color:red;">Due</span>` :
+                   bal < 0 ? `<span style="color:#27ae60;">Overpaid</span>` :
+                             `<span style="color:green;">Paid</span>`;
+    tbody.innerHTML += `
+      <tr>
+        <td>${date}</td>
+        <td>${p.location || ""}</td>
+        <td>${p.supplier || ""}</td>
+        <td>${total.toFixed(2)}</td>
+        <td>${paid.toFixed(2)}</td>
+        <td>${bal.toFixed(2)}</td>
+        <td>${p.paymentMethod || ""}</td>
+        <td>${p.referenceNo || ""}</td>
+        <td>${status}</td>
+        <td>
+          <span style="cursor:pointer; color:green;" onclick="viewPurchase('${p.id}')">👁</span>
+          <span style="cursor:pointer; color:orange; margin-left:6px;" onclick="printPurchase('${p.id}')">🖨</span>
+          <span style="cursor:pointer; color:blue; margin-left:6px;" onclick="editPurchase('${p.id}')">✏</span>
+          <span style="cursor:pointer; color:red; margin-left:6px;" onclick="deletePurchase('${p.id}')">🗑</span>
+        </td>
+      </tr>`;
+  });
 
-// Modal functions
-async function viewPurchase(purchaseId) {
-  try {
-    const docSnap = await firebase.firestore().collection("purchases").doc(purchaseId).get();
-    if (!docSnap.exists) {
-      alert("Purchase not found");
-      return;
-    }
-
-    const p = docSnap.data();
-    const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-    const balance = (p.totalAmount || 0) - (p.amountPaid || 0);
-
-    let itemsHTML = "";
-    if (p.items && p.items.length > 0) {
-      itemsHTML = `
-        <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; margin-top:10px;">
-          <thead style="background:#f0f0f0;">
-            <tr>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Price (KES)</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${p.items.map(item => `
-              <tr>
-                <td>${item.productName}</td>
-                <td>${item.quantity}</td>
-                <td>${item.price}</td>
-                <td>${(item.quantity * item.price).toFixed(2)}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      `;
-    }
-
-    document.getElementById("purchaseModalContent").innerHTML = `
-      <p><strong>Date:</strong> ${date}</p>
-      <p><strong>Supplier:</strong> ${p.supplier || ""}</p>
-      <p><strong>Location:</strong> ${p.location || ""}</p>
-      <p><strong>Reference No:</strong> ${p.referenceNo || ""}</p>
-      <p><strong>Payment Method:</strong> ${p.paymentMethod || ""}</p>
-      <p><strong>Total Amount:</strong> ${p.totalAmount || 0}</p>
-      <p><strong>Amount Paid:</strong> ${p.amountPaid || 0}</p>
-      <p><strong>Balance:</strong> <span style="color:${balance > 0 ? 'red' : 'black'};">${balance}</span></p>
-      <p><strong>Notes:</strong> ${p.notes || ""}</p>
-      ${itemsHTML}
-    `;
-
-    document.getElementById("purchaseModal").style.display = "flex";
-
-  } catch (error) {
-    alert("Error loading purchase: " + error.message);
+  if (perPage !== "all") {
+    const start = (purchasesManager.currentPage - 1) * parseInt(perPage) + 1;
+    const end = start + pageData.length - 1;
+    info.textContent = `Showing ${start}-${end} of ${allData.length}`;
+  } else {
+    info.textContent = `Showing all ${allData.length}`;
   }
+
+  document.getElementById("purchasesPrevPage").disabled = purchasesManager.currentPage === 1;
+  document.getElementById("purchasesNextPage").disabled = perPage !== "all" &&
+    purchasesManager.currentPage * parseInt(perPage) >= allData.length;
 }
 
-function closePurchaseModal() {
-  document.getElementById("purchaseModal").style.display = "none";
-}
+// Close modal
+function closeModal(id) { document.getElementById(id).style.display = "none"; }
 
-// Firestore actions
-async function printPurchase(id) {
-  const docSnap = await firebase.firestore().collection("purchases").doc(id).get();
-  if (!docSnap.exists) return alert("Purchase not found");
-  const p = docSnap.data();
-
-  const paid = p.amountPaid || 0;
-  const balance = (p.totalAmount || 0) - paid;
-
-  const html = `
-    <html>
-      <head>
-        <title>Purchase Receipt</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-          h1, h2, h3 { margin: 0; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .header h1 { font-size: 22px; color: #2c3e50; }
-          .header p { margin: 2px 0; font-size: 12px; color: #555; }
-          .info { margin-bottom: 20px; }
-          .info p { margin: 4px 0; font-size: 14px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
-          th { background: #f4f4f4; }
-          tr:nth-child(even) { background: #fafafa; }
-          .totals { margin-top: 20px; text-align: right; }
-          .totals p { margin: 4px 0; font-size: 14px; }
-          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #777; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1><!-- Business Name here --></h1>
-          <p><!-- Address line here --></p>
-          <p><!-- Phone | Email here --></p>
-          <hr/>
-        </div>
-
-        <div class="info">
-          <p><b>Date:</b> ${p.purchaseDate.toDate().toLocaleDateString()}</p>
-          <p><b>Supplier:</b> ${p.supplier}</p>
-          <p><b>Reference:</b> ${p.referenceNo || "-"}</p>
-          <p><b>Payment Method:</b> ${p.paymentMethod || "-"}</p>
-          <p><b>Location:</b> ${p.location || "-"}</p>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Unit Price (KES)</th>
-              <th>Subtotal (KES)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${p.items && p.items.length > 0
-              ? p.items.map((i, idx) => `
-                <tr>
-                  <td>${idx + 1}</td>
-                  <td>${i.productName}</td>
-                  <td>${i.quantity}</td>
-                  <td style="text-align:right;">${i.price.toFixed(2)}</td>
-                  <td style="text-align:right;">${i.subtotal ? i.subtotal.toFixed(2) : (i.quantity * i.price).toFixed(2)}</td>
-                </tr>`).join("")
-              : "<tr><td colspan='5'>No items</td></tr>"}
-          </tbody>
-        </table>
-
-        <div class="totals">
-          <p><b>Total:</b> KES ${p.totalAmount.toFixed(2)}</p>
-          <p><b>Paid:</b> KES ${paid.toFixed(2)}</p>
-          <p><b>Balance:</b> KES ${balance.toFixed(2)}</p>
-        </div>
-
-        <div class="footer">
-          <p><!-- Footer message here --></p>
-        </div>
-      </body>
-    </html>
-  `;
-
-  const w = window.open("", "_blank", "width=800,height=600");
-  w.document.write(html);
-  w.document.close();
-  w.print();
-}
-
-
-
-function editPurchase(id) {
-  alert(`Open edit form for purchase: ${id}`);
-}
-
-async function deletePurchase(id) {
-  if (!confirm("Are you sure you want to delete this purchase?")) return;
-  await firebase.firestore().collection("purchases").doc(id).delete();
-  alert("Purchase deleted");
-  showListPurchases();
-}
-
-async function exportPurchasesCSV() {
-  try {
-    const snapshot = await firebase.firestore().collection("purchases")
-      .orderBy("purchaseDate", "desc")
-      .get();
-
-    if (snapshot.empty) {
-      alert("No purchases to export");
-      return;
-    }
-
-    let csv = "Date,Supplier,Total Amount,Amount Paid,Balance,Payment Method,Reference No\n";
-    snapshot.forEach(doc => {
-      const p = doc.data();
-      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-      const balance = (p.totalAmount || 0) - (p.amountPaid || 0);
-      csv += `${date},"${p.supplier}",${p.totalAmount || 0},${p.amountPaid || 0},${balance},"${p.paymentMethod || ""}","${p.referenceNo || ""}"\n`;
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `purchases_${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-  } catch (err) {
-    alert("Error exporting purchases: " + err.message);
-  }
-}
 
 
 function showPurchaseReturn() {
