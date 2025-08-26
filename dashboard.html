@@ -4161,12 +4161,21 @@ function renderPurchasesTable() {
       }
     }
 
-    const total = Number(p.totalAmount || 0);
+    // 🔹 Recalculate totals safely
+    let calculatedTotal = 0;
+    if (p.items && Array.isArray(p.items)) {
+      calculatedTotal = p.items.reduce((sum, item) => {
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
+        return sum + (Number(item.quantity || 0) * price);
+      }, 0);
+    }
+    const total = Number(p.totalAmount || calculatedTotal || 0);
     const paid = Number(p.amountPaid || 0);
     const bal = total - paid;
     const status = bal > 0 ? `<span style="color:red;">Due</span>` :
                    bal < 0 ? `<span style="color:#27ae60;">Overpaid</span>` :
                              `<span style="color:green;">Paid</span>`;
+
     tbody.innerHTML += `
       <tr>
         <td>${date}</td>
@@ -4231,11 +4240,10 @@ async function viewPurchase(purchaseId) {
 
     if (p.items && Array.isArray(p.items) && p.items.length) {
       totalQuantity = p.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      calculatedTotalAmount = p.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
-
-      if (Math.abs(calculatedTotalAmount - total) > 0.01) {
-        console.warn(`Total amount mismatch for purchase ${p.id}: Stored=${total}, Calculated=${calculatedTotalAmount}`);
-      }
+      calculatedTotalAmount = p.items.reduce((sum, item) => {
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
+        return sum + (Number(item.quantity || 0) * price);
+      }, 0);
 
       itemsHtml = `
         <table>
@@ -4248,14 +4256,18 @@ async function viewPurchase(purchaseId) {
             </tr>
           </thead>
           <tbody>
-            ${p.items.map(item => `
-              <tr>
-                <td>${item.productName || "N/A"}</td>
-                <td>${Number(item.quantity || 0)}</td>
-                <td>${Number(item.unitPrice || 0).toFixed(2)}</td>
-                <td>${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}</td>
-              </tr>
-            `).join("")}
+            ${p.items.map(item => {
+              const price = Number(item.unitPrice || item.buyingPrice || 0);
+              const qty = Number(item.quantity || 0);
+              return `
+                <tr>
+                  <td>${item.productName || "N/A"}</td>
+                  <td>${qty}</td>
+                  <td>${price.toFixed(2)}</td>
+                  <td>${(qty * price).toFixed(2)}</td>
+                </tr>
+              `;
+            }).join("")}
           </tbody>
           <tfoot>
             <tr>
@@ -4285,11 +4297,7 @@ async function viewPurchase(purchaseId) {
     document.getElementById("purchaseViewModal").style.display = "flex";
   } catch (err) {
     console.error("Error viewing purchase:", err);
-    Swal.fire({
-      icon: "error",
-      title: "Error",
-      text: "Failed to view purchase: " + err.message
-    });
+    Swal.fire({ icon: "error", title: "Error", text: "Failed to view purchase: " + err.message });
   }
 }
 
@@ -4387,6 +4395,7 @@ function addItemRow(productName = "", quantity = "", unitPrice = "", index = Dat
   itemsContainer.appendChild(row);
 }
 
+
 // Print purchase invoice
 async function printPurchase(purchaseId) {
   try {
@@ -4396,9 +4405,9 @@ async function printPurchase(purchaseId) {
     const p = { id: doc.id, ...doc.data() };
     let date = "N/A";
     if (p.purchaseDate) {
-      date = typeof p.purchaseDate.toDate === "function" ?
-        p.purchaseDate.toDate().toISOString().split("T")[0] :
-        p.purchaseDate.toString().split("T")[0];
+      date = typeof p.purchaseDate.toDate === "function"
+        ? p.purchaseDate.toDate().toISOString().split("T")[0]
+        : p.purchaseDate.toString().split("T")[0];
     }
 
     const total = Number(p.totalAmount || 0);
@@ -4411,20 +4420,27 @@ async function printPurchase(purchaseId) {
 
     if (p.items && Array.isArray(p.items) && p.items.length) {
       totalQuantity = p.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      calculatedTotalAmount = p.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
+      calculatedTotalAmount = p.items.reduce((sum, item) => {
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
+        return sum + (Number(item.quantity || 0) * price);
+      }, 0);
 
       if (Math.abs(calculatedTotalAmount - total) > 0.01) {
         console.warn(`Total amount mismatch for purchase ${p.id}: Stored=${total}, Calculated=${calculatedTotalAmount}`);
       }
 
-      itemsHtml = p.items.map(item => `
-        <tr>
-          <td>${item.productName || "N/A"}</td>
-          <td>${Number(item.quantity || 0)}</td>
-          <td>${Number(item.unitPrice || 0).toFixed(2)}</td>
-          <td>${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}</td>
-        </tr>
-      `).join("");
+      itemsHtml = p.items.map(item => {
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
+        const qty = Number(item.quantity || 0);
+        return `
+          <tr>
+            <td>${item.productName || "N/A"}</td>
+            <td>${qty}</td>
+            <td>${price.toFixed(2)}</td>
+            <td>${(qty * price).toFixed(2)}</td>
+          </tr>
+        `;
+      }).join("");
     }
 
     const printWindow = window.open("", "_blank");
@@ -4433,92 +4449,27 @@ async function printPurchase(purchaseId) {
         <head>
           <title>Purchase Invoice - ${p.referenceNo || purchaseId}</title>
           <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 1rem; 
-            }
-            .invoice { 
-              max-width: 800px; 
-              margin: 0 auto; 
-              padding: 1rem; 
-              border: 1px solid #ddd; 
-            }
-            .invoice h1 { 
-              text-align: center; 
-              color: #333; 
-              font-size: 1.5rem; 
-            }
-            .invoice-header { 
-              display: flex; 
-              justify-content: space-between; 
-              margin-bottom: 1rem; 
-              flex-wrap: wrap; 
-              gap: 1rem; 
-            }
-            .invoice-details { 
-              margin-bottom: 1rem; 
-            }
-            .invoice-details p { 
-              margin: 0.3rem 0; 
-              font-size: 0.9rem; 
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-bottom: 1rem; 
-            }
-            th, td { 
-              border: 1px solid #ddd; 
-              padding: 0.5rem; 
-              text-align: left; 
-              font-size: 0.9rem; 
-            }
-            th { 
-              background: #f0f0f0; 
-            }
-            tfoot { 
-              font-weight: bold; 
-              background: #e9ecef; 
-            }
-            tfoot td { 
-              text-align: right; 
-            }
-            tfoot td:first-child { 
-              text-align: left; 
-            }
-            .total-section { 
-              text-align: right; 
-            }
-            .total-section p { 
-              margin: 0.3rem 0; 
-              font-size: 0.9rem; 
-            }
-            .no-print { 
-              padding: 0.5rem 1rem; 
-              border: none; 
-              border-radius: 4px; 
-              background: #007bff; 
-              color: white; 
-              cursor: pointer; 
-            }
-            @media print {
-              .no-print { display: none; }
-            }
+            body { font-family: Arial, sans-serif; margin: 1rem; }
+            .invoice { max-width: 800px; margin: 0 auto; padding: 1rem; border: 1px solid #ddd; }
+            .invoice h1 { text-align: center; color: #333; font-size: 1.5rem; }
+            .invoice-header { display: flex; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+            .invoice-details { margin-bottom: 1rem; }
+            .invoice-details p { margin: 0.3rem 0; font-size: 0.9rem; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+            th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; font-size: 0.9rem; }
+            th { background: #f0f0f0; }
+            tfoot { font-weight: bold; background: #e9ecef; }
+            tfoot td { text-align: right; }
+            tfoot td:first-child { text-align: left; }
+            .total-section { text-align: right; }
+            .total-section p { margin: 0.3rem 0; font-size: 0.9rem; }
+            .no-print { padding: 0.5rem 1rem; border: none; border-radius: 4px; background: #007bff; color: white; cursor: pointer; }
+            @media print { .no-print { display: none; } }
             @media (max-width: 600px) {
-              .invoice { 
-                padding: 0.5rem; 
-              }
-              .invoice h1 { 
-                font-size: 1.2rem; 
-              }
-              .invoice-header { 
-                flex-direction: column; 
-                align-items: flex-start; 
-              }
-              th, td { 
-                font-size: 0.8rem; 
-                padding: 0.4rem; 
-              }
+              .invoice { padding: 0.5rem; }
+              .invoice h1 { font-size: 1.2rem; }
+              .invoice-header { flex-direction: column; align-items: flex-start; }
+              th, td { font-size: 0.8rem; padding: 0.4rem; }
             }
           </style>
         </head>
@@ -4585,6 +4536,7 @@ async function printPurchase(purchaseId) {
     });
   }
 }
+
 
 // Delete purchase
 async function deletePurchase(purchaseId) {
