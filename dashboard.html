@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3565,411 +3566,656 @@ async function savePurchase() {
   }
 }
 
+// Track query version to prevent race conditions
+let purchasesQueryVersion = 0;
+
+// State management
+const purchasesManager = { data: [], currentPage: 1, itemsPerPage: 10 };
+
+// Debounce utility to prevent rapid query calls
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
 async function showListPurchases() {
   saveLastPage("showListPurchases");
 
   document.getElementById("content").innerHTML = `
+    <style>
+      /* Base styles */
+      * { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; margin: 0; padding: 10px; }
+      h2 { font-size: 1.5rem; margin: 0 0 1rem; text-align: center; }
+
+      /* Filter Section */
+      .filter-section {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+        border: 1px solid #e0e0e0;
+      }
+      .filter-section label { 
+        font-weight: 600; 
+        color: #333; 
+        font-size: 0.9rem; 
+      }
+      .filter-section select,
+      .filter-section input[type="text"],
+      .filter-section input[type="date"] {
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        background: #fff;
+        width: 100%;
+        max-width: 200px;
+      }
+      .filter-section button {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .filter-section .apply-btn { background: #0056b3; color: white; }
+      .filter-section .export-btn { background: #218838; color: white; }
+
+      /* Table Container */
+      .table-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        overflow-x: auto;
+      }
+      .table-container table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        min-width: 800px; 
+      }
+      .table-container th, .table-container td {
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        font-size: 0.9rem;
+        text-align: left;
+      }
+      .table-container thead { 
+        position: sticky; 
+        top: 0; 
+        background: #f0f0f0; 
+        z-index: 1; 
+      }
+      .table-container th:last-child, .table-container td:last-child { 
+        min-width: 120px; 
+      }
+
+      /* Pagination Section */
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .pagination-section button {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .pagination-section .prev-btn, .pagination-section .next-btn { 
+        background: #007bff; 
+        color: white; 
+      }
+      .pagination-section select {
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.9rem;
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+      }
+      .modal-content {
+        background: #fff;
+        padding: 1rem;
+        border-radius: 8px;
+        max-width: 90vw;
+        width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        position: relative;
+      }
+      .modal-content h2 { 
+        margin-top: 0; 
+        font-size: 1.25rem; 
+      }
+      .modal-content .close-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.75rem;
+        font-size: 1.25rem;
+        cursor: pointer;
+        color: #333;
+      }
+      .error-message { 
+        color: red; 
+        text-align: center; 
+        padding: 0.5rem; 
+        font-size: 0.9rem; 
+      }
+
+      /* View Modal */
+      .view-details { 
+        line-height: 1.6; 
+        font-size: 0.9rem; 
+      }
+      .view-details table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-top: 0.5rem; 
+      }
+      .view-details th, .view-details td { 
+        border: 1px solid #ddd; 
+        padding: 0.5rem; 
+        text-align: left; 
+      }
+      .view-details th { 
+        background: #f0f0f0; 
+      }
+      .view-details tfoot { 
+        font-weight: bold; 
+        background: #e9ecef; 
+      }
+      .view-details tfoot td { 
+        text-align: right; 
+      }
+      .view-details tfoot td:first-child { 
+        text-align: left; 
+      }
+
+      /* Edit Form */
+      .edit-form div { 
+        margin-bottom: 1rem; 
+      }
+      .edit-form label { 
+        display: block; 
+        font-weight: 600; 
+        margin-bottom: 0.3rem; 
+        font-size: 0.9rem; 
+      }
+      .edit-form input, .edit-form select { 
+        width: 100%; 
+        padding: 0.5rem; 
+        border: 1px solid #ccc; 
+        border-radius: 4px; 
+        font-size: 0.9rem; 
+      }
+      .edit-form .item-row { 
+        display: flex; 
+        gap: 0.5rem; 
+        align-items: center; 
+        flex-wrap: wrap; 
+      }
+      .edit-form .item-row input { 
+        width: auto; 
+        flex: 1; 
+        min-width: 100px; 
+      }
+      .edit-form .remove-item { 
+        background: #dc3545; 
+        color: white; 
+        padding: 0.3rem 0.6rem; 
+        border: none; 
+        border-radius: 4px; 
+        cursor: pointer; 
+        font-size: 0.8rem; 
+      }
+      .edit-form .add-item { 
+        background: #28a745; 
+        color: white; 
+        padding: 0.5rem 1rem; 
+        border: none; 
+        border-radius: 4px; 
+        cursor: pointer; 
+        margin-top: 0.5rem; 
+        font-size: 0.9rem; 
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        .filter-section {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .filter-section div {
+          width: 100%;
+        }
+        .filter-section select,
+        .filter-section input[type="text"],
+        .filter-section input[type="date"] {
+          max-width: none;
+        }
+        .table-container {
+          overflow-x: auto;
+        }
+        .table-container th, .table-container td {
+          font-size: 0.8rem;
+          padding: 0.5rem;
+        }
+        .pagination-section {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .pagination-section > div {
+          margin-bottom: 0.5rem;
+        }
+        .modal-content {
+          width: 95vw;
+          max-height: 90vh;
+          padding: 0.75rem;
+        }
+        .modal-content h2 {
+          font-size: 1.1rem;
+        }
+        .view-details, .edit-form {
+          font-size: 0.8rem;
+        }
+        .view-details table, .edit-form table {
+          min-width: 0;
+        }
+        .view-details th, .view-details td {
+          padding: 0.4rem;
+        }
+        .edit-form .item-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .edit-form .item-row input {
+          min-width: 0;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 480px) {
+        h2 { font-size: 1.2rem; }
+        .filter-section label, .filter-section button, 
+        .pagination-section button, .pagination-section select {
+          font-size: 0.8rem;
+        }
+        .table-container th, .table-container td {
+          font-size: 0.7rem;
+          padding: 0.4rem;
+        }
+        .modal-content {
+          padding: 0.5rem;
+        }
+      }
+    </style>
+
     <h2>List of Purchases</h2>
 
     <!-- Filter Section -->
-    <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <select id="filterLocation" style="min-width:160px; padding:5px;">
-        <option value="all">All Locations</option>
-      </select>
-      <select id="filterSupplier" style="min-width:160px; padding:5px;">
-        <option value="all">All Suppliers</option>
-      </select>
-
-      <!-- Date filter -->
-      <div style="position:relative;">
-        <button id="dateFilterBtn" style="padding:6px 12px; cursor:pointer;">Date: All</button>
-        <div id="dateFilterMenu" 
-          style="display:none; position:absolute; top:35px; left:0; background:white; border:1px solid #ccc; 
-                 box-shadow:0 2px 5px rgba(0,0,0,0.2); z-index:100; min-width:180px;">
-          <div class="date-option" data-range="today">Today</div>
-          <div class="date-option" data-range="yesterday">Yesterday</div>
-          <div class="date-option" data-range="thisWeek">This Week</div>
-          <div class="date-option" data-range="lastWeek">Last Week</div>
-          <div class="date-option" data-range="thisMonth">This Month</div>
-          <div class="date-option" data-range="lastMonth">Last Month</div>
-          <div class="date-option" data-range="thisYear">This Year</div>
-          <div class="date-option" data-range="lastYear">Last Year</div>
-          <div class="date-option" data-range="custom">Custom...</div>
-        </div>
+    <div class="filter-section">
+      <div>
+        <label for="purchaseLocFilter">Location:</label>
+        <select id="purchaseLocFilter"><option value="">All</option></select>
       </div>
-
-      <!-- Custom date pickers -->
-      <input type="date" id="startDate" style="display:none;">
-      <input type="date" id="endDate" style="display:none;">
-
-      <button id="applyFilterBtn" style="padding:6px 12px; cursor:pointer; background:#2c3e50; color:white;">Apply Filter</button>
-      <button onclick="exportPurchasesCSV()" style="margin-left:auto; padding:6px 12px; cursor:pointer;">Export</button>
+      <div>
+        <label for="purchaseSupFilter">Supplier:</label>
+        <select id="purchaseSupFilter"><option value="">All</option></select>
+      </div>
+      <div>
+        <label for="purchaseStartDate">From:</label>
+        <input type="date" id="purchaseStartDate">
+      </div>
+      <div>
+        <label for="purchaseEndDate">To:</label>
+        <input type="date" id="purchaseEndDate">
+      </div>
+      <div>
+        <label for="purchaseSearch">Search:</label>
+        <input type="text" id="purchaseSearch" placeholder="Supplier or Ref No">
+      </div>
+      <button id="applyPurchasesFilterBtn" class="apply-btn">Apply</button>
+      <button id="exportPurchasesBtn" class="export-btn">Export</button>
     </div>
 
     <!-- Purchases Table -->
-    <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse;">
-      <thead style="background:#f0f0f0;">
-        <tr>
-          <th>Date</th>
-          <th>Location</th>
-          <th>Supplier</th>
-          <th>Total (KES)</th>
-          <th>Paid (KES)</th>
-          <th>Balance (KES)</th>
-          <th>Payment Method</th>
-          <th>Reference No</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="purchasesTable">
-        <tr><td colspan="10">Loading...</td></tr>
-      </tbody>
-    </table>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Supplier</th>
+            <th>Total (KES)</th>
+            <th>Paid (KES)</th>
+            <th>Balance (KES)</th>
+            <th>Payment Method</th>
+            <th>Reference No</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="purchasesTbody">
+          <tr><td colspan="10" class="error-message">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <!-- Purchase Details Modal -->
-    <div id="purchaseModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-      background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-      <div style="background:white; padding:20px; width:500px; max-height:80%; overflow:auto; border-radius:8px;">
-        <h3>Purchase Details</h3>
-        <div id="purchaseModalContent"></div>
-        <div style="text-align:right; margin-top:15px;">
-          <button onclick="closePurchaseModal()">Close</button>
-        </div>
+    <!-- Pagination -->
+    <div class="pagination-section">
+      <div>
+        <label for="purchasesItemsPerPage">Show:</label>
+        <select id="purchasesItemsPerPage">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+        <span id="purchasesPaginationInfo"></span>
+      </div>
+      <div>
+        <button id="purchasesPrevPage" class="prev-btn" disabled>Previous</button>
+        <button id="purchasesNextPage" class="next-btn">Next</button>
+      </div>
+    </div>
+
+    <!-- View Modal -->
+    <div id="purchaseViewModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('purchaseViewModal')">&times;</span>
+        <h2>Purchase Details</h2>
+        <div id="purchaseViewContent" class="view-details"></div>
+        <div style="text-align:right;"><button onclick="closeModal('purchaseViewModal')">Close</button></div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="purchaseEditModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('purchaseEditModal')">&times;</span>
+        <h2>Edit Purchase</h2>
+        <form id="editPurchaseForm" class="edit-form">
+          <div>
+            <label for="editPurchaseDate">Purchase Date:</label>
+            <input type="date" id="editPurchaseDate" required>
+          </div>
+          <div>
+            <label for="editPurchaseLocation">Location:</label>
+            <input type="text" id="editPurchaseLocation" required>
+          </div>
+          <div>
+            <label for="editPurchaseSupplier">Supplier:</label>
+            <input type="text" id="editPurchaseSupplier" required>
+          </div>
+          <div>
+            <label for="editPurchasePaymentMethod">Payment Method:</label>
+            <select id="editPurchasePaymentMethod" required>
+              <option value="Cash">Cash</option>
+              <option value="Credit">Credit</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div>
+            <label for="editPurchaseReferenceNo">Reference No:</label>
+            <input type="text" id="editPurchaseReferenceNo">
+          </div>
+          <div>
+            <label for="editPurchaseAmountPaid">Amount Paid (KES):</label>
+            <input type="number" id="editPurchaseAmountPaid" step="0.01" required>
+          </div>
+          <div>
+            <label>Items:</label>
+            <div id="editPurchaseItems"></div>
+            <button type="button" class="add-item" onclick="addItemRow()">Add Item</button>
+          </div>
+          <div style="text-align:right;">
+            <button type="submit">Save</button>
+            <button type="button" onclick="closeModal('purchaseEditModal')">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
   `;
 
-  // Load dropdowns for suppliers & locations
-  loadFilterOptions();
+  // Verify DOM elements exist
+  if (!document.getElementById("purchasesTbody")) {
+    console.error("Table body not found");
+    return;
+  }
 
-  // Setup date filter menu toggle
-  const dateBtn = document.getElementById("dateFilterBtn");
-  const dateMenu = document.getElementById("dateFilterMenu");
-  dateBtn.addEventListener("click", () => {
-    dateMenu.style.display = (dateMenu.style.display === "none" ? "block" : "none");
+  // Load dropdowns
+  await loadPurchaseFilterOptions();
+
+  // Listeners with debounced loadPurchases
+  const debouncedLoadPurchases = debounce(() => {
+    purchasesManager.currentPage = 1;
+    loadPurchases();
+  }, 300);
+
+  document.getElementById("applyPurchasesFilterBtn").addEventListener("click", debouncedLoadPurchases);
+  document.getElementById("exportPurchasesBtn").addEventListener("click", exportPurchasesCSV);
+
+  document.getElementById("purchasesPrevPage").addEventListener("click", () => {
+    if (purchasesManager.currentPage > 1) {
+      purchasesManager.currentPage--;
+      renderPurchasesTable();
+    }
+  });
+  document.getElementById("purchasesNextPage").addEventListener("click", () => {
+    purchasesManager.currentPage++;
+    renderPurchasesTable();
+  });
+  document.getElementById("purchasesItemsPerPage").addEventListener("change", () => {
+    purchasesManager.currentPage = 1;
+    renderPurchasesTable();
   });
 
-  // Handle date menu clicks
-  dateMenu.querySelectorAll(".date-option").forEach(opt => {
-    opt.addEventListener("click", (e) => {
-      const range = e.target.dataset.range;
-      selectedDateRange = range;
-      dateBtn.textContent = "Date: " + e.target.textContent;
-      dateMenu.style.display = "none";
-
-      if (range === "custom") {
-        document.getElementById("startDate").style.display = "inline-block";
-        document.getElementById("endDate").style.display = "inline-block";
-      } else {
-        document.getElementById("startDate").style.display = "none";
-        document.getElementById("endDate").style.display = "none";
-      }
-    });
-  });
-
-  // Apply filter button
-  document.getElementById("applyFilterBtn").addEventListener("click", () => {
-    loadFilteredPurchases();
-  });
-
-  // Load all purchases initially
-  loadFilteredPurchases();
-}
-let selectedDateRange = "all";
-
-async function loadFilterOptions() {
-  const locSelect = document.getElementById("filterLocation");
-  const supSelect = document.getElementById("filterSupplier");
-
-  const snapshot = await firebase.firestore().collection("purchases").get();
-
-  const locations = new Set();
-  const suppliers = new Set();
-
-  snapshot.forEach(doc => {
-    const p = doc.data();
-    if (p.location) locations.add(p.location.trim());
-    if (p.supplier) suppliers.add(p.supplier.trim());
-  });
-
-  locations.forEach(loc => {
-    const opt = document.createElement("option");
-    opt.value = loc;
-    opt.textContent = loc;
-    locSelect.appendChild(opt);
-  });
-
-  suppliers.forEach(sup => {
-    const opt = document.createElement("option");
-    opt.value = sup;
-    opt.textContent = sup;
-    supSelect.appendChild(opt);
-  });
+  // Initial load
+  loadPurchases();
 }
 
-
-async function loadFilteredPurchases() {
-  const table = document.getElementById("purchasesTable");
-  table.innerHTML = "<tr><td colspan='10'>Loading...</td></tr>";
-
-  let query = firebase.firestore().collection("purchases");
-
-  // Apply Location filter
-  const loc = document.getElementById("filterLocation").value;
-  if (loc && loc !== "all") {
-    query = query.where("location", "==", loc);
-  }
-
-  // Apply Supplier filter
-  const sup = document.getElementById("filterSupplier").value;
-  if (sup && sup !== "all") {
-    query = query.where("supplier", "==", sup);
-  }
-
-  // Apply Date filter
-  const { start, end } = getDateRange(selectedDateRange);
-  if (start && end) {
-    query = query.where("purchaseDate", ">=", start).where("purchaseDate", "<=", end);
-  }
-
-  query = query.orderBy("purchaseDate", "desc");
+// Load filter dropdowns
+async function loadPurchaseFilterOptions() {
+  const locSelect = document.getElementById("purchaseLocFilter");
+  const supSelect = document.getElementById("purchaseSupFilter");
+  const tbody = document.getElementById("purchasesTbody");
 
   try {
-    const snapshot = await query.get();
-    table.innerHTML = "";
+    if (!firebase.apps.length) throw new Error("Firebase not initialized");
+    const snapshot = await firebase.firestore().collection("purchases").get();
+    console.log("Filter options snapshot size:", snapshot.size);
 
-    if (snapshot.empty) {
-      table.innerHTML = "<tr><td colspan='10'>No purchases found.</td></tr>";
-      return;
-    }
-
-    // ✅ Totals accumulators
-    let totalSum = 0;
-    let paidSum = 0;
-    let balanceSum = 0;
-
-    snapshot.forEach(doc => {
-      const p = doc.data();
-      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-
-      // ✅ Ensure numeric values
-      const total = Number(p.totalAmount) || 0;
-      const paid = Number(p.amountPaid) || 0;
-      const balance = total - paid;
-
-      totalSum += total;
-      paidSum += paid;
-      balanceSum += balance;
-
-      // ✅ Smarter status handling
-      let status = "";
-      if (balance > 0) {
-        status = `<span style="color:red;font-weight:bold;">Due</span>`;
-      } else if (balance < 0) {
-        status = `<span style="color:#27ae60;font-weight:bold;">Overpaid</span>`; // lighter green
-      } else {
-        status = `<span style="color:green;">Paid</span>`;
-      }
-
-      table.innerHTML += `
-        <tr>
-          <td>${date}</td>
-          <td>${p.location || ""}</td>
-          <td>${p.supplier || ""}</td>
-          <td>${total.toFixed(2)}</td>
-          <td>${paid.toFixed(2)}</td>
-          <td style="color:${balance > 0 ? 'red' : balance < 0 ? '#27ae60' : 'black'};">
-            ${balance.toFixed(2)}
-          </td>
-          <td>${p.paymentMethod || ""}</td>
-          <td>${p.referenceNo || ""}</td>
-          <td>${status}</td>
-          <td>
-            <span title="View" style="cursor:pointer; color:green;" onclick="viewPurchase('${doc.id}')">👁</span>
-            <span title="Print" style="cursor:pointer; color:orange; margin-left:5px;" onclick="printPurchase('${doc.id}')">🖨</span>
-            <span title="Edit" style="cursor:pointer; color:blue; margin-left:5px;" onclick="editPurchase('${doc.id}')">✏</span>
-            <span title="Delete" style="cursor:pointer; color:red; margin-left:5px;" onclick="deletePurchase('${doc.id}')">🗑</span>
-          </td>
-        </tr>
-      `;
+    const locs = new Set(), sups = new Set();
+    snapshot.forEach(d => {
+      const p = d.data();
+      if (p.location) locs.add(p.location);
+      if (p.supplier) sups.add(p.supplier);
     });
 
-    // ✅ Totals row at bottom
-    table.innerHTML += `
-      <tr style="background:#f9f9f9; font-weight:bold;">
-        <td colspan="3" style="text-align:right;">Totals:</td>
-        <td>${totalSum.toFixed(2)}</td>
-        <td>${paidSum.toFixed(2)}</td>
-        <td>${balanceSum.toFixed(2)}</td>
-        <td colspan="4"></td>
-      </tr>
-    `;
-
+    locSelect.innerHTML = `<option value="">All</option>`;
+    supSelect.innerHTML = `<option value="">All</option>`;
+    locs.forEach(l => locSelect.innerHTML += `<option>${l}</option>`);
+    sups.forEach(s => supSelect.innerHTML += `<option>${s}</option>`);
   } catch (err) {
-    table.innerHTML = `<tr><td colspan="10">Error: ${err.message}</td></tr>`;
+    console.error("Error loading filter options:", err);
+    tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error loading filters: ${err.message}</td></tr>`;
   }
 }
 
-
-async function exportPurchasesCSV() {
-  const rows = [];
-  
-  // CSV headers
-  rows.push([
-    "Date",
-    "Location",
-    "Supplier",
-    "Total (KES)",
-    "Paid (KES)",
-    "Balance (KES)",
-    "Payment Method",
-    "Reference No",
-    "Status"
-  ]);
+// Load purchases
+async function loadPurchases() {
+  const version = ++purchasesQueryVersion;
+  const tbody = document.getElementById("purchasesTbody");
+  tbody.innerHTML = `<tr><td colspan="10" class="error-message">Loading...</td></tr>`;
 
   try {
-    let query = firebase.firestore().collection("purchases");
+    if (!firebase.apps.length) throw new Error("Firebase not initialized");
+    if (!firebase.auth().currentUser) throw new Error("User not authenticated");
 
-    // Apply Location filter
-    const loc = document.getElementById("filterLocation").value;
-    if (loc && loc !== "all") {
-      query = query.where("location", "==", loc);
-    }
+    let q = firebase.firestore().collection("purchases");
+    const loc = document.getElementById("purchaseLocFilter").value;
+    const sup = document.getElementById("purchaseSupFilter").value;
+    const start = document.getElementById("purchaseStartDate").value;
+    const end = document.getElementById("purchaseEndDate").value;
+    const search = document.getElementById("purchaseSearch").value.toLowerCase();
 
-    // Apply Supplier filter
-    const sup = document.getElementById("filterSupplier").value;
-    if (sup && sup !== "all") {
-      query = query.where("supplier", "==", sup);
-    }
+    console.log("Query filters:", { loc, sup, start, end, search });
 
-    // Apply Date filter
-    const { start, end } = getDateRange(selectedDateRange);
+    if (loc) q = q.where("location", "==", loc);
+    if (sup) q = q.where("supplier", "==", sup);
     if (start && end) {
-      query = query.where("purchaseDate", ">=", start).where("purchaseDate", "<=", end);
+      q = q.where("purchaseDate", ">=", new Date(start))
+           .where("purchaseDate", "<=", new Date(`${end}T23:59:59`));
     }
 
-    query = query.orderBy("purchaseDate", "desc");
+    const timeout = setTimeout(() => {
+      tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error: Request timed out</td></tr>`;
+    }, 10000);
 
-    const snapshot = await query.get();
+    const snap = await q.orderBy("purchaseDate", "desc").get();
+    clearTimeout(timeout);
 
-    if (snapshot.empty) {
-      alert("No purchases found to export with current filters.");
+    console.log("Snapshot size:", snap.size, "Docs:", snap.docs.map(d => d.data()));
+    if (version !== purchasesQueryVersion) {
+      console.log("Discarding outdated query result");
       return;
     }
 
-    snapshot.forEach(doc => {
-      const p = doc.data();
-      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-
-      const total = Number(p.totalAmount) || 0;
-      const paid = Number(p.amountPaid) || 0;
-      const balance = total - paid;
-
-      let status = "";
-      if (balance > 0) {
-        status = "Due";
-      } else if (balance < 0) {
-        status = "Overpaid";
-      } else {
-        status = "Paid";
-      }
-
-      rows.push([
-        date,
-        p.location || "",
-        p.supplier || "",
-        total.toFixed(2),
-        paid.toFixed(2),
-        balance.toFixed(2),
-        p.paymentMethod || "",
-        p.referenceNo || "",
-        status
-      ]);
-    });
-
-    // Build CSV string
-    const csvContent = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-
-    // Trigger download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "purchases_export.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    // ✅ Show success toast
-    if (typeof showSuccess === "function") {
-      showSuccess("Purchases exported successfully!");
+    if (snap.empty) {
+      purchasesManager.data = [];
+      renderPurchasesTable();
+      return;
     }
 
+    purchasesManager.data = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => {
+        const matches = !search ||
+          (p.supplier || "").toLowerCase().includes(search) ||
+          (p.referenceNo || "").toLowerCase().includes(search);
+        console.log("Purchase:", p, "Matches search:", matches);
+        return matches;
+      });
+
+    console.log("Filtered purchases:", purchasesManager.data);
+    renderPurchasesTable();
   } catch (err) {
-    alert("Error exporting purchases: " + err.message);
+    console.error("Error loading purchases:", err);
+    tbody.innerHTML = `<tr><td colspan="10" class="error-message">Error: ${err.message}</td></tr>`;
   }
 }
 
+// Render table
+function renderPurchasesTable() {
+  const tbody = document.getElementById("purchasesTbody");
+  const info = document.getElementById("purchasesPaginationInfo");
+  const perPage = document.getElementById("purchasesItemsPerPage").value;
+  const allData = purchasesManager.data;
 
-function getDateRange(range) {
-  const today = new Date();
-  let start = null, end = null;
+  let pageData = [];
+  if (perPage === "all") {
+    pageData = allData;
+  } else {
+    const pp = parseInt(perPage);
+    const start = (purchasesManager.currentPage - 1) * pp;
+    pageData = allData.slice(start, start + pp);
+  }
 
-  switch (range) {
-    case "today":
-      start = new Date(today.setHours(0,0,0,0));
-      end = new Date(today.setHours(23,59,59,999));
-      break;
-    case "yesterday":
-      const y = new Date();
-      y.setDate(y.getDate() - 1);
-      start = new Date(y.setHours(0,0,0,0));
-      end = new Date(y.setHours(23,59,59,999));
-      break;
-    case "thisWeek":
-      const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-      start = new Date(firstDay.setHours(0,0,0,0));
-      end = new Date();
-      break;
-    case "lastWeek":
-      const lastWeekStart = new Date();
-      lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
-      start = new Date(lastWeekStart.setHours(0,0,0,0));
-      const lastWeekEnd = new Date(start);
-      lastWeekEnd.setDate(start.getDate() + 6);
-      end = new Date(lastWeekEnd.setHours(23,59,59,999));
-      break;
-    case "thisMonth":
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date();
-      break;
-    case "lastMonth":
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(today.getFullYear(), today.getMonth(), 0, 23,59,59,999);
-      break;
-    case "thisYear":
-      start = new Date(today.getFullYear(), 0, 1);
-      end = new Date();
-      break;
-    case "lastYear":
-      start = new Date(today.getFullYear() - 1, 0, 1);
-      end = new Date(today.getFullYear() - 1, 11, 31, 23,59,59,999);
-      break;
-    case "custom":
-      const s = document.getElementById("startDate").value;
-      const e = document.getElementById("endDate").value;
-      if (s && e) {
-        start = new Date(s);
-        end = new Date(e);
-        end.setHours(23,59,59,999);
+  tbody.innerHTML = pageData.length ? "" : `<tr><td colspan="10" style="text-align:center;">No purchases found.</td></tr>`;
+  pageData.forEach(p => {
+    let date = "N/A";
+    if (p.purchaseDate) {
+      if (typeof p.purchaseDate.toDate === "function") {
+        date = p.purchaseDate.toDate().toISOString().split("T")[0];
+      } else {
+        date = p.purchaseDate.toString().split("T")[0];
       }
-      break;
+    }
+
+    // 🔹 Recalculate totals safely
+    let calculatedTotal = 0;
+    if (p.items && Array.isArray(p.items)) {
+      calculatedTotal = p.items.reduce((sum, item) => {
+        const price = Number(item.unitPrice || item.buyingPrice || 0);
+        return sum + (Number(item.quantity || 0) * price);
+      }, 0);
+    }
+    const total = Number(p.totalAmount || calculatedTotal || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
+    const status = bal > 0 ? `<span style="color:red;">Due</span>` :
+                   bal < 0 ? `<span style="color:#27ae60;">Overpaid</span>` :
+                             `<span style="color:green;">Paid</span>`;
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${date}</td>
+        <td>${p.location || "N/A"}</td>
+        <td>${p.supplier || "N/A"}</td>
+        <td>${total.toFixed(2)}</td>
+        <td>${paid.toFixed(2)}</td>
+        <td>${bal.toFixed(2)}</td>
+        <td>${p.paymentMethod || "N/A"}</td>
+        <td>${p.referenceNo || "N/A"}</td>
+        <td>${status}</td>
+        <td>
+          <span style="cursor:pointer; color:green;" onclick="viewPurchase('${p.id}')">👁</span>
+          <span style="cursor:pointer; color:orange; margin-left:6px;" onclick="printPurchase('${p.id}')">🖨</span>
+          <span style="cursor:pointer; color:blue; margin-left:6px;" onclick="editPurchase('${p.id}')">✏</span>
+          <span style="cursor:pointer; color:red; margin-left:6px;" onclick="deletePurchase('${p.id}')">🗑</span>
+        </td>
+      </tr>`;
+  });
+
+  if (perPage !== "all") {
+    const pp = parseInt(perPage);
+    const start = (purchasesManager.currentPage - 1) * pp + 1;
+    const end = Math.min(start + pageData.length - 1, allData.length);
+    info.textContent = `Showing ${start}-${end} of ${allData.length}`;
+  } else {
+    info.textContent = `Showing all ${allData.length}`;
   }
-  return { start, end };
+
+  document.getElementById("purchasesPrevPage").disabled = purchasesManager.currentPage === 1;
+  document.getElementById("purchasesNextPage").disabled = perPage !== "all" &&
+    purchasesManager.currentPage * parseInt(perPage) >= allData.length;
 }
 
+// Close modal
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.style.display = "none";
+}
 
 // View purchase details
 async function viewPurchase(purchaseId) {
@@ -4056,10 +4302,100 @@ async function viewPurchase(purchaseId) {
   }
 }
 
+// Edit purchase
+async function editPurchase(purchaseId) {
+  try {
+    const doc = await firebase.firestore().collection("purchases").doc(purchaseId).get();
+    if (!doc.exists) throw new Error("Purchase not found");
 
-function closePurchaseModal() {
-  document.getElementById("purchaseModal").style.display = "none";
+    const p = { id: doc.id, ...doc.data() };
+    const date = p.purchaseDate ?
+      (typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0]) : "";
+
+    // Populate form fields
+    document.getElementById("editPurchaseDate").value = date;
+    document.getElementById("editPurchaseLocation").value = p.location || "";
+    document.getElementById("editPurchaseSupplier").value = p.supplier || "";
+    document.getElementById("editPurchasePaymentMethod").value = p.paymentMethod || "Cash";
+    document.getElementById("editPurchaseReferenceNo").value = p.referenceNo || "";
+    document.getElementById("editPurchaseAmountPaid").value = p.amountPaid || 0;
+
+    // Populate items
+    const itemsContainer = document.getElementById("editPurchaseItems");
+    itemsContainer.innerHTML = "";
+    (p.items || []).forEach((item, index) => {
+      addItemRow(item.productName, item.quantity, item.unitPrice, index);
+    });
+
+    // Handle form submission
+    const form = document.getElementById("editPurchaseForm");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const items = Array.from(document.querySelectorAll(".item-row")).map(row => ({
+          productName: row.querySelector(".item-name").value,
+          quantity: Number(row.querySelector(".item-quantity").value),
+          unitPrice: Number(row.querySelector(".item-unit-price").value)
+        }));
+        const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
+        await firebase.firestore().collection("purchases").doc(purchaseId).update({
+          purchaseDate: new Date(document.getElementById("editPurchaseDate").value),
+          location: document.getElementById("editPurchaseLocation").value,
+          supplier: document.getElementById("editPurchaseSupplier").value,
+          paymentMethod: document.getElementById("editPurchasePaymentMethod").value,
+          referenceNo: document.getElementById("editPurchaseReferenceNo").value,
+          amountPaid: Number(document.getElementById("editPurchaseAmountPaid").value),
+          totalAmount,
+          items
+        });
+
+        closeModal("purchaseEditModal");
+        loadPurchases();
+        Swal.fire({
+          icon: "success",
+          title: "Purchase Updated",
+          text: "The purchase has been updated successfully.",
+          timer: 2000
+        });
+      } catch (err) {
+        console.error("Error updating purchase:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to update purchase: " + err.message
+        });
+      }
+    };
+
+    document.getElementById("purchaseEditModal").style.display = "flex";
+  } catch (err) {
+    console.error("Error loading purchase for edit:", err);
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Failed to load purchase: " + err.message
+    });
+  }
 }
+
+// Add item row for edit form
+function addItemRow(productName = "", quantity = "", unitPrice = "", index = Date.now()) {
+  const itemsContainer = document.getElementById("editPurchaseItems");
+  const row = document.createElement("div");
+  row.className = "item-row";
+  row.id = `item-row-${index}`;
+  row.innerHTML = `
+    <input type="text" class="item-name" placeholder="Product Name" value="${productName}" required>
+    <input type="number" class="item-quantity" placeholder="Quantity" value="${quantity}" min="1" required>
+    <input type="number" class="item-unit-price" placeholder="Buying Price" value="${unitPrice}" step="0.01" min="0" required>
+    <button type="button" class="remove-item" onclick="document.getElementById('item-row-${index}').remove()">Remove</button>
+  `;
+  itemsContainer.appendChild(row);
+}
+
 
 // Firestore actions
 async function printPurchase(id) {
@@ -4151,45 +4487,79 @@ async function printPurchase(id) {
 }
 
 
-
-function editPurchase(id) {
-  alert(`Open edit form for purchase: ${id}`);
-}
-
-async function deletePurchase(id) {
-  if (!confirm("Are you sure you want to delete this purchase?")) return;
-  await firebase.firestore().collection("purchases").doc(id).delete();
-  alert("Purchase deleted");
-  showListPurchases();
-}
-
-async function exportPurchasesCSV() {
-  try {
-    const snapshot = await firebase.firestore().collection("purchases")
-      .orderBy("purchaseDate", "desc")
-      .get();
-
-    if (snapshot.empty) {
-      alert("No purchases to export");
-      return;
+// Delete purchase
+async function deletePurchase(purchaseId) {
+  Swal.fire({
+    title: "Confirm Delete",
+    text: "Are you sure you want to delete this purchase? This action cannot be undone.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Delete",
+    cancelButtonText: "Cancel",
+    reverseButtons: true,
+    focusCancel: true
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        await firebase.firestore().collection("purchases").doc(purchaseId).delete();
+        loadPurchases();
+        Swal.fire({
+          icon: "success",
+          title: "Purchase Deleted",
+          text: "The purchase has been deleted successfully.",
+          timer: 2000,
+          showConfirmButton: false
+        });
+      } catch (err) {
+        console.error("Error deleting purchase:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to delete purchase: " + err.message
+        });
+      }
     }
+  });
+}
 
-    let csv = "Date,Supplier,Total Amount,Amount Paid,Balance,Payment Method,Reference No\n";
-    snapshot.forEach(doc => {
-      const p = doc.data();
-      const date = p.purchaseDate ? p.purchaseDate.toDate().toISOString().split("T")[0] : "";
-      const balance = (p.totalAmount || 0) - (p.amountPaid || 0);
-      csv += `${date},"${p.supplier}",${p.totalAmount || 0},${p.amountPaid || 0},${balance},"${p.paymentMethod || ""}","${p.referenceNo || ""}"\n`;
+// Export purchases to CSV
+function exportPurchasesCSV() {
+  const allData = purchasesManager.data;
+  if (!allData.length) {
+    Swal.fire({
+      icon: "warning",
+      title: "No Data",
+      text: "No purchases available to export.",
+      showConfirmButton: true
     });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `purchases_${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-  } catch (err) {
-    alert("Error exporting purchases: " + err.message);
+    return;
   }
+
+  const headers = ["Date,Location,Supplier,Total (KES),Paid (KES),Balance (KES),Payment Method,Reference No,Status"];
+  const rows = allData.map(p => {
+    let date = "N/A";
+    if (p.purchaseDate) {
+      date = typeof p.purchaseDate.toDate === "function" ?
+        p.purchaseDate.toDate().toISOString().split("T")[0] :
+        p.purchaseDate.toString().split("T")[0];
+    }
+    const total = Number(p.totalAmount || 0);
+    const paid = Number(p.amountPaid || 0);
+    const bal = total - paid;
+    const status = bal > 0 ? "Due" : bal < 0 ? "Overpaid" : "Paid";
+    return `"${date}","${p.location || ""}","${p.supplier || ""}",${total.toFixed(2)},${paid.toFixed(2)},${bal.toFixed(2)},"${p.paymentMethod || ""}","${p.referenceNo || ""}","${status}"`;
+  });
+
+  const csv = headers.concat(rows).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `purchases_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
 }
 
 
@@ -4796,14 +5166,35 @@ async function showCustomers() {
       .top-controls {
         margin-bottom: 15px;
         display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .filter-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .filter-row input, .filter-row select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        flex: 1;
+        min-width: 150px;
+        box-sizing: border-box;
+      }
+      .button-row {
+        display: flex;
         gap: 10px;
         flex-wrap: wrap;
         align-items: center;
       }
-      .top-controls select, .top-controls input {
-        padding: 6px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
+      .add-button-row {
+        display: flex;
+        justify-content: flex-start;
+        width: 100%;
       }
       .btn-primary {
         background: #3498db;
@@ -4930,23 +5321,34 @@ async function showCustomers() {
         from { transform: translateY(-20px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
       }
+      @media (max-width: 600px) {
+        .filter-row input, .filter-row select {
+          min-width: 100%;
+        }
+      }
     </style>
 
     <h2>Customers</h2>
 
     <!-- Filters and Actions -->
     <div class="top-controls">
-      <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
-      <select id="groupFilter">
-        <option value="">All Groups</option>
-      </select>
-      <select id="locationFilter">
-        <option value="">All Locations</option>
-      </select>
-      <button class="btn-primary" onclick="applyFilters()">Apply Filter</button>
-      <button class="btn-secondary" onclick="resetFilters()">Reset Filters</button>
-      <button class="btn-circle" title="Add Customer" onclick="openCustomerModal()">+</button>
-      <button class="btn-secondary" onclick="exportCustomers()">Export</button>
+      <div class="filter-row">
+        <input type="text" id="customerSearch" placeholder="Search customers..." oninput="loadCustomers()" />
+        <select id="groupFilter">
+          <option value="">All Groups</option>
+        </select>
+        <select id="locationFilter">
+          <option value="">All Locations</option>
+        </select>
+      </div>
+      <div class="button-row">
+        <button class="btn-primary" onclick="applyFilters()">Apply Filter</button>
+        <button class="btn-secondary" onclick="resetFilters()">Reset Filters</button>
+        <button class="btn-secondary" onclick="exportCustomers()">Export</button>
+      </div>
+      <div class="add-button-row">
+        <button class="btn-circle" title="Add Customer" onclick="openCustomerModal()">+</button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -5303,5 +5705,8 @@ function toggleSell() {
 
 
   </script>
+  
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
 </body>
 </html>
