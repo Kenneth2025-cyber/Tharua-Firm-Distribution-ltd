@@ -4218,88 +4218,98 @@ function closeModal(id) {
 }
 
 // View purchase details
-async function viewPurchase(purchaseId) {
-  try {
-    const doc = await firebase.firestore().collection("purchases").doc(purchaseId).get();
-    if (!doc.exists) throw new Error("Purchase not found");
+async function viewPurchase(id) {
+  const docSnap = await firebase.firestore().collection("purchases").doc(id).get();
+  if (!docSnap.exists) return alert("Purchase not found");
+  const p = docSnap.data();
 
-    const p = { id: doc.id, ...doc.data() };
-    let date = "N/A";
-    if (p.purchaseDate) {
-      date = typeof p.purchaseDate.toDate === "function" ?
-        p.purchaseDate.toDate().toISOString().split("T")[0] :
-        p.purchaseDate.toString().split("T")[0];
-    }
+  const paid = p.amountPaid || 0;
+  const balance = (p.totalAmount || 0) - paid;
 
-    const total = Number(p.totalAmount || 0);
-    const paid = Number(p.amountPaid || 0);
-    const bal = total - paid;
+  const html = `
+    <html>
+      <head>
+        <title>Purchase Details</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+          h1, h2, h3 { margin: 0; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .header h1 { font-size: 22px; color: #2c3e50; }
+          .header p { margin: 2px 0; font-size: 12px; color: #555; }
+          .info { margin-bottom: 20px; }
+          .info p { margin: 4px 0; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+          th { background: #f4f4f4; }
+          tr:nth-child(even) { background: #fafafa; }
+          .totals { margin-top: 20px; text-align: right; }
+          .totals p { margin: 4px 0; font-size: 14px; }
+          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #777; }
+          .actions { text-align: center; margin-top: 20px; }
+          .actions button { padding: 10px 20px; font-size: 14px; cursor: pointer; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1><!-- Business Name here --></h1>
+          <p><!-- Address line here --></p>
+          <p><!-- Phone | Email here --></p>
+          <hr/>
+        </div>
 
-    let itemsHtml = "<p>No items available.</p>";
-    let totalQuantity = 0;
-    let calculatedTotalAmount = 0;
+        <div class="info">
+          <p><b>Date:</b> ${p.purchaseDate.toDate().toLocaleDateString()}</p>
+          <p><b>Supplier:</b> ${p.supplier}</p>
+          <p><b>Reference:</b> ${p.referenceNo || "-"}</p>
+          <p><b>Payment Method:</b> ${p.paymentMethod || "-"}</p>
+          <p><b>Location:</b> ${p.location || "-"}</p>
+        </div>
 
-    if (p.items && Array.isArray(p.items) && p.items.length) {
-      totalQuantity = p.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-      calculatedTotalAmount = p.items.reduce((sum, item) => {
-        const price = Number(item.unitPrice || item.buyingPrice || 0);
-        return sum + (Number(item.quantity || 0) * price);
-      }, 0);
-
-      itemsHtml = `
         <table>
           <thead>
             <tr>
-              <th>Product Name</th>
-              <th>Quantity</th>
-              <th>Buying Price (KES)</th>
-              <th>Total (KES)</th>
+              <th>#</th>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Unit Price (KES)</th>
+              <th>Subtotal (KES)</th>
             </tr>
           </thead>
           <tbody>
-            ${p.items.map(item => {
-              const price = Number(item.unitPrice || item.buyingPrice || 0);
-              const qty = Number(item.quantity || 0);
-              return `
+            ${p.items && p.items.length > 0
+              ? p.items.map((i, idx) => `
                 <tr>
-                  <td>${item.productName || "N/A"}</td>
-                  <td>${qty}</td>
-                  <td>${price.toFixed(2)}</td>
-                  <td>${(qty * price).toFixed(2)}</td>
-                </tr>
-              `;
-            }).join("")}
+                  <td>${idx + 1}</td>
+                  <td>${i.productName}</td>
+                  <td>${i.quantity}</td>
+                  <td style="text-align:right;">${i.price.toFixed(2)}</td>
+                  <td style="text-align:right;">${i.subtotal ? i.subtotal.toFixed(2) : (i.quantity * i.price).toFixed(2)}</td>
+                </tr>`).join("")
+              : "<tr><td colspan='5'>No items</td></tr>"}
           </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              <td>${totalQuantity}</td>
-              <td></td>
-              <td>${calculatedTotalAmount.toFixed(2)}</td>
-            </tr>
-          </tfoot>
         </table>
-      `;
-    }
 
-    document.getElementById("purchaseViewContent").innerHTML = `
-      <p><strong>Purchase ID:</strong> ${p.id}</p>
-      <p><strong>Date:</strong> ${date}</p>
-      <p><strong>Location:</strong> ${p.location || "N/A"}</p>
-      <p><strong>Supplier:</strong> ${p.supplier || "N/A"}</p>
-      <p><strong>Payment Method:</strong> ${p.paymentMethod || "N/A"}</p>
-      <p><strong>Reference No:</strong> ${p.referenceNo || "N/A"}</p>
-      <p><strong>Total Amount:</strong> KES ${total.toFixed(2)}</p>
-      <p><strong>Amount Paid:</strong> KES ${paid.toFixed(2)}</p>
-      <p><strong>Balance:</strong> KES ${bal.toFixed(2)}</p>
-      <h3>Items</h3>
-      ${itemsHtml}
-    `;
-    document.getElementById("purchaseViewModal").style.display = "flex";
-  } catch (err) {
-    console.error("Error viewing purchase:", err);
-    Swal.fire({ icon: "error", title: "Error", text: "Failed to view purchase: " + err.message });
-  }
+        <div class="totals">
+          <p><b>Total:</b> KES ${p.totalAmount.toFixed(2)}</p>
+          <p><b>Paid:</b> KES ${paid.toFixed(2)}</p>
+          <p><b>Balance:</b> KES ${balance.toFixed(2)}</p>
+        </div>
+
+        <div class="actions">
+          <button onclick="window.print()">Print Purchase</button>
+          <button onclick="window.close()">Close</button>
+        </div>
+
+        <div class="footer">
+          <p><!-- Footer message here --></p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const w = window.open("", "_blank", "width=800,height=600");
+  w.document.write(html);
+  w.document.close();
 }
 
 // Edit purchase
