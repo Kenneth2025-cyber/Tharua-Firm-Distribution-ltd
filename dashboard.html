@@ -5864,6 +5864,123 @@ function calculateTotals() {
   document.getElementById("saleBalance").value = balance;
 }
 
+// Save Sale (basic version)
+async function saveSale() {
+  if (saleItems.length === 0) {
+    alert("No products added.");
+    return;
+  }
+
+  const location = document.getElementById("saleLocation").value || "Unknown";
+  const customer = document.getElementById("saleCustomer").value.trim() || "Walk-in Customer";
+  const salesperson = document.getElementById("saleSalesperson").value.trim() || "Unknown";
+  const total = parseFloat(document.getElementById("saleTotal").value) || 0;
+  const expenses = parseFloat(document.getElementById("saleExpenses").value) || 0;
+  const net = parseFloat(document.getElementById("saleNet").value) || 0;
+  const paid = parseFloat(document.getElementById("salePaid").value) || 0;
+  const balance = parseFloat(document.getElementById("saleBalance").value) || 0;
+
+  try {
+    // Save sale to Firestore
+    const db = firebase.firestore();
+    const saleRef = await db.collection("sales").add({
+      location,
+      customer,
+      salesperson,
+      total,
+      expenses,
+      net,
+      paid,
+      balance,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Save each item under /sales/{saleId}/items
+    for (const item of saleItems) {
+      await saleRef.collection("items").add(item);
+
+      // Deduct stock from products collection
+      const productRef = db.collection("products").doc(item.product);
+      await db.runTransaction(async (tx) => {
+        const doc = await tx.get(productRef);
+        if (!doc.exists) throw new Error(`Product ${item.product} not found`);
+        const currentStock = doc.data().openingStock || 0;
+        if (currentStock < item.qty) throw new Error(`Not enough stock for ${item.product}`);
+        tx.update(productRef, { openingStock: currentStock - item.qty });
+      });
+    }
+
+    alert("Sale saved successfully!");
+    printSale(saleRef.id, { location, customer, salesperson, total, expenses, net, paid, balance, items: saleItems });
+
+    // Reset form
+    saleItems = [];
+    renderSaleItems();
+    document.getElementById("saleLocation").value = "";
+    document.getElementById("saleCustomer").value = "";
+    document.getElementById("saleSalesperson").value = "";
+    document.getElementById("saleExpenses").value = "0";
+    document.getElementById("salePaid").value = "0";
+    calculateTotals();
+
+  } catch (err) {
+    alert("Error saving sale: " + err.message);
+  }
+}
+
+// Print Sale (simple receipt)
+function printSale(saleId, saleData) {
+  const printWindow = window.open("", "_blank");
+  const html = `
+    <html>
+    <head>
+      <title>Sale Receipt</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding:20px; }
+        h2 { text-align:center; }
+        table { width:100%; border-collapse:collapse; margin-top:20px; }
+        th, td { border:1px solid #ddd; padding:8px; text-align:left; }
+        th { background:#f4f4f4; }
+        .totals { margin-top:20px; float:right; }
+      </style>
+    </head>
+    <body>
+      <h2>Sale Receipt</h2>
+      <p><b>Sale ID:</b> ${saleId}</p>
+      <p><b>Location:</b> ${saleData.location}</p>
+      <p><b>Salesperson:</b> ${saleData.salesperson}</p>
+      <p><b>Customer:</b> ${saleData.customer}</p>
+      <p><b>Date:</b> ${new Date().toLocaleString()}</p>
+      <table>
+        <thead>
+          <tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>
+        </thead>
+        <tbody>
+          ${saleData.items.map(i => `
+            <tr>
+              <td>${i.product}</td>
+              <td>${i.qty}</td>
+              <td>${i.price}</td>
+              <td>${i.subtotal}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+      <div class="totals">
+        <p><b>Total:</b> ${saleData.total}</p>
+        <p><b>Expenses:</b> ${saleData.expenses}</p>
+        <p><b>Net:</b> ${saleData.net}</p>
+        <p><b>Paid:</b> ${saleData.paid}</p>
+        <p><b>Balance:</b> ${saleData.balance}</p>
+      </div>
+      <script>window.print(); setTimeout(() => window.close(), 1000);</script>
+    </body>
+    </html>
+  `;
+  printWindow.document.write(html);
+  printWindow.document.close();
+}
+
 
   </script>
   
