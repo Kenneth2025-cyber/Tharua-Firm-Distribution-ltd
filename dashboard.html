@@ -784,7 +784,19 @@ button {
 
     <a onclick="clearContent()"><i class="fas fa-truck-moving"></i> <span>Stock Transfers</span></a>
     <a onclick="clearContent()"><i class="fas fa-balance-scale-left"></i> <span>Stock Adjustment</span></a>
-    <a onclick="clearContent()"><i class="fas fa-file-invoice-dollar"></i> <span>Expenses</span></a>
+<div class="dropdown">
+  <a onclick="toggleExpenses()" id="expensesMenu">
+    <i class="fas fa-file-invoice-dollar"></i>
+    <span>Expenses</span>
+    <i class="fas fa-caret-down" style="margin-left:auto;"></i>
+  </a>
+  <div id="expensesSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showListExpenses()"><span>List of Expenses</span></a>
+    <a onclick="showAddExpense()"><span>Add Expense</span></a>
+    <a onclick="showExpenseCategories()"><span>Expense Categories</span></a>
+  </div>
+</div>
+
     <a onclick="clearContent()"><i class="fas fa-calculator"></i> <span>Accounting</span></a>
     <a onclick="clearContent()"><i class="fas fa-robot"></i> <span>AI Assistance</span></a>
     <a onclick="clearContent()"><i class="fas fa-chart-line"></i> <span>Reports</span></a>
@@ -5864,6 +5876,24 @@ function calculateTotals() {
   document.getElementById("saleExpensesDisplay").value = expenses.toFixed(2);
   document.getElementById("saleNet").value = net.toFixed(2);
   document.getElementById("saleBalance").value = balance.toFixed(2);
+}
+function toggleExpenses() {
+  const submenu = document.getElementById("expensesSubmenu");
+  submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+}
+function showListExpenses() { 
+  saveLastPage("showListExpenses"); 
+  document.getElementById("content").innerHTML = `<h2>List of Expenses</h2><p>Coming soon...</p>`; 
+}
+
+function showAddExpense() { 
+  saveLastPage("showAddExpense"); 
+  document.getElementById("content").innerHTML = `<h2>Add Expense</h2><p>Form coming soon...</p>`; 
+}
+
+function showExpenseCategories() { 
+  saveLastPage("showExpenseCategories"); 
+  document.getElementById("content").innerHTML = `<h2>Expense Categories</h2><p>Coming soon...</p>`; 
 }
 
 
