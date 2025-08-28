@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5711,6 +5710,158 @@ function exportCustomers() {
 function toggleSell() {
   const submenu = document.getElementById("sellSubmenu");
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+}
+
+async function showAddSale() {
+  saveLastPage("showAddSale");
+
+  document.getElementById("content").innerHTML = `
+    <h2>Add New Sale</h2>
+
+    <!-- Header Section -->
+    <div class="form-container">
+      <div class="form-group">
+        <label for="saleLocation">Business Location</label>
+        <select id="saleLocation" required>
+          <option value="">Loading...</option>
+        </select>
+
+        <label for="saleCustomer">Customer</label>
+        <input type="text" id="saleCustomer" placeholder="Search customer (default Walk-in)" />
+
+        <label for="saleSalesperson">Field Salesperson</label>
+        <input type="text" id="saleSalesperson" placeholder="Search salesperson..." />
+      </div>
+    </div>
+
+    <!-- Add Product Section -->
+    <div class="form-container">
+      <div class="form-group">
+        <label for="saleProduct">Product</label>
+        <input type="text" id="saleProduct" placeholder="Search product..." />
+
+        <label for="saleQty">Quantity</label>
+        <input type="number" id="saleQty" min="1" />
+
+        <label for="salePrice">Price</label>
+        <input type="number" id="salePrice" min="0" step="0.01" />
+
+        <button type="button" class="submit-btn" onclick="addProductToSale()">Add Product</button>
+      </div>
+    </div>
+
+    <!-- Sale Items Table -->
+    <div class="table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Subtotal</th>
+            <th>Remove</th>
+          </tr>
+        </thead>
+        <tbody id="saleItemsTbody">
+          <tr><td colspan="5" style="text-align:center;">No items yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Expenses Section -->
+    <div class="form-container">
+      <h3>Field Expenses (optional)</h3>
+      <div class="form-group">
+        <label for="saleExpenses">Expenses (KES)</label>
+        <input type="number" id="saleExpenses" min="0" step="0.01" value="0" />
+      </div>
+    </div>
+
+    <!-- Payment Section -->
+    <div class="form-container">
+      <h3>Payment</h3>
+      <div class="form-group">
+        <label>Total Sales:</label>
+        <input type="text" id="saleTotal" readonly />
+
+        <label>Net Sales (after expenses):</label>
+        <input type="text" id="saleNet" readonly />
+
+        <label>Amount Paid:</label>
+        <input type="number" id="salePaid" min="0" step="0.01" />
+
+        <label>Balance Due:</label>
+        <input type="text" id="saleBalance" readonly />
+      </div>
+    </div>
+
+    <button type="button" class="submit-btn" onclick="saveSale()">Save & Print</button>
+    <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
+  `;
+
+  // Load locations into dropdown
+  const locSnapshot = await firebase.firestore().collection("businessLocations").get();
+  const locSelect = document.getElementById("saleLocation");
+  locSelect.innerHTML = `<option value="">Select Location</option>`;
+  locSnapshot.forEach(doc => {
+    const loc = doc.data();
+    locSelect.innerHTML += `<option value="${loc.name}">${loc.name}</option>`;
+  });
+}
+
+let saleItems = [];
+
+function addProductToSale() {
+  const product = document.getElementById("saleProduct").value;
+  const qty = parseInt(document.getElementById("saleQty").value) || 0;
+  const price = parseFloat(document.getElementById("salePrice").value) || 0;
+
+  if (!product || qty <= 0 || price <= 0) {
+    alert("Enter product, qty, and price correctly");
+    return;
+  }
+
+  const subtotal = qty * price;
+  saleItems.push({ product, qty, price, subtotal });
+  renderSaleItems();
+}
+
+function renderSaleItems() {
+  const tbody = document.getElementById("saleItemsTbody");
+  if (saleItems.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">No items yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = "";
+  saleItems.forEach((item, index) => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.product}</td>
+        <td>${item.qty}</td>
+        <td>${item.price}</td>
+        <td>${item.subtotal}</td>
+        <td><span style="cursor:pointer;color:red;" onclick="removeSaleItem(${index})">❌</span></td>
+      </tr>
+    `;
+  });
+  calculateTotals();
+}
+
+function removeSaleItem(index) {
+  saleItems.splice(index, 1);
+  renderSaleItems();
+}
+
+function calculateTotals() {
+  const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
+  const expenses = parseFloat(document.getElementById("saleExpenses").value) || 0;
+  const net = total - expenses;
+  const paid = parseFloat(document.getElementById("salePaid").value) || 0;
+  const balance = net - paid;
+
+  document.getElementById("saleTotal").value = total;
+  document.getElementById("saleNet").value = net;
+  document.getElementById("saleBalance").value = balance;
 }
 
 
