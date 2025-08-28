@@ -5712,39 +5712,45 @@ function toggleSell() {
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
 }
 
-// Ensure Firebase is initialized before running this code
-// Example: firebase.initializeApp({ ...config });
-
-// Load the Add Sale form
 async function showAddSale() {
   saveLastPage("showAddSale");
 
-  // Set the content
   document.getElementById("content").innerHTML = `
     <h2>Add New Sale</h2>
+
+    <!-- Header Section -->
     <div class="form-container">
       <div class="form-group">
         <label for="saleLocation">Business Location</label>
         <select id="saleLocation" required>
           <option value="">Loading...</option>
         </select>
+
         <label for="saleCustomer">Customer</label>
         <input type="text" id="saleCustomer" placeholder="Search customer (default Walk-in)" />
+
         <label for="saleSalesperson">Field Salesperson</label>
         <input type="text" id="saleSalesperson" placeholder="Search salesperson..." />
       </div>
     </div>
+
+    <!-- Add Product Section -->
     <div class="form-container">
       <div class="form-group">
         <label for="saleProduct">Product</label>
         <input type="text" id="saleProduct" placeholder="Search product..." />
+
         <label for="saleQty">Quantity</label>
-        <input type="number" id="saleQty" min="1" value="1" />
+        <input type="number" id="saleQty" min="1" />
+
         <label for="salePrice">Price</label>
-        <input type="number" id="salePrice" min="0" step="0.01" value="0" />
-        <button type="button" class="submit-btn" id="addProductBtn">Add Product</button>
+        <input type="number" id="salePrice" min="0" step="0.01" />
+
+        <button type="button" class="submit-btn" onclick="addProductToSale()">Add Product</button>
       </div>
     </div>
+
+    <!-- Sale Items Table -->
     <div class="table-container">
       <table class="users-table">
         <thead>
@@ -5761,6 +5767,8 @@ async function showAddSale() {
         </tbody>
       </table>
     </div>
+
+    <!-- Expenses Section -->
     <div class="form-container">
       <h3>Field Expenses (optional)</h3>
       <div class="form-group">
@@ -5768,64 +5776,54 @@ async function showAddSale() {
         <input type="number" id="saleExpenses" min="0" step="0.01" value="0" />
       </div>
     </div>
+
+    <!-- Payment Section -->
     <div class="form-container">
       <h3>Payment</h3>
       <div class="form-group">
         <label>Total Sales:</label>
-        <input type="text" id="saleTotal" readonly value="0" />
+        <input type="text" id="saleTotal" readonly />
+
         <label>Net Sales (after expenses):</label>
-        <input type="text" id="saleNet" readonly value="0" />
+        <input type="text" id="saleNet" readonly />
+
         <label>Amount Paid:</label>
-        <input type="number" id="salePaid" min="0" step="0.01" value="0" />
+        <input type="number" id="salePaid" min="0" step="0.01" />
+
         <label>Balance Due:</label>
-        <input type="text" id="saleBalance" readonly value="0" />
+        <input type="text" id="saleBalance" readonly />
       </div>
     </div>
-    <button type="button" class="submit-btn" id="saveSaleBtn">Save & Print</button>
+
+    <button type="button" class="submit-btn" onclick="saveSale()">Save & Print</button>
     <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
   `;
 
   // Load locations into dropdown
-  try {
-    const locSnapshot = await firebase.firestore().collection("businessLocations").get();
-    const locSelect = document.getElementById("saleLocation");
-    locSelect.innerHTML = `<option value="">Select Location</option>`;
-    locSnapshot.forEach(doc => {
-      const loc = doc.data();
-      locSelect.innerHTML += `<option value="${loc.name}">${loc.name}</option>`;
-    });
-  } catch (error) {
-    document.getElementById("addSaleMessage").innerText = "Error loading locations: " + error.message;
-  }
-
-  // Add event listeners
-  document.getElementById("addProductBtn").addEventListener("click", addProductToSale);
-  document.getElementById("saveSaleBtn").addEventListener("click", saveSale);
-  document.getElementById("saleExpenses").addEventListener("input", calculateTotals);
-  document.getElementById("salePaid").addEventListener("input", calculateTotals);
+  const locSnapshot = await firebase.firestore().collection("businessLocations").get();
+  const locSelect = document.getElementById("saleLocation");
+  locSelect.innerHTML = `<option value="">Select Location</option>`;
+  locSnapshot.forEach(doc => {
+    const loc = doc.data();
+    locSelect.innerHTML += `<option value="${loc.name}">${loc.name}</option>`;
+  });
 }
 
 let saleItems = [];
 
 function addProductToSale() {
-  const product = document.getElementById("saleProduct").value.trim();
+  const product = document.getElementById("saleProduct").value;
   const qty = parseInt(document.getElementById("saleQty").value) || 0;
   const price = parseFloat(document.getElementById("salePrice").value) || 0;
 
   if (!product || qty <= 0 || price <= 0) {
-    document.getElementById("addSaleMessage").innerText = "Enter product, quantity, and price correctly.";
+    alert("Enter product, qty, and price correctly");
     return;
   }
 
-  // Optional: Validate product exists in Firestore
-  // This requires an async check to the products collection
-  saleItems.push({ product, qty, price, subtotal: qty * price });
+  const subtotal = qty * price;
+  saleItems.push({ product, qty, price, subtotal });
   renderSaleItems();
-
-  // Clear inputs
-  document.getElementById("saleProduct").value = "";
-  document.getElementById("saleQty").value = "1";
-  document.getElementById("salePrice").value = "0";
 }
 
 function renderSaleItems() {
@@ -5840,8 +5838,8 @@ function renderSaleItems() {
       <tr>
         <td>${item.product}</td>
         <td>${item.qty}</td>
-        <td>${item.price.toFixed(2)}</td>
-        <td>${item.subtotal.toFixed(2)}</td>
+        <td>${item.price}</td>
+        <td>${item.subtotal}</td>
         <td><span style="cursor:pointer;color:red;" onclick="removeSaleItem(${index})">❌</span></td>
       </tr>
     `;
@@ -5861,157 +5859,15 @@ function calculateTotals() {
   const paid = parseFloat(document.getElementById("salePaid").value) || 0;
   const balance = net - paid;
 
-  document.getElementById("saleTotal").value = total.toFixed(2);
-  document.getElementById("saleNet").value = net.toFixed(2);
-  document.getElementById("saleBalance").value = balance.toFixed(2);
+  document.getElementById("saleTotal").value = total;
+  document.getElementById("saleNet").value = net;
+  document.getElementById("saleBalance").value = balance;
 }
 
-async function saveSale() {
-  if (saleItems.length === 0) {
-    document.getElementById("addSaleMessage").innerText = "No products added.";
-    return;
-  }
 
-  const location = document.getElementById("saleLocation").value;
-  if (!location) {
-    document.getElementById("addSaleMessage").innerText = "Please select a business location.";
-    return;
-  }
-
-  const customer = document.getElementById("saleCustomer").value.trim() || "Walk-in Customer";
-  const salesperson = document.getElementById("saleSalesperson").value.trim() || "Unknown";
-  const total = parseFloat(document.getElementById("saleTotal").value) || 0;
-  const expenses = parseFloat(document.getElementById("saleExpenses").value) || 0;
-  const net = parseFloat(document.getElementById("saleNet").value) || 0;
-  const paid = parseFloat(document.getElementById("salePaid").value) || 0;
-  const balance = parseFloat(document.getElementById("saleBalance").value) || 0;
-
-  const db = firebase.firestore();
-  const saleRef = db.collection("sales").doc();
-
-  try {
-    const batch = db.batch();
-
-    // Sale header
-    batch.set(saleRef, {
-      location,
-      customer,
-      salesperson,
-      total,
-      expenses,
-      net,
-      paid,
-      balance,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Sale items and stock deduction
-    for (const item of saleItems) {
-      const itemRef = saleRef.collection("items").doc();
-      batch.set(itemRef, item);
-
-      // Check if product exists and has sufficient stock
-      const productRef = db.collection("products").doc(item.product);
-      const productDoc = await productRef.get();
-      if (!productDoc.exists) {
-        throw new Error(`Product ${item.product} does not exist.`);
-      }
-      const productData = productDoc.data();
-      if (productData.openingStock < item.qty) {
-        throw new Error(`Insufficient stock for ${item.product}. Available: ${productData.openingStock}, Requested: ${item.qty}`);
-      }
-      batch.update(productRef, {
-        openingStock: firebase.firestore.FieldValue.increment(-item.qty)
-      });
-    }
-
-    // Commit batch
-    await batch.commit();
-
-    // Show success message (replace with actual implementation)
-    showSuccessNotification?.("Sale saved successfully!") || 
-      (document.getElementById("addSaleMessage").innerText = "Sale saved successfully!");
-
-    // Print sale
-    printSale(saleRef.id, { location, customer, salesperson, total, expenses, net, paid, balance, items: saleItems });
-
-    // Reset form
-    saleItems = [];
-    renderSaleItems();
-    document.getElementById("saleLocation").value = "";
-    document.getElementById("saleCustomer").value = "";
-    document.getElementById("saleSalesperson").value = "";
-    document.getElementById("saleExpenses").value = "0";
-    document.getElementById("salePaid").value = "0";
-  } catch (error) {
-    document.getElementById("addSaleMessage").innerText = "Error saving sale: " + error.message;
-  }
-}
-
-function printSale(saleId, saleData) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    document.getElementById("addSaleMessage").innerText = "Failed to open print window. Please allow pop-ups.";
-    return;
-  }
-  const html = `
-    <html>
-      <head>
-        <title>Sale Receipt</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding:20px; }
-          h2 { text-align:center; }
-          table { width:100%; border-collapse:collapse; margin-top:20px; }
-          th, td { border:1px solid #ddd; padding:8px; text-align:left; }
-          th { background:#f4f4f4; }
-          .totals { margin-top:20px; float:right; }
-        </style>
-      </head>
-      <body>
-        <h2>Sale Receipt</h2>
-        <p><b>Sale ID:</b> ${saleId}</p>
-        <p><b>Location:</b> ${saleData.location}</p>
-        <p><b>Salesperson:</b> ${saleData.salesperson}</p>
-        <p><b>Customer:</b> ${saleData.customer}</p>
-        <p><b>Date:</b> ${new Date().toLocaleString()}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Price</th>
-              <th>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${saleData.items.map(i => `
-              <tr>
-                <td>${i.product}</td>
-                <td>${i.qty}</td>
-                <td>${i.price.toFixed(2)}</td>
-                <td>${i.subtotal.toFixed(2)}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-        <div class="totals">
-          <p><b>Total Sales:</b> ${saleData.total.toFixed(2)}</p>
-          <p><b>Expenses:</b> ${saleData.expenses.toFixed(2)}</p>
-          <p><b>Net Sales:</b> ${saleData.net.toFixed(2)}</p>
-          <p><b>Amount Paid:</b> ${saleData.paid.toFixed(2)}</p>
-          <p><b>Balance Due:</b> ${saleData.balance.toFixed(2)}</p>
-        </div>
-        <script>
-          window.print();
-          setTimeout(() => window.close(), 1000); // Auto-close after printing
-        </script>
-      </body>
-    </html>
-  `;
-  printWindow.document.write(html);
-  printWindow.document.close();
-</script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  </script>
+  
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
 </body>
 </html>
-
