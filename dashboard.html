@@ -6054,6 +6054,7 @@ function toggleExpenses() {
     /* -------------------------------
        EXPENSES LIST + ADD (PLACEHOLDERS)
     --------------------------------*/
+	
 async function showListExpenses() {
   saveLastPage("showListExpenses");
 
@@ -6265,19 +6266,17 @@ let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
 // Load expenses with filters
 async function loadExpenses() {
   const tbody = document.getElementById("expensesTbody");
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Loading...</td></tr>`;
 
-  // Get filter values
   const loc = document.getElementById("filterLocation").value;
   const cat = document.getElementById("filterCategory").value;
   const sp = document.getElementById("filterSalesperson").value;
   const start = document.getElementById("filterStart").value;
   const end = document.getElementById("filterEnd").value;
-  const search = document.getElementById("filterSearch").value.toLowerCase().trim();
+  const search = document.getElementById("filterSearch").value.toLowerCase();
   expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
-    ? Infinity
-    : parseInt(document.getElementById("itemsPerPage").value);
+    ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
 
-  // Build Firestore query
   let query = firebase.firestore().collection("expenses");
 
   if (loc) query = query.where("location", "==", loc);
@@ -6290,70 +6289,46 @@ async function loadExpenses() {
     query = query.where("expenseDate", ">=", s).where("expenseDate", "<", e);
   }
 
-  // Apply server-side pagination
-  if (expensePage.perPage !== Infinity) {
-    const startIdx = (expensePage.current - 1) * expensePage.perPage;
-    query = query.orderBy("expenseDate", "desc").limit(expensePage.perPage).startAt(startIdx);
-  } else {
-    query = query.orderBy("expenseDate", "desc");
-  }
+  const snap = await query.orderBy("expenseDate", "desc").get();
 
-  try {
-    const snap = await query.get();
+  let rows = [];
+  let total = 0, paid = 0, due = 0;
 
-    // Check for empty results immediately
-    if (snap.empty) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
-      updateTotalsAndPagination(0, 0, 0, 0);
-      return;
-    }
+  snap.forEach(doc => {
+    const e = doc.data();
+    if (search && !(e.note || "").toLowerCase().includes(search)) return;
 
-    let rows = [];
-    let total = 0, paid = 0, due = 0;
+    total += e.totalAmount || 0;
+    paid += e.paidAmount || 0;
+    due += e.dueAmount || 0;
 
-    snap.forEach(doc => {
-      const e = doc.data();
-      if (search && !(e.note || "").toLowerCase().includes(search)) return;
+    rows.push(`
+      <tr>
+        <td>${e.expenseDate?.toDate().toLocaleDateString() || ""}</td>
+        <td>${e.location || ""}</td>
+        <td>${e.category || ""}</td>
+        <td>${e.salesperson || ""}</td>
+        <td>KES ${Number(e.totalAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.dueAmount || 0).toLocaleString()}</td>
+        <td>${e.note || ""}</td>
+        <td>
+          <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
+          <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
+          <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
+        </td>
+      </tr>
+    `);
+  });
 
-      total += e.totalAmount || 0;
-      paid += e.paidAmount || 0;
-      due += e.dueAmount || 0;
+  // Apply pagination
+  expensePage.total = rows.length;
+  const startIdx = (expensePage.current - 1) * expensePage.perPage;
+  const endIdx = startIdx + expensePage.perPage;
+  const pageRows = expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
 
-      rows.push(`
-        <tr>
-          <td>${e.expenseDate?.toDate().toLocaleDateString() || ""}</td>
-          <td>${e.location || ""}</td>
-          <td>${e.category || ""}</td>
-          <td>${e.salesperson || ""}</td>
-          <td>KES ${Number(e.totalAmount || 0).toLocaleString()}</td>
-          <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
-          <td>KES ${Number(e.dueAmount || 0).toLocaleString()}</td>
-          <td>${e.note || ""}</td>
-          <td>
-            <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
-            <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
-            <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
-          </td>
-        </tr>
-      `);
-    });
+  tbody.innerHTML = pageRows.length ? pageRows.join("") : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
 
-    // Update table body
-    tbody.innerHTML = rows.length
-      ? rows.join("")
-      : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
-
-    // Update totals and pagination
-    updateTotalsAndPagination(total, paid, due, rows.length);
-  } catch (error) {
-    console.error("Error loading expenses:", error);
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Error loading expenses.</td></tr>`;
-    updateTotalsAndPagination(0, 0, 0, 0);
-  }
-}
-
-// Helper function to update totals and pagination
-function updateTotalsAndPagination(total, paid, due, rowCount) {
   // Update totals
   document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
   document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
@@ -6364,15 +6339,14 @@ function updateTotalsAndPagination(total, paid, due, rowCount) {
   document.getElementById("summaryPaid").textContent = "KES " + paid.toLocaleString();
   document.getElementById("summaryDue").textContent = "KES " + due.toLocaleString();
 
-  // Update pagination
-  expensePage.total = rowCount;
+  // Update pagination info
   const pageInfo = document.getElementById("pageInfo");
   pageInfo.textContent = expensePage.perPage === Infinity
-    ? `Showing all ${rowCount}`
+    ? `Showing all ${rows.length}`
     : `Page ${expensePage.current} of ${Math.ceil(expensePage.total / expensePage.perPage)}`;
 
   document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
-  document.getElementById("nextPageBtn").disabled = (expensePage.current * expensePage.perPage) >= expensePage.total;
+  document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
 }
 
 function prevExpensesPage() {
@@ -6393,6 +6367,7 @@ function nextExpensesPage() {
 function viewExpense(id) { alert("View expense " + id); }
 function editExpense(id) { alert("Edit expense " + id); }
 function deleteExpense(id) { alert("Delete expense " + id); }
+
 
 async function showAddExpense() {
   saveLastPage("showAddExpense");
