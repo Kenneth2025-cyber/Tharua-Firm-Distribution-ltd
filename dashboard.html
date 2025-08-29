@@ -5890,153 +5890,179 @@ function toggleExpenses() {
 /* -------------------------------
    EXPENSE CATEGORIES PAGE
 --------------------------------*/
-function showExpenseCategories() {
-  saveLastPage("showExpenseCategories");
+  function showExpenseCategories() {
+      saveLastPage("showExpenseCategories");
 
-  document.getElementById("content").innerHTML = `
-    <h2>Expense Categories</h2>
+      document.getElementById("content").innerHTML = `
+        <h2>Expense Categories</h2>
 
-    <!-- Add New Category -->
-    <div class="form-container">
-      <div class="form-group">
-        <input type="text" id="newExpenseCategory" placeholder="New Category" />
-        <button onclick="addExpenseCategory()" class="submit-btn">Add Category</button>
-      </div>
-    </div>
+        <!-- Add New Category -->
+        <div class="form-container">
+          <div class="form-group">
+            <input type="text" id="newExpenseCategory" placeholder="New Category" />
+            <button onclick="addExpenseCategory()" class="submit-btn">Add Category</button>
+          </div>
+        </div>
 
-    <!-- List Categories -->
-    <div class="table-container">
-      <table class="users-table">
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="expenseCategoriesTable"></tbody>
-      </table>
-    </div>
-  `;
+        <!-- List Categories -->
+        <div class="table-container">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="expenseCategoriesTable"></tbody>
+          </table>
+        </div>
+      `;
 
-  loadExpenseCategories();
-}
-
-// Add category
-async function addExpenseCategory() {
-  const name = document.getElementById("newExpenseCategory").value.trim();
-  if (!name) return alert("Category name required");
-
-  // Prevent duplicates
-  const existing = await firebase.firestore()
-    .collection("expenseCategories")
-    .where("name", "==", name)
-    .get();
-  if (!existing.empty) {
-    alert("Category already exists.");
-    return;
-  }
-
-  try {
-    await firebase.firestore().collection("expenseCategories").add({
-      name,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    document.getElementById("newExpenseCategory").value = "";
-    showSuccessNotification("Category added successfully");
-    loadExpenseCategories();
-  } catch (err) {
-    alert("Error adding category: " + err.message);
-  }
-}
-
-// Load categories
-async function loadExpenseCategories() {
-  const tbody = document.getElementById("expenseCategoriesTable");
-  tbody.innerHTML = "<tr><td colspan='2'>Loading...</td></tr>";
-
-  try {
-    const snapshot = await firebase.firestore()
-      .collection("expenseCategories")
-      .orderBy("name")
-      .get();
-
-    if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='2'>No categories found.</td></tr>";
-      return;
+      loadExpenseCategories();
     }
 
-    tbody.innerHTML = "";
-    snapshot.forEach(doc => {
-      const cat = doc.data();
-      tbody.innerHTML += `
-        <tr data-id="${doc.id}">
-          <td class="editable">${cat.name}</td>
-          <td class="desktop-actions">
-            <span title="Edit" style="cursor:pointer; color:#2980b9;" onclick="editExpenseCategory('${doc.id}', '${cat.name}')">✏</span>
-            <span title="Delete" style="cursor:pointer; color:red; margin-left:6px;" onclick="deleteExpenseCategory('${doc.id}')">🗑</span>
-          </td>
-        </tr>
+    // Add category
+    async function addExpenseCategory() {
+      const name = document.getElementById("newExpenseCategory").value.trim();
+      if (!name) return alert("Category name required");
+
+      // Prevent duplicates
+      const existing = await firebase.firestore()
+        .collection("expenseCategories")
+        .where("name", "==", name)
+        .get();
+      if (!existing.empty) {
+        alert("Category already exists.");
+        return;
+      }
+
+      try {
+        await firebase.firestore().collection("expenseCategories").add({
+          name,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById("newExpenseCategory").value = "";
+        showSuccessNotification("Category added successfully");
+        loadExpenseCategories();
+      } catch (err) {
+        alert("Error adding category: " + err.message);
+      }
+    }
+
+    // Load categories
+    async function loadExpenseCategories() {
+      const tbody = document.getElementById("expenseCategoriesTable");
+      tbody.innerHTML = "<tr><td colspan='2'>Loading...</td></tr>";
+
+      try {
+        const snapshot = await firebase.firestore()
+          .collection("expenseCategories")
+          .orderBy("name")
+          .get();
+
+        if (snapshot.empty) {
+          tbody.innerHTML = "<tr><td colspan='2'>No categories found.</td></tr>";
+          return;
+        }
+
+        tbody.innerHTML = "";
+        snapshot.forEach(doc => {
+          const cat = doc.data();
+          tbody.innerHTML += `
+            <tr data-id="${doc.id}">
+              <td class="editable">${cat.name}</td>
+              <td class="desktop-actions">
+                <span title="Edit" style="cursor:pointer; color:#2980b9;" onclick="editExpenseCategory('${doc.id}', '${cat.name}')">✏</span>
+                <span title="Delete" style="cursor:pointer; color:red; margin-left:6px;" onclick="deleteExpenseCategory('${doc.id}')">🗑</span>
+              </td>
+            </tr>
+          `;
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan='2'>Error: ${err.message}</td></tr>`;
+      }
+    }
+
+    // Edit category inline
+    function editExpenseCategory(id, currentName) {
+      const row = document.querySelector(`tr[data-id="${id}"]`);
+      const cell = row.querySelector(".editable");
+      const actionsCell = row.querySelector(".desktop-actions");
+
+      cell.innerHTML = `<input type="text" id="editCategoryInput_${id}" value="${currentName}" class="edit-input" />`;
+
+      actionsCell.innerHTML = `
+        <button class="btn-save" onclick="saveExpenseCategory('${id}')">Save</button>
+        <button class="btn-cancel" onclick="loadExpenseCategories()">Cancel</button>
       `;
-    });
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan='2'>Error: ${err.message}</td></tr>`;
-  }
-}
+    }
 
-// Edit category inline
-function editExpenseCategory(id, currentName) {
-  const row = document.querySelector(`tr[data-id="${id}"]`);
-  const cell = row.querySelector(".editable");
-  const actionsCell = row.querySelector(".desktop-actions");
+    // Save edited category
+    async function saveExpenseCategory(id) {
+      const input = document.getElementById(`editCategoryInput_${id}`);
+      const newName = input.value.trim();
+      if (!newName) return alert("Category name cannot be empty");
 
-  cell.innerHTML = `<input type="text" id="editCategoryInput_${id}" value="${currentName}" class="edit-input" />`;
+      try {
+        await firebase.firestore().collection("expenseCategories").doc(id).update({ name: newName });
+        showSuccessNotification("Category updated successfully");
+        loadExpenseCategories();
+      } catch (err) {
+        alert("Error updating category: " + err.message);
+      }
+    }
 
-  actionsCell.innerHTML = `
-    <button class="btn-save" onclick="saveExpenseCategory('${id}')">Save</button>
-    <button class="btn-cancel" onclick="loadExpenseCategories()">Cancel</button>
-  `;
-}
+    // Delete category with SweetAlert2 confirmation
+    async function deleteExpenseCategory(id) {
+      const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: "Do you want to delete this category?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+      });
 
-// Save edited category
-async function saveExpenseCategory(id) {
-  const input = document.getElementById(`editCategoryInput_${id}`);
-  const newName = input.value.trim();
-  if (!newName) return alert("Category name cannot be empty");
+      if (result.isConfirmed) {
+        try {
+          await firebase.firestore().collection("expenseCategories").doc(id).delete();
+          showSuccessNotification("Category deleted successfully");
+          loadExpenseCategories();
+        } catch (err) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Error deleting category: ' + err.message
+          });
+        }
+      }
+    }
 
-  try {
-    await firebase.firestore().collection("expenseCategories").doc(id).update({ name: newName });
-    showSuccessNotification("Category updated successfully");
-    loadExpenseCategories();
-  } catch (err) {
-    alert("Error updating category: " + err.message);
-  }
-}
+    // Success notification
+    function showSuccessNotification(message) {
+      Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: message,
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
 
-// Delete category
-async function deleteExpenseCategory(id) {
-  if (!confirm("Delete this category?")) return;
+    /* -------------------------------
+       EXPENSES LIST + ADD (PLACEHOLDERS)
+    --------------------------------*/
+    function showListExpenses() { 
+      saveLastPage("showListExpenses"); 
+      document.getElementById("content").innerHTML = `<h2>List of Expenses</h2><p>Coming soon...</p>`; 
+    }
 
-  try {
-    await firebase.firestore().collection("expenseCategories").doc(id).delete();
-    showSuccessNotification("Category deleted successfully");
-    loadExpenseCategories();
-  } catch (err) {
-    alert("Error deleting category: " + err.message);
-  }
-}
-
-/* -------------------------------
-   EXPENSES LIST + ADD (PLACEHOLDERS)
---------------------------------*/
-function showListExpenses() { 
-  saveLastPage("showListExpenses"); 
-  document.getElementById("content").innerHTML = `<h2>List of Expenses</h2><p>Coming soon...</p>`; 
-}
-
-function showAddExpense() { 
-  saveLastPage("showAddExpense"); 
-  document.getElementById("content").innerHTML = `<h2>Add Expense</h2><p>Form coming soon...</p>`; 
-}
+    function showAddExpense() { 
+      saveLastPage("showAddExpense"); 
+      document.getElementById("content").innerHTML = `<h2>Add Expense</h2><p>Form coming soon...</p>`; 
+    }
 
 
 
