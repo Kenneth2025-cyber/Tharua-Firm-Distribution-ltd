@@ -6059,10 +6059,197 @@ function toggleExpenses() {
       document.getElementById("content").innerHTML = `<h2>List of Expenses</h2><p>Coming soon...</p>`; 
     }
 
-    function showAddExpense() { 
-      saveLastPage("showAddExpense"); 
-      document.getElementById("content").innerHTML = `<h2>Add Expense</h2><p>Form coming soon...</p>`; 
-    }
+async function showAddExpense() {
+  saveLastPage("showAddExpense");
+
+  // Show loading while fetching dropdown options
+  document.getElementById("content").innerHTML = `
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading expense form...</p>
+    </div>
+  `;
+
+  // Load dropdown data
+  const locations = await getCollectionOptions("businessLocations");
+  const categories = await getCollectionOptions("expenseCategories");
+  const salespersons = await getCollectionOptions("fieldSalespersons");
+
+  // Render form
+  document.getElementById("content").innerHTML = `
+    <style>
+      .form-container {
+        max-width: 700px;
+        width: 90%;
+        margin: 20px auto;
+        padding: 20px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+      .form-container h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        font-size: 22px;
+        color: #333;
+      }
+      .form-group { margin-bottom: 15px; }
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+        font-size: 14px;
+        color: #444;
+      }
+      .form-group input, 
+      .form-group select, 
+      .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+      }
+      .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+      .submit-btn {
+        width: 100%;
+        padding: 12px;
+        background: #007bff;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+      .submit-btn:hover { background: #0056b3; }
+      #addExpenseMessage {
+        margin-top: 12px;
+        font-size: 14px;
+        text-align: center;
+      }
+    </style>
+
+    <div class="form-container">
+      <h2>Add Expense</h2>
+      <form id="addExpenseForm">
+        
+        <div class="form-group">
+          <label for="expenseLocation">Business Location *</label>
+          <select id="expenseLocation" required>
+            <option value="">Select location</option>
+            ${locations.map(l => `<option value="${l}">${l}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="expenseCategory">Expense Category *</label>
+          <select id="expenseCategory" required>
+            <option value="">Select category</option>
+            ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="expenseSalesperson">Assign to Field Salesperson</label>
+          <select id="expenseSalesperson">
+            <option value="">-- Optional --</option>
+            ${salespersons.map(s => `<option value="${s}">${s}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="expenseDate">Date of Expense *</label>
+          <input type="date" id="expenseDate" required />
+        </div>
+
+        <div class="form-group">
+          <label for="expenseAmount">Total Amount (KES) *</label>
+          <input type="number" id="expenseAmount" min="0" step="0.01" required placeholder="Enter total amount" />
+        </div>
+
+        <div class="form-group">
+          <label for="expensePaid">Paid Amount (KES)</label>
+          <input type="number" id="expensePaid" min="0" step="0.01" value="0" />
+        </div>
+
+        <div class="form-group">
+          <label for="expenseNote">Expense Note</label>
+          <textarea id="expenseNote" placeholder="Enter notes (optional)"></textarea>
+        </div>
+
+        <button type="submit" class="submit-btn">Save Expense</button>
+      </form>
+      <div id="addExpenseMessage"></div>
+    </div>
+  `;
+
+  document.getElementById("addExpenseForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await addExpenseSubmit();
+  });
+}
+
+// Submit handler
+async function addExpenseSubmit() {
+  const location = document.getElementById("expenseLocation").value;
+  const category = document.getElementById("expenseCategory").value;
+  const salesperson = document.getElementById("expenseSalesperson").value;
+  const expenseDate = document.getElementById("expenseDate").value;
+  const totalAmount = parseFloat(document.getElementById("expenseAmount").value);
+  const paidAmount = parseFloat(document.getElementById("expensePaid").value) || 0;
+  const note = document.getElementById("expenseNote").value.trim();
+
+  const messageEl = document.getElementById("addExpenseMessage");
+  messageEl.style.color = "red";
+
+  // Validation
+  if (!location || !category || !expenseDate || isNaN(totalAmount)) {
+    messageEl.textContent = "Please fill in all required fields.";
+    return;
+  }
+  if (totalAmount < 0 || paidAmount < 0) {
+    messageEl.textContent = "Amounts cannot be negative.";
+    return;
+  }
+  if (paidAmount > totalAmount) {
+    messageEl.textContent = "Paid amount cannot exceed total.";
+    return;
+  }
+
+  const dueAmount = totalAmount - paidAmount;
+
+  // Build expense record
+  const expenseData = {
+    location,
+    category,
+    salesperson: salesperson || null,
+    expenseDate: new Date(expenseDate),
+    totalAmount,
+    paidAmount,
+    dueAmount,
+    note,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  messageEl.innerHTML = `<span class="spinner"></span> Saving...`;
+
+  try {
+    await firebase.firestore().collection("expenses").add(expenseData);
+    messageEl.style.color = "green";
+    messageEl.textContent = "Expense saved successfully.";
+    showSuccessNotification("Expense saved successfully.");
+    document.getElementById("addExpenseForm").reset();
+  } catch (err) {
+    console.error("Error adding expense:", err);
+    messageEl.style.color = "red";
+    messageEl.textContent = "Error: " + err.message;
+  }
+}
 
 
 
