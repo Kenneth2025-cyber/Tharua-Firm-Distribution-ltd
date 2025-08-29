@@ -6450,9 +6450,84 @@ function exportExpensesPDF() {
 }
 
 // Placeholders for actions
-function viewExpense(id) { alert("View expense " + id); }
-function editExpense(id) { alert("Edit expense " + id); }
-function deleteExpense(id) { alert("Delete expense " + id); }
+async function viewExpense(id) {
+  const doc = await firebase.firestore().collection("expenses").doc(id).get();
+  if (!doc.exists) return alert("Expense not found");
+
+  const e = doc.data();
+  Swal.fire({
+    title: "Expense Details",
+    html: `
+      <p><b>Date:</b> ${e.expenseDate?.toDate().toLocaleDateString() || ""}</p>
+      <p><b>Location:</b> ${e.location || ""}</p>
+      <p><b>Category:</b> ${e.category || ""}</p>
+      <p><b>Salesperson:</b> ${e.salesperson || ""}</p>
+      <p><b>Total:</b> KES ${Number(e.totalAmount || 0).toLocaleString()}</p>
+      <p><b>Paid:</b> KES ${Number(e.paidAmount || 0).toLocaleString()}</p>
+      <p><b>Due:</b> KES ${Number(e.dueAmount || 0).toLocaleString()}</p>
+      <p><b>Note:</b> ${e.note || ""}</p>
+    `,
+    confirmButtonText: "Close"
+  });
+}
+async function editExpense(id) {
+  const doc = await firebase.firestore().collection("expenses").doc(id).get();
+  if (!doc.exists) return alert("Expense not found");
+  const e = doc.data();
+
+  const { value: formValues } = await Swal.fire({
+    title: "Edit Expense",
+    html: `
+      <input id="editDate" type="date" class="swal2-input" value="${e.expenseDate ? e.expenseDate.toDate().toISOString().split("T")[0] : ""}">
+      <input id="editLocation" class="swal2-input" value="${e.location || ""}" placeholder="Location">
+      <input id="editCategory" class="swal2-input" value="${e.category || ""}" placeholder="Category">
+      <input id="editSalesperson" class="swal2-input" value="${e.salesperson || ""}" placeholder="Salesperson">
+      <input id="editTotal" type="number" class="swal2-input" value="${e.totalAmount || 0}" placeholder="Total">
+      <input id="editPaid" type="number" class="swal2-input" value="${e.paidAmount || 0}" placeholder="Paid">
+      <input id="editDue" type="number" class="swal2-input" value="${e.dueAmount || 0}" placeholder="Due">
+      <textarea id="editNote" class="swal2-textarea" placeholder="Note">${e.note || ""}</textarea>
+    `,
+    focusConfirm: false,
+    preConfirm: () => {
+      return {
+        expenseDate: document.getElementById("editDate").value,
+        location: document.getElementById("editLocation").value,
+        category: document.getElementById("editCategory").value,
+        salesperson: document.getElementById("editSalesperson").value,
+        totalAmount: Number(document.getElementById("editTotal").value),
+        paidAmount: Number(document.getElementById("editPaid").value),
+        dueAmount: Number(document.getElementById("editDue").value),
+        note: document.getElementById("editNote").value
+      };
+    }
+  });
+
+  if (formValues) {
+    await firebase.firestore().collection("expenses").doc(id).update({
+      ...formValues,
+      expenseDate: formValues.expenseDate ? new Date(formValues.expenseDate) : null
+    });
+    Swal.fire("Updated!", "Expense updated successfully", "success");
+    loadExpenses();
+  }
+}
+async function deleteExpense(id) {
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "This will permanently delete the expense.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it!",
+    cancelButtonText: "Cancel"
+  });
+
+  if (result.isConfirmed) {
+    await firebase.firestore().collection("expenses").doc(id).delete();
+    Swal.fire("Deleted!", "Expense has been deleted.", "success");
+    loadExpenses();
+  }
+}
+
 
 async function showAddExpense() {
   saveLastPage("showAddExpense");
