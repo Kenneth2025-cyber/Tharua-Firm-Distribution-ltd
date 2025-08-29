@@ -6336,18 +6336,22 @@ async function loadExpenses() {
     }
     if (search && !(e.note || "").toLowerCase().includes(search)) return;
 
-    total += e.totalAmount || 0;
-    paid += e.paidAmount || 0;
-    due += e.dueAmount || 0;
+    const totalAmt = e.totalAmount || 0;
+    const paidAmt = e.paidAmount || 0;
+    const dueAmt = totalAmt - paidAmt;
+
+    total += totalAmt;
+    paid += paidAmt;
+    due += dueAmt;
 
     allFilteredExpenses.push({
       date: e.expenseDate?.toDate().toLocaleDateString() || "",
       location: e.location || "",
       category: e.category || "",
       salesperson: e.salesperson || "",
-      total: e.totalAmount || 0,
-      paid: e.paidAmount || 0,
-      due: e.dueAmount || 0,
+      total: totalAmt,
+      paid: paidAmt,
+      due: dueAmt,
       note: e.note || ""
     });
 
@@ -6357,9 +6361,9 @@ async function loadExpenses() {
         <td>${e.location || ""}</td>
         <td>${e.category || ""}</td>
         <td>${e.salesperson || ""}</td>
-        <td>KES ${Number(e.totalAmount || 0).toLocaleString()}</td>
-        <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
-        <td>KES ${Number(e.dueAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(totalAmt).toLocaleString()}</td>
+        <td>KES ${Number(paidAmt).toLocaleString()}</td>
+        <td>KES ${Number(dueAmt).toLocaleString()}</td>
         <td>${e.note || ""}</td>
         <td>
           <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
@@ -6409,9 +6413,9 @@ function nextExpensesPage() {
 
 // Export Functions
 function exportExpensesExcel() {
-  let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\\n";
+  let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\n";
   allFilteredExpenses.forEach(e => {
-    csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\\n`;
+    csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv" });
@@ -6449,12 +6453,14 @@ function exportExpensesPDF() {
   printWin.print();
 }
 
-// Placeholders for actions
+// View Expense
 async function viewExpense(id) {
   const doc = await firebase.firestore().collection("expenses").doc(id).get();
   if (!doc.exists) return alert("Expense not found");
 
   const e = doc.data();
+  const dueAmt = (e.totalAmount || 0) - (e.paidAmount || 0);
+
   Swal.fire({
     title: "Expense Details",
     html: `
@@ -6464,12 +6470,14 @@ async function viewExpense(id) {
       <p><b>Salesperson:</b> ${e.salesperson || ""}</p>
       <p><b>Total:</b> KES ${Number(e.totalAmount || 0).toLocaleString()}</p>
       <p><b>Paid:</b> KES ${Number(e.paidAmount || 0).toLocaleString()}</p>
-      <p><b>Due:</b> KES ${Number(e.dueAmount || 0).toLocaleString()}</p>
+      <p><b>Due:</b> KES ${Number(dueAmt).toLocaleString()}</p>
       <p><b>Note:</b> ${e.note || ""}</p>
     `,
     confirmButtonText: "Close"
   });
 }
+
+// Edit Expense
 async function editExpense(id) {
   const doc = await firebase.firestore().collection("expenses").doc(id).get();
   if (!doc.exists) return alert("Expense not found");
@@ -6492,21 +6500,21 @@ async function editExpense(id) {
           value="${e.totalAmount || 0}" placeholder="Total">
         <input id="editPaid" type="number" class="swal2-input" 
           value="${e.paidAmount || 0}" placeholder="Paid">
-        <input id="editDue" type="number" class="swal2-input" 
-          value="${e.dueAmount || 0}" placeholder="Due">
         <textarea id="editNote" class="swal2-textarea" placeholder="Note">${e.note || ""}</textarea>
       </div>
     `,
     focusConfirm: false,
     preConfirm: () => {
+      const total = Number(document.getElementById("editTotal").value);
+      const paid = Number(document.getElementById("editPaid").value);
       return {
         expenseDate: document.getElementById("editDate").value,
         location: document.getElementById("editLocation").value,
         category: document.getElementById("editCategory").value,
         salesperson: document.getElementById("editSalesperson").value,
-        totalAmount: Number(document.getElementById("editTotal").value),
-        paidAmount: Number(document.getElementById("editPaid").value),
-        dueAmount: Number(document.getElementById("editDue").value),
+        totalAmount: total,
+        paidAmount: paid,
+        dueAmount: total - paid,
         note: document.getElementById("editNote").value
       };
     }
@@ -6521,6 +6529,8 @@ async function editExpense(id) {
     loadExpenses();
   }
 }
+
+// Delete Expense
 async function deleteExpense(id) {
   const result = await Swal.fire({
     title: "Are you sure?",
@@ -6563,7 +6573,500 @@ async function showAddExpense() {
         width: 90%;
         margin: 20px auto;
         padding: 20px;
+        background: #fff;async function showListExpenses() {
+  saveLastPage("showListExpenses");
+
+  document.getElementById("content").innerHTML = `
+    <style>
+      .filter-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+      }
+      .filter-section label {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .filter-section button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+      .filter-section button:hover {
+        background: #0056b3;
+      }
+      .filter-actions {
+        display: flex;
+        gap: 10px;
+      }
+      .summary-cards {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .summary-card {
+        flex: 1;
+        min-width: 200px;
         background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        text-align: center;
+      }
+      .summary-card h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #666;
+      }
+      .summary-card p {
+        margin: 5px 0 0;
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+      }
+      .table-container {
+        max-height: 500px;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead {
+        position: sticky;
+        top: 0;
+        background: #f0f0f0;
+        z-index: 1;
+      }
+      th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      th {
+        font-weight: 600;
+        color: #333;
+      }
+      tfoot td {
+        font-weight: bold;
+        background: #f9f9f9;
+      }
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 15px;
+      }
+      .pagination-section button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .pagination-section button:disabled {
+        background: #cccccc;
+        cursor: not-allowed;
+      }
+      .pagination-section select {
+        padding: 5px;
+        border-radius: 5px;
+      }
+    </style>
+
+    <h2>List of Expenses</h2>
+
+    <!-- Filters -->
+    <div class="filter-section">
+      <div>
+        <label>Location:</label>
+        <select id="filterLocation"></select>
+      </div>
+      <div>
+        <label>Category:</label>
+        <select id="filterCategory"></select>
+      </div>
+      <div>
+        <label>Salesperson:</label>
+        <select id="filterSalesperson"></select>
+      </div>
+      <div>
+        <label>Date From:</label>
+        <input type="date" id="filterStart" />
+      </div>
+      <div>
+        <label>Date To:</label>
+        <input type="date" id="filterEnd" />
+      </div>
+      <div>
+        <label>Search:</label>
+        <input type="text" id="filterSearch" placeholder="Notes..." />
+      </div>
+      <div class="filter-actions">
+        <button onclick="loadExpenses()">Apply</button>
+        <button onclick="exportExpensesExcel()">Export to Excel</button>
+        <button onclick="exportExpensesPDF()">Export to PDF</button>
+      </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="summary-card">
+        <h3>Total Expenses</h3>
+        <p id="summaryTotal">KES 0</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Paid</h3>
+        <p id="summaryPaid">KES 0</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Due</h3>
+        <p id="summaryDue">KES 0</p>
+      </div>
+    </div>
+
+    <!-- Expenses Table -->
+    <div class="table-container">
+      <table id="expensesTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Category</th>
+            <th>Salesperson</th>
+            <th>Total (KES)</th>
+            <th>Paid (KES)</th>
+            <th>Due (KES)</th>
+            <th>Note</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="expensesTbody">
+          <tr><td colspan="9" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right;">TOTAL:</td>
+            <td id="tableTotal">KES 0</td>
+            <td id="tablePaid">KES 0</td>
+            <td id="tableDue">KES 0</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-section">
+      <div>
+        Show: 
+        <select id="itemsPerPage" onchange="loadExpenses()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div>
+        <button id="prevPageBtn" onclick="prevExpensesPage()">Prev</button>
+        <span id="pageInfo"></span>
+        <button id="nextPageBtn" onclick="nextExpensesPage()">Next</button>
+      </div>
+    </div>
+  `;
+
+  await loadExpenseFilters();
+  await loadExpenses();
+}
+
+// Load filters dynamically
+async function loadExpenseFilters() {
+  await populateDropdown("businessLocations", "filterLocation", "All Locations");
+  await populateDropdown("expenseCategories", "filterCategory", "All Categories");
+  await populateDropdown("fieldSalespersons", "filterSalesperson", "All Salespersons");
+}
+
+// Helper for dropdowns
+async function populateDropdown(collection, elementId, defaultText) {
+  const select = document.getElementById(elementId);
+  select.innerHTML = `<option value="">${defaultText}</option>`;
+  const snap = await firebase.firestore().collection(collection).orderBy("name").get();
+  snap.forEach(doc => {
+    const d = doc.data();
+    if (d.name) {
+      select.innerHTML += `<option value="${d.name}">${d.name}</option>`;
+    }
+  });
+}
+
+// Pagination state
+let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
+let allFilteredExpenses = [];
+
+// Load expenses with filters (applied in-memory)
+async function loadExpenses() {
+  const tbody = document.getElementById("expensesTbody");
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Loading...</td></tr>`;
+
+  const loc = document.getElementById("filterLocation").value;
+  const cat = document.getElementById("filterCategory").value;
+  const sp = document.getElementById("filterSalesperson").value;
+  const start = document.getElementById("filterStart").value;
+  const end = document.getElementById("filterEnd").value;
+  const search = document.getElementById("filterSearch").value.toLowerCase();
+  expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
+    ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
+
+  const snap = await firebase.firestore()
+    .collection("expenses")
+    .orderBy("expenseDate", "desc")
+    .get();
+
+  let rows = [];
+  let total = 0, paid = 0, due = 0;
+  allFilteredExpenses = [];
+
+  snap.forEach(doc => {
+    const e = doc.data();
+    if (loc && e.location !== loc) return;
+    if (cat && e.category !== cat) return;
+    if (sp && e.salesperson !== sp) return;
+    if (start && end) {
+      const d = e.expenseDate?.toDate();
+      const s = new Date(start);
+      const ed = new Date(end + "T23:59:59");
+      if (!d || d < s || d > ed) return;
+    }
+    if (search && !(e.note || "").toLowerCase().includes(search)) return;
+
+    const totalAmt = e.totalAmount || 0;
+    const paidAmt = e.paidAmount || 0;
+    const dueAmt = totalAmt - paidAmt;
+
+    total += totalAmt;
+    paid += paidAmt;
+    due += dueAmt;
+
+    allFilteredExpenses.push({
+      date: e.expenseDate?.toDate().toLocaleDateString() || "",
+      location: e.location || "",
+      category: e.category || "",
+      salesperson: e.salesperson || "",
+      total: totalAmt,
+      paid: paidAmt,
+      due: dueAmt,
+      note: e.note || ""
+    });
+
+    rows.push(`
+      <tr>
+        <td>${e.expenseDate?.toDate().toLocaleDateString() || ""}</td>
+        <td>${e.location || ""}</td>
+        <td>${e.category || ""}</td>
+        <td>${e.salesperson || ""}</td>
+        <td>KES ${Number(totalAmt).toLocaleString()}</td>
+        <td>KES ${Number(paidAmt).toLocaleString()}</td>
+        <td>KES ${Number(dueAmt).toLocaleString()}</td>
+        <td>${e.note || ""}</td>
+        <td>
+          <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
+          <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
+          <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
+        </td>
+      </tr>
+    `);
+  });
+
+  expensePage.total = rows.length;
+  const startIdx = (expensePage.current - 1) * expensePage.perPage;
+  const endIdx = startIdx + expensePage.perPage;
+  const pageRows = expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
+
+  tbody.innerHTML = pageRows.length ? pageRows.join("") : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
+
+  document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
+  document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
+  document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
+
+  document.getElementById("summaryTotal").textContent = "KES " + total.toLocaleString();
+  document.getElementById("summaryPaid").textContent = "KES " + paid.toLocaleString();
+  document.getElementById("summaryDue").textContent = "KES " + due.toLocaleString();
+
+  document.getElementById("pageInfo").textContent = expensePage.perPage === Infinity
+    ? `Showing all ${rows.length}`
+    : `Page ${expensePage.current} of ${Math.ceil(expensePage.total / expensePage.perPage)}`;
+
+  document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
+  document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
+}
+
+function prevExpensesPage() {
+  if (expensePage.current > 1) {
+    expensePage.current--;
+    loadExpenses();
+  }
+}
+
+function nextExpensesPage() {
+  if ((expensePage.current * expensePage.perPage) < expensePage.total) {
+    expensePage.current++;
+    loadExpenses();
+  }
+}
+
+// Export Functions
+function exportExpensesExcel() {
+  let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\n";
+  allFilteredExpenses.forEach(e => {
+    csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "expenses.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportExpensesPDF() {
+  const printWin = window.open("", "_blank");
+  printWin.document.write("<h2>Expenses Report</h2>");
+  printWin.document.write("<table border='1' style='border-collapse:collapse;width:100%;'>");
+  printWin.document.write("<tr><th>Date</th><th>Location</th><th>Category</th><th>Salesperson</th><th>Total</th><th>Paid</th><th>Due</th><th>Note</th></tr>");
+
+  allFilteredExpenses.forEach(e => {
+    printWin.document.write(
+      `<tr>
+        <td>${e.date}</td>
+        <td>${e.location}</td>
+        <td>${e.category}</td>
+        <td>${e.salesperson}</td>
+        <td>KES ${e.total.toLocaleString()}</td>
+        <td>KES ${e.paid.toLocaleString()}</td>
+        <td>KES ${e.due.toLocaleString()}</td>
+        <td>${e.note}</td>
+      </tr>`
+    );
+  });
+
+  printWin.document.write("</table>");
+  printWin.document.close();
+  printWin.print();
+}
+
+// View Expense
+async function viewExpense(id) {
+  const doc = await firebase.firestore().collection("expenses").doc(id).get();
+  if (!doc.exists) return alert("Expense not found");
+
+  const e = doc.data();
+  const dueAmt = (e.totalAmount || 0) - (e.paidAmount || 0);
+
+  Swal.fire({
+    title: "Expense Details",
+    html: `
+      <p><b>Date:</b> ${e.expenseDate?.toDate().toLocaleDateString() || ""}</p>
+      <p><b>Location:</b> ${e.location || ""}</p>
+      <p><b>Category:</b> ${e.category || ""}</p>
+      <p><b>Salesperson:</b> ${e.salesperson || ""}</p>
+      <p><b>Total:</b> KES ${Number(e.totalAmount || 0).toLocaleString()}</p>
+      <p><b>Paid:</b> KES ${Number(e.paidAmount || 0).toLocaleString()}</p>
+      <p><b>Due:</b> KES ${Number(dueAmt).toLocaleString()}</p>
+      <p><b>Note:</b> ${e.note || ""}</p>
+    `,
+    confirmButtonText: "Close"
+  });
+}
+
+// Edit Expense
+async function editExpense(id) {
+  const doc = await firebase.firestore().collection("expenses").doc(id).get();
+  if (!doc.exists) return alert("Expense not found");
+  const e = doc.data();
+
+  const { value: formValues } = await Swal.fire({
+    title: "Edit Expense",
+    width: 600,
+    html: `
+      <div style="max-height:400px; overflow-y:auto; text-align:left; padding-right:10px;">
+        <input id="editDate" type="date" class="swal2-input" 
+          value="${e.expenseDate ? e.expenseDate.toDate().toISOString().split("T")[0] : ""}">
+        <input id="editLocation" class="swal2-input" 
+          value="${e.location || ""}" placeholder="Location">
+        <input id="editCategory" class="swal2-input" 
+          value="${e.category || ""}" placeholder="Category">
+        <input id="editSalesperson" class="swal2-input" 
+          value="${e.salesperson || ""}" placeholder="Salesperson">
+        <input id="editTotal" type="number" class="swal2-input" 
+          value="${e.totalAmount || 0}" placeholder="Total">
+        <input id="editPaid" type="number" class="swal2-input" 
+          value="${e.paidAmount || 0}" placeholder="Paid">
+        <textarea id="editNote" class="swal2-textarea" placeholder="Note">${e.note || ""}</textarea>
+      </div>
+    `,
+    focusConfirm: false,
+    preConfirm: () => {
+      const total = Number(document.getElementById("editTotal").value);
+      const paid = Number(document.getElementById("editPaid").value);
+      return {
+        expenseDate: document.getElementById("editDate").value,
+        location: document.getElementById("editLocation").value,
+        category: document.getElementById("editCategory").value,
+        salesperson: document.getElementById("editSalesperson").value,
+        totalAmount: total,
+        paidAmount: paid,
+        dueAmount: total - paid,
+        note: document.getElementById("editNote").value
+      };
+    }
+  });
+
+  if (formValues) {
+    await firebase.firestore().collection("expenses").doc(id).update({
+      ...formValues,
+      expenseDate: formValues.expenseDate ? new Date(formValues.expenseDate) : null
+    });
+    Swal.fire("Updated!", "Expense updated successfully", "success");
+    loadExpenses();
+  }
+}
+
+// Delete Expense
+async function deleteExpense(id) {
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "This will permanently delete the expense.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it!",
+    cancelButtonText: "Cancel"
+  });
+
+  if (result.isConfirmed) {
+    await firebase.firestore().collection("expenses").doc(id).delete();
+    Swal.fire("Deleted!", "Expense has been deleted.", "success");
+    loadExpenses();
+  }
+}
+
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       }
