@@ -7083,22 +7083,17 @@ async function fetchInventoryReports() {
   const brand = document.getElementById("brandFilter").value;
   const search = document.getElementById("searchInventory").value.toLowerCase();
 
-  let query = firebase.firestore().collection("products");
-
-  if (loc) query = query.where("locations", "array-contains", loc);
-  if (cat) query = query.where("category", "==", cat);
-  if (brand) query = query.where("brand", "==", brand);
-
-  const snapshot = await query.get();
-
+  // 🔹 Step 1: get all products
+  const snapshot = await firebase.firestore().collection("products").get();
   let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Apply search
-  if (search) {
-    data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
-  }
+  // 🔹 Step 2: apply filters in JS
+  if (loc) data = data.filter(d => d.locations && d.locations.includes(loc));
+  if (cat) data = data.filter(d => d.category === cat);
+  if (brand) data = data.filter(d => d.brand === brand);
+  if (search) data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
 
-  // Render table
+  // 🔹 Step 3: render table
   if (!data.length) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No inventory records found.</td></tr>`;
     return;
