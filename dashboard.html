@@ -6074,6 +6074,23 @@ async function showListExpenses() {
         font-weight: 600;
         font-size: 14px;
       }
+      .filter-section button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+      .filter-section button:hover {
+        background: #0056b3;
+      }
+      .filter-actions {
+        display: flex;
+        gap: 10px;
+      }
       .summary-cards {
         display: flex;
         gap: 20px;
@@ -6135,12 +6152,7 @@ async function showListExpenses() {
         justify-content: space-between;
         margin-top: 15px;
       }
-      .export-buttons {
-        margin-top: 15px;
-        display: flex;
-        gap: 10px;
-      }
-      .export-buttons button {
+      .pagination-section button {
         background: #007bff;
         color: white;
         border: none;
@@ -6148,8 +6160,13 @@ async function showListExpenses() {
         border-radius: 5px;
         cursor: pointer;
       }
-      .export-buttons button:hover {
-        background: #0056b3;
+      .pagination-section button:disabled {
+        background: #cccccc;
+        cursor: not-allowed;
+      }
+      .pagination-section select {
+        padding: 5px;
+        border-radius: 5px;
       }
     </style>
 
@@ -6181,7 +6198,11 @@ async function showListExpenses() {
         <label>Search:</label>
         <input type="text" id="filterSearch" placeholder="Notes..." />
       </div>
-      <button onclick="loadExpenses()">Apply</button>
+      <div class="filter-actions">
+        <button onclick="loadExpenses()">Apply</button>
+        <button onclick="exportExpensesExcel()">Export to Excel</button>
+        <button onclick="exportExpensesPDF()">Export to PDF</button>
+      </div>
     </div>
 
     <!-- Summary Cards -->
@@ -6229,12 +6250,6 @@ async function showListExpenses() {
           </tr>
         </tfoot>
       </table>
-    </div>
-
-    <!-- Export Buttons -->
-    <div class="export-buttons">
-      <button onclick="exportExpensesExcel()">Export to Excel</button>
-      <button onclick="exportExpensesPDF()">Export to PDF</button>
     </div>
 
     <!-- Pagination -->
@@ -6438,7 +6453,6 @@ function exportExpensesPDF() {
 function viewExpense(id) { alert("View expense " + id); }
 function editExpense(id) { alert("Edit expense " + id); }
 function deleteExpense(id) { alert("Delete expense " + id); }
-
 
 async function showAddExpense() {
   saveLastPage("showAddExpense");
