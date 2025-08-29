@@ -799,17 +799,7 @@ button {
 
     <a onclick="clearContent()"><i class="fas fa-calculator"></i> <span>Accounting</span></a>
     <a onclick="clearContent()"><i class="fas fa-robot"></i> <span>AI Assistance</span></a>
-<li class="has-submenu">
-  <a href="#"><i class="fas fa-chart-line"></i> <span>Reports</span></a>
-  <ul class="submenu">
-    <li><a href="#" onclick="exportExpensesExcel()">Expenses Reports</a></li>
-    <li><a href="#" onclick="showSalesReports()">Sales Reports</a></li>
-    <li><a href="#" onclick="showPaymentsReports()">Payments Reports</a></li>
-    <li><a href="#" onclick="showInventoryReports()">Inventory Reports</a></li>
-    <li><a href="#" onclick="showIncomeReports()">Income / Productivity Reports</a></li>
-  </ul>
-</li>
-
+    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> <span>Reports</span></a>
     <a onclick="clearContent()"><i class="fas fa-envelope"></i> <span>Notification Templates</span></a>
     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
@@ -6865,10 +6855,6 @@ async function addExpenseSubmit() {
 }
 
 
-function showSalesReports() { alert("Sales Reports clicked"); }
-function showPaymentsReports() { alert("Payments Reports clicked"); }
-function showInventoryReports() { alert("Inventory Reports clicked"); }
-function showIncomeReports() { alert("Income / Productivity Reports clicked"); }
 
   </script>
   
