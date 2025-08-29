@@ -6891,13 +6891,196 @@ function showPurchaseReport() {
   `;
 }
 
-function showInventoryReport() {
+async function showInventoryReport(page = 1) {
   saveLastPage("showInventoryReport");
-  document.getElementById("content").innerHTML = `
+
+  const content = document.getElementById("content");
+  content.innerHTML = `
     <h2>Inventory Report</h2>
-    <p>Section Under Development</p>
+
+    <!-- Summary Cards -->
+    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+      <div id="buyingValueCard" class="summary-card">Value by Buying Price: 0</div>
+      <div id="sellingValueCard" class="summary-card">Value by Selling Price: 0</div>
+      <div id="revenueValueCard" class="summary-card">Potential Revenue: 0</div>
+    </div>
+
+    <!-- Filters -->
+    <div class="top-controls">
+      <select id="inventoryLocationFilter">
+        <option value="">All Locations</option>
+      </select>
+      <select id="inventoryCategoryFilter">
+        <option value="">All Categories</option>
+      </select>
+      <select id="inventoryBrandFilter">
+        <option value="">All Brands</option>
+      </select>
+      <button onclick="loadInventoryReport()">Filter</button>
+    </div>
+
+    <!-- Table -->
+    <table class="styled-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Location</th>
+          <th>Stock Available</th>
+          <th>Value (Buying Price)</th>
+          <th>Value (Selling Price)</th>
+          <th>Potential Revenue</th>
+        </tr>
+      </thead>
+      <tbody id="inventoryReportTable"></tbody>
+    </table>
+
+    <!-- Pagination -->
+    <div class="pagination" id="inventoryPagination"></div>
   `;
+
+  // Load dropdowns
+  await populateInventoryFilters();
+
+  // Load first page
+  loadInventoryReport(page);
 }
+
+async function populateInventoryFilters() {
+  // Locations
+  const locationSnap = await firestore.collection("businessLocations").get();
+  const locSelect = document.getElementById("inventoryLocationFilter");
+  locationSnap.forEach(doc => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.data().name;
+    locSelect.appendChild(opt);
+  });
+
+  // Categories
+  const catSnap = await firestore.collection("categories").get();
+  const catSelect = document.getElementById("inventoryCategoryFilter");
+  catSnap.forEach(doc => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.data().name;
+    catSelect.appendChild(opt);
+  });
+
+  // Brands
+  const brandSnap = await firestore.collection("brands").get();
+  const brandSelect = document.getElementById("inventoryBrandFilter");
+  brandSnap.forEach(doc => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.data().name;
+    brandSelect.appendChild(opt);
+  });
+}
+
+async function loadInventoryReport(page = 1) {
+  const itemsPerPage = 10;
+  const tbody = document.getElementById("inventoryReportTable");
+  tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
+
+  const locationFilter = document.getElementById("inventoryLocationFilter").value;
+  const categoryFilter = document.getElementById("inventoryCategoryFilter").value;
+  const brandFilter = document.getElementById("inventoryBrandFilter").value;
+
+  // Query products
+  let query = firestore.collection("products");
+  if (categoryFilter) query = query.where("category", "==", categoryFilter);
+  if (brandFilter) query = query.where("brand", "==", brandFilter);
+
+  const snap = await query.get();
+  let rows = [];
+  let totalBuying = 0, totalSelling = 0, totalRevenue = 0;
+
+  for (let doc of snap.docs) {
+    const product = { id: doc.id, ...doc.data() };
+
+    // --- Stock balance computation ---
+    let stock = 0;
+
+    // Opening stock
+    const openingSnap = await firestore.collection("openingStocks")
+      .where("productId", "==", product.id)
+      .where("locationId", "==", locationFilter || product.defaultLocation || "")
+      .get();
+    openingSnap.forEach(d => stock += d.data().quantity);
+
+    // Purchases
+    const purchasesSnap = await firestore.collection("purchases")
+      .where("productId", "==", product.id)
+      .where("locationId", "==", locationFilter || product.defaultLocation || "")
+      .get();
+    purchasesSnap.forEach(d => stock += d.data().quantity);
+
+    // Sales
+    const salesSnap = await firestore.collection("sales")
+      .where("productId", "==", product.id)
+      .where("locationId", "==", locationFilter || product.defaultLocation || "")
+      .get();
+    salesSnap.forEach(d => stock -= d.data().quantity);
+
+    // Adjustments
+    const adjustSnap = await firestore.collection("stockAdjustments")
+      .where("productId", "==", product.id)
+      .where("locationId", "==", locationFilter || product.defaultLocation || "")
+      .get();
+    adjustSnap.forEach(d => stock += d.data().quantity);
+
+    // Transfers In
+    const transfersInSnap = await firestore.collection("stockTransfers")
+      .where("productId", "==", product.id)
+      .where("toLocationId", "==", locationFilter || product.defaultLocation || "")
+      .get();
+    transfersInSnap.forEach(d => stock += d.data().quantity);
+
+    // Transfers Out
+    const transfersOutSnap = await firestore.collection("stockTransfers")
+      .where("productId", "==", product.id)
+      .where("fromLocationId", "==", locationFilter || product.defaultLocation || "")
+      .get();
+    transfersOutSnap.forEach(d => stock -= d.data().quantity);
+
+    if (locationFilter && (!product.defaultLocation || product.defaultLocation !== locationFilter)) {
+      // skip products not in this location
+    }
+
+    // --- Value calculations ---
+    const buyingValue = stock * (product.buyingPrice || 0);
+    const sellingValue = stock * (product.sellingPrice || 0);
+    const revenue = sellingValue - buyingValue;
+
+    totalBuying += buyingValue;
+    totalSelling += sellingValue;
+    totalRevenue += revenue;
+
+    rows.push(`
+      <tr>
+        <td>${product.name}</td>
+        <td>${locationFilter ? locationFilter : (product.defaultLocationName || "N/A")}</td>
+        <td>${stock}</td>
+        <td>${buyingValue.toFixed(2)}</td>
+        <td>${sellingValue.toFixed(2)}</td>
+        <td>${revenue.toFixed(2)}</td>
+      </tr>
+    `);
+  }
+
+  // Update totals
+  document.getElementById("buyingValueCard").innerText = `Value by Buying Price: ${totalBuying.toFixed(2)}`;
+  document.getElementById("sellingValueCard").innerText = `Value by Selling Price: ${totalSelling.toFixed(2)}`;
+  document.getElementById("revenueValueCard").innerText = `Potential Revenue: ${totalRevenue.toFixed(2)}`;
+
+  // Pagination
+  const start = (page - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  tbody.innerHTML = rows.slice(start, end).join("") || `<tr><td colspan="6">No records found</td></tr>`;
+
+  renderInventoryPagination(rows.length, itemsPerPage, page);
+}
+
 
 function showFinancialSummary() {
   saveLastPage("showFinancialSummary");
