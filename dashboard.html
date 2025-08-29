@@ -6891,205 +6891,241 @@ function showPurchaseReport() {
   `;
 }
 
-async function showInventoryReport(page = 1) {
+async function showInventoryReport() {
   saveLastPage("showInventoryReport");
 
-  const content = document.getElementById("content");
-  content.innerHTML = `
+  document.getElementById("content").innerHTML = `
+    <style>
+      .filter-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        border: 1px solid #e0e0e0;
+      }
+      .filter-section label {
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+        margin-right: 8px;
+      }
+      .filter-section select, .filter-section input[type="text"] {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        background: #fff;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .filter-section select { width: 140px; }
+      .filter-section input[type="text"] { width: 180px; }
+      .filter-section button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .filter-section .apply-btn { background: #0056b3; color: white; }
+      .filter-section .apply-btn:hover { background: #003d82; }
+      .filter-section .export-btn { background: #218838; color: white; }
+      .filter-section .export-btn:hover { background: #1a6d2e; }
+
+      .table-container {
+        max-height: 500px;
+        overflow-y: auto;
+        width: 100%;
+        position: relative;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .table-container table { width: 100%; border-collapse: collapse; }
+      .table-container th, .table-container td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      .table-container th { font-weight: 600; color: #333; }
+
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 15px;
+        font-size: 14px;
+      }
+      .pagination-section button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .pagination-section .prev-btn, .pagination-section .next-btn {
+        background: #007bff; color: white;
+      }
+      .pagination-section button:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+
     <h2>Inventory Report</h2>
 
-    <!-- Summary Cards -->
-    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-      <div id="buyingValueCard" class="summary-card">Value by Buying Price: 0</div>
-      <div id="sellingValueCard" class="summary-card">Value by Selling Price: 0</div>
-      <div id="revenueValueCard" class="summary-card">Potential Revenue: 0</div>
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <div class="filter-group">
+        <label for="locationFilter">Location:</label>
+        <select id="locationFilter"><option value="">Select Location</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="categoryFilter">Category:</label>
+        <select id="categoryFilter"><option value="">Select Category</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="brandFilter">Brand:</label>
+        <select id="brandFilter"><option value="">Select Brand</option></select>
+      </div>
+      <div class="search-group">
+        <label for="searchInventory">Search:</label>
+        <input type="text" id="searchInventory" placeholder="3+ chars..."/>
+      </div>
+      <button id="applyInventoryFilterBtn" class="apply-btn">Apply</button>
+      <button id="exportInventoryBtn" class="export-btn">Export</button>
     </div>
 
-    <!-- Filters -->
-    <div class="top-controls">
-      <select id="inventoryLocationFilter">
-        <option value="">All Locations</option>
-      </select>
-      <select id="inventoryCategoryFilter">
-        <option value="">All Categories</option>
-      </select>
-      <select id="inventoryBrandFilter">
-        <option value="">All Brands</option>
-      </select>
-      <button onclick="loadInventoryReport()">Filter</button>
+    <!-- Inventory Table -->
+    <div class="table-container">
+      <table border="1" cellpadding="8" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Brand</th>
+            <th>Location</th>
+            <th>Opening Stock</th>
+            <th>Purchased</th>
+            <th>Sold</th>
+            <th>Closing Stock</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryTbody">
+          <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
     </div>
-
-    <!-- Table -->
-    <table class="styled-table">
-      <thead>
-        <tr>
-          <th>Product</th>
-          <th>Location</th>
-          <th>Stock Available</th>
-          <th>Value (Buying Price)</th>
-          <th>Value (Selling Price)</th>
-          <th>Potential Revenue</th>
-        </tr>
-      </thead>
-      <tbody id="inventoryReportTable"></tbody>
-    </table>
 
     <!-- Pagination -->
-    <div class="pagination" id="inventoryPagination"></div>
+    <div class="pagination-section">
+      <div>
+        <label for="inventoryItemsPerPage">Show:</label>
+        <select id="inventoryItemsPerPage">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+        <span id="inventoryPaginationInfo"></span>
+      </div>
+      <div>
+        <button id="inventoryPrevPageBtn" class="prev-btn" disabled>Previous</button>
+        <button id="inventoryNextPageBtn" class="next-btn">Next</button>
+      </div>
+    </div>
   `;
 
-  // Load dropdowns
-  await populateInventoryFilters();
+  // Load filters (locations, categories, brands)
+  await loadInventoryFilters();
 
-  // Load first page
-  loadInventoryReport(page);
+  // Fetch first set of reports
+  fetchInventoryReports();
+
+  // Event listeners
+  document.getElementById("applyInventoryFilterBtn").addEventListener("click", fetchInventoryReports);
+  document.getElementById("searchInventory").addEventListener("input", () => {
+    if (document.getElementById("searchInventory").value.length >= 3 || document.getElementById("searchInventory").value === "") {
+      fetchInventoryReports();
+    }
+  });
+  document.getElementById("inventoryItemsPerPage").addEventListener("change", fetchInventoryReports);
+  document.getElementById("inventoryPrevPageBtn").addEventListener("click", () => changeInventoryPage(-1));
+  document.getElementById("inventoryNextPageBtn").addEventListener("click", () => changeInventoryPage(1));
+  document.getElementById("exportInventoryBtn").addEventListener("click", exportInventoryReport);
 }
 
-async function populateInventoryFilters() {
-  // --- Locations ---
-  const locSelect = document.getElementById("inventoryLocationFilter");
-  locSelect.innerHTML = `<option value="">All Locations</option>`; // reset with default
-  const locationSnap = await firestore.collection("businessLocations").get();
-  locationSnap.forEach(doc => {
-    const data = doc.data();
-    const opt = document.createElement("option");
-    opt.value = doc.id;
-    opt.textContent = data.name || "Unnamed Location";
-    locSelect.appendChild(opt);
-  });
+// Load dropdown filter options
+async function loadInventoryFilters() {
+  const locSnap = await firebase.firestore().collection("businessLocations").get();
+  const catSnap = await firebase.firestore().collection("categories").get();
+  const brandSnap = await firebase.firestore().collection("brands").get();
 
-  // --- Categories ---
-  const catSelect = document.getElementById("inventoryCategoryFilter");
-  catSelect.innerHTML = `<option value="">All Categories</option>`;
-  const catSnap = await firestore.collection("categories").get();
-  catSnap.forEach(doc => {
-    const data = doc.data();
-    const opt = document.createElement("option");
-    opt.value = doc.id;
-    opt.textContent = data.name || "Unnamed Category";
-    catSelect.appendChild(opt);
-  });
+  const locationFilter = document.getElementById("locationFilter");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const brandFilter = document.getElementById("brandFilter");
 
-  // --- Brands ---
-  const brandSelect = document.getElementById("inventoryBrandFilter");
-  brandSelect.innerHTML = `<option value="">All Brands</option>`;
-  const brandSnap = await firestore.collection("brands").get();
-  brandSnap.forEach(doc => {
-    const data = doc.data();
-    const opt = document.createElement("option");
-    opt.value = doc.id;
-    opt.textContent = data.name || "Unnamed Brand";
-    brandSelect.appendChild(opt);
-  });
+  locSnap.forEach(doc => locationFilter.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+  catSnap.forEach(doc => categoryFilter.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+  brandSnap.forEach(doc => brandFilter.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
 }
 
+// Fetch reports based on filters
+async function fetchInventoryReports() {
+  const tbody = document.getElementById("inventoryTbody");
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Loading...</td></tr>`;
 
-async function loadInventoryReport(page = 1) {
-  const itemsPerPage = 10;
-  const tbody = document.getElementById("inventoryReportTable");
-  tbody.innerHTML = `<tr><td colspan="6">Loading...</td></tr>`;
+  const loc = document.getElementById("locationFilter").value;
+  const cat = document.getElementById("categoryFilter").value;
+  const brand = document.getElementById("brandFilter").value;
+  const search = document.getElementById("searchInventory").value.toLowerCase();
 
-  const locationFilter = document.getElementById("inventoryLocationFilter").value;
-  const categoryFilter = document.getElementById("inventoryCategoryFilter").value;
-  const brandFilter = document.getElementById("inventoryBrandFilter").value;
+  let query = firebase.firestore().collection("products");
 
-  // --- Fetch products first ---
-  let productQuery = firestore.collection("products");
-  if (categoryFilter) productQuery = productQuery.where("category", "==", categoryFilter);
-  if (brandFilter) productQuery = productQuery.where("brand", "==", brandFilter);
-  const productSnap = await productQuery.get();
+  if (loc) query = query.where("locations", "array-contains", loc);
+  if (cat) query = query.where("category", "==", cat);
+  if (brand) query = query.where("brand", "==", brand);
 
-  let products = {};
-  productSnap.forEach(doc => {
-    products[doc.id] = { id: doc.id, ...doc.data(), stock: 0 };
-  });
+  const snapshot = await query.get();
 
-  // --- Fetch transactions in bulk ---
-  const locationCondition = locationFilter ? ["==", locationFilter] : null;
+  let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  async function bulkFetch(collection, field, sign = 1) {
-    let q = firestore.collection(collection);
-    if (locationCondition) q = q.where(field, locationCondition[0], locationCondition[1]);
-    const snap = await q.get();
-    snap.forEach(d => {
-      const t = d.data();
-      if (products[t.productId]) {
-        products[t.productId].stock += (t.quantity || 0) * sign;
-      }
-    });
+  // Apply search
+  if (search) {
+    data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
   }
 
-  // Opening stock (always +)
-  await bulkFetch("openingStocks", "locationId", 1);
+  // Render table
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No inventory records found.</td></tr>`;
+    return;
+  }
 
-  // Purchases (always +)
-  await bulkFetch("purchases", "locationId", 1);
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td>${d.name || ""}</td>
+      <td>${d.category || ""}</td>
+      <td>${d.brand || ""}</td>
+      <td>${(d.locations && d.locations.join(", ")) || ""}</td>
+      <td>${d.openingStock || 0}</td>
+      <td>${d.purchased || 0}</td>
+      <td>${d.sold || 0}</td>
+      <td>${(d.openingStock || 0) + (d.purchased || 0) - (d.sold || 0)}</td>
+    </tr>
+  `).join("");
+}
 
-  // Sales (subtract)
-  await bulkFetch("sales", "locationId", -1);
+// Pagination helpers
+function changeInventoryPage(direction) {
+  // Optional: implement pagination logic if needed
+}
 
-  // Adjustments (+ or -)
-  await bulkFetch("stockAdjustments", "locationId", 1);
-
-  // Transfers In
-  let transfersInQuery = firestore.collection("stockTransfers");
-  if (locationFilter) transfersInQuery = transfersInQuery.where("toLocationId", "==", locationFilter);
-  const transfersInSnap = await transfersInQuery.get();
-  transfersInSnap.forEach(d => {
-    const t = d.data();
-    if (products[t.productId]) {
-      products[t.productId].stock += (t.quantity || 0);
-    }
-  });
-
-  // Transfers Out
-  let transfersOutQuery = firestore.collection("stockTransfers");
-  if (locationFilter) transfersOutQuery = transfersOutQuery.where("fromLocationId", "==", locationFilter);
-  const transfersOutSnap = await transfersOutQuery.get();
-  transfersOutSnap.forEach(d => {
-    const t = d.data();
-    if (products[t.productId]) {
-      products[t.productId].stock -= (t.quantity || 0);
-    }
-  });
-
-  // --- Build rows ---
-  let rows = [];
-  let totalBuying = 0, totalSelling = 0, totalRevenue = 0;
-
-  Object.values(products).forEach(p => {
-    const stock = p.stock || 0;
-    const buyingValue = stock * (p.buyingPrice || 0);
-    const sellingValue = stock * (p.sellingPrice || 0);
-    const revenue = sellingValue - buyingValue;
-
-    totalBuying += buyingValue;
-    totalSelling += sellingValue;
-    totalRevenue += revenue;
-
-    rows.push(`
-      <tr>
-        <td>${p.name}</td>
-        <td>${locationFilter ? locationFilter : "All Locations"}</td>
-        <td>${stock}</td>
-        <td>${buyingValue.toFixed(2)}</td>
-        <td>${sellingValue.toFixed(2)}</td>
-        <td>${revenue.toFixed(2)}</td>
-      </tr>
-    `);
-  });
-
-  // Update totals
-  document.getElementById("buyingValueCard").innerText = `Value by Buying Price: ${totalBuying.toFixed(2)}`;
-  document.getElementById("sellingValueCard").innerText = `Value by Selling Price: ${totalSelling.toFixed(2)}`;
-  document.getElementById("revenueValueCard").innerText = `Potential Revenue: ${totalRevenue.toFixed(2)}`;
-
-  // Pagination
-  const start = (page - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
-  tbody.innerHTML = rows.slice(start, end).join("") || `<tr><td colspan="6">No records found</td></tr>`;
-
-  renderInventoryPagination(rows.length, itemsPerPage, page);
+// Export function
+function exportInventoryReport() {
+  alert("Exporting Inventory Report... (implement PDF/CSV export here)");
 }
 
 
