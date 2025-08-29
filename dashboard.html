@@ -6054,7 +6054,6 @@ function toggleExpenses() {
     /* -------------------------------
        EXPENSES LIST + ADD (PLACEHOLDERS)
     --------------------------------*/
-	
 async function showListExpenses() {
   saveLastPage("showListExpenses");
 
@@ -6263,7 +6262,7 @@ async function populateDropdown(collection, elementId, defaultText) {
 // Pagination state
 let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
 
-// Load expenses with filters
+// Load expenses with filters (applied in-memory)
 async function loadExpenses() {
   const tbody = document.getElementById("expensesTbody");
   tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Loading...</td></tr>`;
@@ -6277,25 +6276,28 @@ async function loadExpenses() {
   expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
     ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
 
-  let query = firebase.firestore().collection("expenses");
-
-  if (loc) query = query.where("location", "==", loc);
-  if (cat) query = query.where("category", "==", cat);
-  if (sp) query = query.where("salesperson", "==", sp);
-  if (start && end) {
-    const s = new Date(start);
-    const e = new Date(end);
-    e.setDate(e.getDate() + 1);
-    query = query.where("expenseDate", ">=", s).where("expenseDate", "<", e);
-  }
-
-  const snap = await query.orderBy("expenseDate", "desc").get();
+  // Always order by expenseDate for consistency
+  const snap = await firebase.firestore()
+    .collection("expenses")
+    .orderBy("expenseDate", "desc")
+    .get();
 
   let rows = [];
   let total = 0, paid = 0, due = 0;
 
   snap.forEach(doc => {
     const e = doc.data();
+
+    // Apply filters in-memory
+    if (loc && e.location !== loc) return;
+    if (cat && e.category !== cat) return;
+    if (sp && e.salesperson !== sp) return;
+    if (start && end) {
+      const d = e.expenseDate?.toDate();
+      const s = new Date(start);
+      const ed = new Date(end + "T23:59:59");
+      if (!d || d < s || d > ed) return;
+    }
     if (search && !(e.note || "").toLowerCase().includes(search)) return;
 
     total += e.totalAmount || 0;
