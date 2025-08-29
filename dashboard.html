@@ -6477,15 +6477,25 @@ async function editExpense(id) {
 
   const { value: formValues } = await Swal.fire({
     title: "Edit Expense",
+    width: 600,
     html: `
-      <input id="editDate" type="date" class="swal2-input" value="${e.expenseDate ? e.expenseDate.toDate().toISOString().split("T")[0] : ""}">
-      <input id="editLocation" class="swal2-input" value="${e.location || ""}" placeholder="Location">
-      <input id="editCategory" class="swal2-input" value="${e.category || ""}" placeholder="Category">
-      <input id="editSalesperson" class="swal2-input" value="${e.salesperson || ""}" placeholder="Salesperson">
-      <input id="editTotal" type="number" class="swal2-input" value="${e.totalAmount || 0}" placeholder="Total">
-      <input id="editPaid" type="number" class="swal2-input" value="${e.paidAmount || 0}" placeholder="Paid">
-      <input id="editDue" type="number" class="swal2-input" value="${e.dueAmount || 0}" placeholder="Due">
-      <textarea id="editNote" class="swal2-textarea" placeholder="Note">${e.note || ""}</textarea>
+      <div style="max-height:400px; overflow-y:auto; text-align:left; padding-right:10px;">
+        <input id="editDate" type="date" class="swal2-input" 
+          value="${e.expenseDate ? e.expenseDate.toDate().toISOString().split("T")[0] : ""}">
+        <input id="editLocation" class="swal2-input" 
+          value="${e.location || ""}" placeholder="Location">
+        <input id="editCategory" class="swal2-input" 
+          value="${e.category || ""}" placeholder="Category">
+        <input id="editSalesperson" class="swal2-input" 
+          value="${e.salesperson || ""}" placeholder="Salesperson">
+        <input id="editTotal" type="number" class="swal2-input" 
+          value="${e.totalAmount || 0}" placeholder="Total">
+        <input id="editPaid" type="number" class="swal2-input" 
+          value="${e.paidAmount || 0}" placeholder="Paid">
+        <input id="editDue" type="number" class="swal2-input" 
+          value="${e.dueAmount || 0}" placeholder="Due">
+        <textarea id="editNote" class="swal2-textarea" placeholder="Note">${e.note || ""}</textarea>
+      </div>
     `,
     focusConfirm: false,
     preConfirm: () => {
