@@ -6946,36 +6946,43 @@ async function showInventoryReport(page = 1) {
 }
 
 async function populateInventoryFilters() {
-  // Locations
-  const locationSnap = await firestore.collection("businessLocations").get();
+  // --- Locations ---
   const locSelect = document.getElementById("inventoryLocationFilter");
+  locSelect.innerHTML = `<option value="">All Locations</option>`; // reset with default
+  const locationSnap = await firestore.collection("businessLocations").get();
   locationSnap.forEach(doc => {
+    const data = doc.data();
     const opt = document.createElement("option");
     opt.value = doc.id;
-    opt.textContent = doc.data().name;
+    opt.textContent = data.name || "Unnamed Location";
     locSelect.appendChild(opt);
   });
 
-  // Categories
-  const catSnap = await firestore.collection("categories").get();
+  // --- Categories ---
   const catSelect = document.getElementById("inventoryCategoryFilter");
+  catSelect.innerHTML = `<option value="">All Categories</option>`;
+  const catSnap = await firestore.collection("categories").get();
   catSnap.forEach(doc => {
+    const data = doc.data();
     const opt = document.createElement("option");
     opt.value = doc.id;
-    opt.textContent = doc.data().name;
+    opt.textContent = data.name || "Unnamed Category";
     catSelect.appendChild(opt);
   });
 
-  // Brands
-  const brandSnap = await firestore.collection("brands").get();
+  // --- Brands ---
   const brandSelect = document.getElementById("inventoryBrandFilter");
+  brandSelect.innerHTML = `<option value="">All Brands</option>`;
+  const brandSnap = await firestore.collection("brands").get();
   brandSnap.forEach(doc => {
+    const data = doc.data();
     const opt = document.createElement("option");
     opt.value = doc.id;
-    opt.textContent = doc.data().name;
+    opt.textContent = data.name || "Unnamed Brand";
     brandSelect.appendChild(opt);
   });
 }
+
 
 async function loadInventoryReport(page = 1) {
   const itemsPerPage = 10;
