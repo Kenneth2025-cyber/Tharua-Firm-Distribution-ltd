@@ -6054,10 +6054,318 @@ function toggleExpenses() {
     /* -------------------------------
        EXPENSES LIST + ADD (PLACEHOLDERS)
     --------------------------------*/
-    function showListExpenses() { 
-      saveLastPage("showListExpenses"); 
-      document.getElementById("content").innerHTML = `<h2>List of Expenses</h2><p>Coming soon...</p>`; 
+async function showListExpenses() {
+  saveLastPage("showListExpenses");
+
+  document.getElementById("content").innerHTML = `
+    <style>
+      .filter-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+      }
+      .filter-section label {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .summary-cards {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .summary-card {
+        flex: 1;
+        min-width: 200px;
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        text-align: center;
+      }
+      .summary-card h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #666;
+      }
+      .summary-card p {
+        margin: 5px 0 0;
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+      }
+      .table-container {
+        max-height: 500px;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead {
+        position: sticky;
+        top: 0;
+        background: #f0f0f0;
+        z-index: 1;
+      }
+      th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      th {
+        font-weight: 600;
+        color: #333;
+      }
+      tfoot td {
+        font-weight: bold;
+        background: #f9f9f9;
+      }
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 15px;
+      }
+    </style>
+
+    <h2>List of Expenses</h2>
+
+    <!-- Filters -->
+    <div class="filter-section">
+      <div>
+        <label>Location:</label>
+        <select id="filterLocation"></select>
+      </div>
+      <div>
+        <label>Category:</label>
+        <select id="filterCategory"></select>
+      </div>
+      <div>
+        <label>Salesperson:</label>
+        <select id="filterSalesperson"></select>
+      </div>
+      <div>
+        <label>Date From:</label>
+        <input type="date" id="filterStart" />
+      </div>
+      <div>
+        <label>Date To:</label>
+        <input type="date" id="filterEnd" />
+      </div>
+      <div>
+        <label>Search:</label>
+        <input type="text" id="filterSearch" placeholder="Notes..." />
+      </div>
+      <button onclick="loadExpenses()">Apply</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="summary-card">
+        <h3>Total Expenses</h3>
+        <p id="summaryTotal">KES 0</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Paid</h3>
+        <p id="summaryPaid">KES 0</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Due</h3>
+        <p id="summaryDue">KES 0</p>
+      </div>
+    </div>
+
+    <!-- Expenses Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Category</th>
+            <th>Salesperson</th>
+            <th>Total (KES)</th>
+            <th>Paid (KES)</th>
+            <th>Due (KES)</th>
+            <th>Note</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="expensesTbody">
+          <tr><td colspan="9" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right;">TOTAL:</td>
+            <td id="tableTotal">KES 0</td>
+            <td id="tablePaid">KES 0</td>
+            <td id="tableDue">KES 0</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-section">
+      <div>
+        Show: 
+        <select id="itemsPerPage" onchange="loadExpenses()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div>
+        <button id="prevPageBtn" onclick="prevExpensesPage()">Prev</button>
+        <span id="pageInfo"></span>
+        <button id="nextPageBtn" onclick="nextExpensesPage()">Next</button>
+      </div>
+    </div>
+  `;
+
+  await loadExpenseFilters();
+  await loadExpenses();
+}
+
+// Load filters dynamically
+async function loadExpenseFilters() {
+  await populateDropdown("businessLocations", "filterLocation", "All Locations");
+  await populateDropdown("expenseCategories", "filterCategory", "All Categories");
+  await populateDropdown("fieldSalespersons", "filterSalesperson", "All Salespersons");
+}
+
+// Helper for dropdowns
+async function populateDropdown(collection, elementId, defaultText) {
+  const select = document.getElementById(elementId);
+  select.innerHTML = `<option value="">${defaultText}</option>`;
+  const snap = await firebase.firestore().collection(collection).orderBy("name").get();
+  snap.forEach(doc => {
+    const d = doc.data();
+    if (d.name) {
+      select.innerHTML += `<option value="${d.name}">${d.name}</option>`;
     }
+  });
+}
+
+// Pagination state
+let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
+
+// Load expenses with filters
+async function loadExpenses() {
+  const tbody = document.getElementById("expensesTbody");
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Loading...</td></tr>`;
+
+  const loc = document.getElementById("filterLocation").value;
+  const cat = document.getElementById("filterCategory").value;
+  const sp = document.getElementById("filterSalesperson").value;
+  const start = document.getElementById("filterStart").value;
+  const end = document.getElementById("filterEnd").value;
+  const search = document.getElementById("filterSearch").value.toLowerCase();
+  expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
+    ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
+
+  let query = firebase.firestore().collection("expenses");
+
+  if (loc) query = query.where("location", "==", loc);
+  if (cat) query = query.where("category", "==", cat);
+  if (sp) query = query.where("salesperson", "==", sp);
+  if (start && end) {
+    const s = new Date(start);
+    const e = new Date(end);
+    e.setDate(e.getDate() + 1);
+    query = query.where("expenseDate", ">=", s).where("expenseDate", "<", e);
+  }
+
+  const snap = await query.orderBy("expenseDate", "desc").get();
+
+  let rows = [];
+  let total = 0, paid = 0, due = 0;
+
+  snap.forEach(doc => {
+    const e = doc.data();
+    if (search && !(e.note || "").toLowerCase().includes(search)) return;
+
+    total += e.totalAmount || 0;
+    paid += e.paidAmount || 0;
+    due += e.dueAmount || 0;
+
+    rows.push(`
+      <tr>
+        <td>${e.expenseDate?.toDate().toLocaleDateString() || ""}</td>
+        <td>${e.location || ""}</td>
+        <td>${e.category || ""}</td>
+        <td>${e.salesperson || ""}</td>
+        <td>KES ${Number(e.totalAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.dueAmount || 0).toLocaleString()}</td>
+        <td>${e.note || ""}</td>
+        <td>
+          <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
+          <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
+          <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
+        </td>
+      </tr>
+    `);
+  });
+
+  // Apply pagination
+  expensePage.total = rows.length;
+  const startIdx = (expensePage.current - 1) * expensePage.perPage;
+  const endIdx = startIdx + expensePage.perPage;
+  const pageRows = expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
+
+  tbody.innerHTML = pageRows.length ? pageRows.join("") : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
+
+  // Update totals
+  document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
+  document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
+  document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
+
+  // Update summary cards
+  document.getElementById("summaryTotal").textContent = "KES " + total.toLocaleString();
+  document.getElementById("summaryPaid").textContent = "KES " + paid.toLocaleString();
+  document.getElementById("summaryDue").textContent = "KES " + due.toLocaleString();
+
+  // Update pagination info
+  const pageInfo = document.getElementById("pageInfo");
+  pageInfo.textContent = expensePage.perPage === Infinity
+    ? `Showing all ${rows.length}`
+    : `Page ${expensePage.current} of ${Math.ceil(expensePage.total / expensePage.perPage)}`;
+
+  document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
+  document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
+}
+
+function prevExpensesPage() {
+  if (expensePage.current > 1) {
+    expensePage.current--;
+    loadExpenses();
+  }
+}
+
+function nextExpensesPage() {
+  if ((expensePage.current * expensePage.perPage) < expensePage.total) {
+    expensePage.current++;
+    loadExpenses();
+  }
+}
+
+// Placeholders for actions
+function viewExpense(id) { alert("View expense " + id); }
+function editExpense(id) { alert("Edit expense " + id); }
+function deleteExpense(id) { alert("Delete expense " + id); }
 
 async function showAddExpense() {
   saveLastPage("showAddExpense");
