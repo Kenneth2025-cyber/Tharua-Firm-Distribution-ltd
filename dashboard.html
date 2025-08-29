@@ -6135,6 +6135,22 @@ async function showListExpenses() {
         justify-content: space-between;
         margin-top: 15px;
       }
+      .export-buttons {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+      }
+      .export-buttons button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .export-buttons button:hover {
+        background: #0056b3;
+      }
     </style>
 
     <h2>List of Expenses</h2>
@@ -6186,7 +6202,7 @@ async function showListExpenses() {
 
     <!-- Expenses Table -->
     <div class="table-container">
-      <table>
+      <table id="expensesTable">
         <thead>
           <tr>
             <th>Date</th>
@@ -6213,6 +6229,12 @@ async function showListExpenses() {
           </tr>
         </tfoot>
       </table>
+    </div>
+
+    <!-- Export Buttons -->
+    <div class="export-buttons">
+      <button onclick="exportExpensesExcel()">Export to Excel</button>
+      <button onclick="exportExpensesPDF()">Export to PDF</button>
     </div>
 
     <!-- Pagination -->
@@ -6261,6 +6283,7 @@ async function populateDropdown(collection, elementId, defaultText) {
 
 // Pagination state
 let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
+let allFilteredExpenses = [];
 
 // Load expenses with filters (applied in-memory)
 async function loadExpenses() {
@@ -6276,7 +6299,6 @@ async function loadExpenses() {
   expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
     ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
 
-  // Always order by expenseDate for consistency
   const snap = await firebase.firestore()
     .collection("expenses")
     .orderBy("expenseDate", "desc")
@@ -6284,11 +6306,10 @@ async function loadExpenses() {
 
   let rows = [];
   let total = 0, paid = 0, due = 0;
+  allFilteredExpenses = [];
 
   snap.forEach(doc => {
     const e = doc.data();
-
-    // Apply filters in-memory
     if (loc && e.location !== loc) return;
     if (cat && e.category !== cat) return;
     if (sp && e.salesperson !== sp) return;
@@ -6303,6 +6324,17 @@ async function loadExpenses() {
     total += e.totalAmount || 0;
     paid += e.paidAmount || 0;
     due += e.dueAmount || 0;
+
+    allFilteredExpenses.push({
+      date: e.expenseDate?.toDate().toLocaleDateString() || "",
+      location: e.location || "",
+      category: e.category || "",
+      salesperson: e.salesperson || "",
+      total: e.totalAmount || 0,
+      paid: e.paidAmount || 0,
+      due: e.dueAmount || 0,
+      note: e.note || ""
+    });
 
     rows.push(`
       <tr>
@@ -6323,7 +6355,6 @@ async function loadExpenses() {
     `);
   });
 
-  // Apply pagination
   expensePage.total = rows.length;
   const startIdx = (expensePage.current - 1) * expensePage.perPage;
   const endIdx = startIdx + expensePage.perPage;
@@ -6331,19 +6362,15 @@ async function loadExpenses() {
 
   tbody.innerHTML = pageRows.length ? pageRows.join("") : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
 
-  // Update totals
   document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
   document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
   document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
 
-  // Update summary cards
   document.getElementById("summaryTotal").textContent = "KES " + total.toLocaleString();
   document.getElementById("summaryPaid").textContent = "KES " + paid.toLocaleString();
   document.getElementById("summaryDue").textContent = "KES " + due.toLocaleString();
 
-  // Update pagination info
-  const pageInfo = document.getElementById("pageInfo");
-  pageInfo.textContent = expensePage.perPage === Infinity
+  document.getElementById("pageInfo").textContent = expensePage.perPage === Infinity
     ? `Showing all ${rows.length}`
     : `Page ${expensePage.current} of ${Math.ceil(expensePage.total / expensePage.perPage)}`;
 
@@ -6363,6 +6390,48 @@ function nextExpensesPage() {
     expensePage.current++;
     loadExpenses();
   }
+}
+
+// Export Functions
+function exportExpensesExcel() {
+  let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\\n";
+  allFilteredExpenses.forEach(e => {
+    csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "expenses.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportExpensesPDF() {
+  const printWin = window.open("", "_blank");
+  printWin.document.write("<h2>Expenses Report</h2>");
+  printWin.document.write("<table border='1' style='border-collapse:collapse;width:100%;'>");
+  printWin.document.write("<tr><th>Date</th><th>Location</th><th>Category</th><th>Salesperson</th><th>Total</th><th>Paid</th><th>Due</th><th>Note</th></tr>");
+
+  allFilteredExpenses.forEach(e => {
+    printWin.document.write(
+      `<tr>
+        <td>${e.date}</td>
+        <td>${e.location}</td>
+        <td>${e.category}</td>
+        <td>${e.salesperson}</td>
+        <td>KES ${e.total.toLocaleString()}</td>
+        <td>KES ${e.paid.toLocaleString()}</td>
+        <td>KES ${e.due.toLocaleString()}</td>
+        <td>${e.note}</td>
+      </tr>`
+    );
+  });
+
+  printWin.document.write("</table>");
+  printWin.document.close();
+  printWin.print();
 }
 
 // Placeholders for actions
