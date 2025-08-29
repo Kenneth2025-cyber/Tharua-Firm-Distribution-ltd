@@ -6359,7 +6359,11 @@ async function loadExpenses() {
         <td>${e.salesperson || ""}</td>
         <td>KES ${Number(e.totalAmount || 0).toLocaleString()}</td>
         <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
-        <td>KES ${Number(e.dueAmount || 0).toLocaleString()}</td>
+        <td>
+          KES ${Number(e.dueAmount || 0).toLocaleString()}
+          <span style="color:purple; margin-left:6px; cursor:pointer;" 
+            onclick="addPayment('${doc.id}', ${e.totalAmount || 0}, ${e.paidAmount || 0})">💰</span>
+        </td>
         <td>${e.note || ""}</td>
         <td>
           <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
@@ -6407,11 +6411,37 @@ function nextExpensesPage() {
   }
 }
 
+// Add Payment
+async function addPayment(id, total, currentPaid) {
+  const { value: amount } = await Swal.fire({
+    title: "Add Payment",
+    input: "number",
+    inputLabel: `Total: KES ${total.toLocaleString()} | Already Paid: KES ${currentPaid.toLocaleString()}`,
+    inputPlaceholder: "Enter payment amount",
+    inputAttributes: { min: 1, max: total - currentPaid },
+    showCancelButton: true
+  });
+
+  if (amount) {
+    const payment = Number(amount);
+    const newPaid = currentPaid + payment;
+    const newDue = total - newPaid;
+
+    await firebase.firestore().collection("expenses").doc(id).update({
+      paidAmount: newPaid,
+      dueAmount: newDue
+    });
+
+    Swal.fire("Success", `Payment of KES ${payment.toLocaleString()} added.`, "success");
+    loadExpenses();
+  }
+}
+
 // Export Functions
 function exportExpensesExcel() {
-  let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\\n";
+  let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\n";
   allFilteredExpenses.forEach(e => {
-    csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\\n`;
+    csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv" });
@@ -6453,6 +6483,7 @@ function exportExpensesPDF() {
 function viewExpense(id) { alert("View expense " + id); }
 function editExpense(id) { alert("Edit expense " + id); }
 function deleteExpense(id) { alert("Delete expense " + id); }
+
 
 async function showAddExpense() {
   saveLastPage("showAddExpense");
