@@ -6455,28 +6455,45 @@ async function addPayment(id, total, currentPaid) {
 
 
 // Export Functions
-function exportExpensesExcel() {
+async function exportExpensesExcel() {
   let csv = "Date,Location,Category,Salesperson,Total, Paid, Due, Note\n";
-  allFilteredExpenses.forEach(e => {
+
+  for (let e of allFilteredExpenses) {
     csv += `${e.date},${e.location},${e.category},${e.salesperson},${e.total},${e.paid},${e.due},${e.note}\n`;
-  });
+
+    // Fetch payments for this expense
+    const expRef = await firebase.firestore().collection("expenses")
+      .where("expenseDate", "==", new Date(e.date)) // safer is by ID, but allFilteredExpenses has no ID now
+      .get();
+
+    if (!expRef.empty) {
+      const doc = expRef.docs[0]; // get first match
+      const paymentsSnap = await doc.ref.collection("payments").orderBy("date", "asc").get();
+      paymentsSnap.forEach(p => {
+        const d = p.data();
+        const dt = d.date?.toDate ? d.date.toDate().toLocaleString() : new Date(d.date).toLocaleString();
+        csv += `,,PAYMENT,, ,${d.amount}, Balance After: ${d.balanceAfter}, ${dt}\n`;
+      });
+    }
+  }
 
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "expenses.csv";
+  a.download = "expenses_with_payments.csv";
   a.click();
   URL.revokeObjectURL(url);
 }
 
-function exportExpensesPDF() {
+
+async function exportExpensesPDF() {
   const printWin = window.open("", "_blank");
   printWin.document.write("<h2>Expenses Report</h2>");
   printWin.document.write("<table border='1' style='border-collapse:collapse;width:100%;'>");
   printWin.document.write("<tr><th>Date</th><th>Location</th><th>Category</th><th>Salesperson</th><th>Total</th><th>Paid</th><th>Due</th><th>Note</th></tr>");
 
-  allFilteredExpenses.forEach(e => {
+  for (let e of allFilteredExpenses) {
     printWin.document.write(
       `<tr>
         <td>${e.date}</td>
@@ -6489,12 +6506,39 @@ function exportExpensesPDF() {
         <td>${e.note}</td>
       </tr>`
     );
-  });
+
+    // Fetch payments
+    const expRef = await firebase.firestore().collection("expenses")
+      .where("expenseDate", "==", new Date(e.date)) // safer is by ID
+      .get();
+
+    if (!expRef.empty) {
+      const doc = expRef.docs[0];
+      const paymentsSnap = await doc.ref.collection("payments").orderBy("date", "asc").get();
+      if (!paymentsSnap.empty) {
+        printWin.document.write(`<tr><td colspan="8"><b>Payment History</b></td></tr>`);
+        printWin.document.write(`<tr><th colspan="2">Date</th><th colspan="2">Amount</th><th colspan="2">Balance After</th><th colspan="2">---</th></tr>`);
+        paymentsSnap.forEach(p => {
+          const d = p.data();
+          const dt = d.date?.toDate ? d.date.toDate().toLocaleString() : new Date(d.date).toLocaleString();
+          printWin.document.write(
+            `<tr>
+              <td colspan="2">${dt}</td>
+              <td colspan="2">KES ${d.amount.toLocaleString()}</td>
+              <td colspan="2">KES ${d.balanceAfter.toLocaleString()}</td>
+              <td colspan="2"></td>
+            </tr>`
+          );
+        });
+      }
+    }
+  }
 
   printWin.document.write("</table>");
   printWin.document.close();
   printWin.print();
 }
+
 
 // Placeholders for actions
 async function viewExpense(id) {
