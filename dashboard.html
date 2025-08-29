@@ -799,7 +799,22 @@ button {
 
     <a onclick="clearContent()"><i class="fas fa-calculator"></i> <span>Accounting</span></a>
     <a onclick="clearContent()"><i class="fas fa-robot"></i> <span>AI Assistance</span></a>
-    <a onclick="clearContent()"><i class="fas fa-chart-line"></i> <span>Reports</span></a>
+<div class="dropdown">
+  <a onclick="toggleReports()" id="reportsMenu">
+    <i class="fas fa-chart-line"></i>
+    <span>Reports</span>
+    <i class="fas fa-caret-down" style="margin-left:auto;"></i>
+  </a>
+  <div id="reportsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showSalesReport()"><span>Sales Report</span></a>
+    <a onclick="showPurchaseReport()"><span>Purchase Report</span></a>
+    <a onclick="showInventoryReport()"><span>Inventory Report</span></a>
+    <a onclick="showFinancialSummary()"><span>Financial Summary</span></a>
+    <a onclick="showCustomerReport()"><span>Customer Report</span></a>
+    <a onclick="showExpenseReport()"><span>Expense Report</span></a>
+  </div>
+</div>
+
     <a onclick="clearContent()"><i class="fas fa-envelope"></i> <span>Notification Templates</span></a>
     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
 </div>
@@ -6854,6 +6869,10 @@ async function addExpenseSubmit() {
   }
 }
 
+function toggleReports() {
+  const submenu = document.getElementById("reportsSubmenu");
+  submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
+}
 
 
   </script>
