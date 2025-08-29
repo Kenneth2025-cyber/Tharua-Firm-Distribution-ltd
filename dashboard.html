@@ -7099,18 +7099,30 @@ async function fetchInventoryReports() {
     return;
   }
 
-  tbody.innerHTML = data.map(d => `
-    <tr>
-      <td>${d.name || ""}</td>
-      <td>${d.category || ""}</td>
-      <td>${d.brand || ""}</td>
-      <td>${(d.locations && d.locations.join(", ")) || ""}</td>
-      <td>${d.openingStock || 0}</td>
-      <td>${d.purchased || 0}</td>
-      <td>${d.sold || 0}</td>
-      <td>${(d.openingStock || 0) + (d.purchased || 0) - (d.sold || 0)}</td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = data.map(d => {
+    // if location selected, show only that one, else show all
+    const displayLocations = loc ? [loc] : (d.locations || []);
+
+    return displayLocations.map(location => {
+      const opening = d.openingStock?.[location] || d.openingStock || 0;
+      const purchased = d.purchased?.[location] || d.purchased || 0;
+      const sold = d.sold?.[location] || d.sold || 0;
+      const closing = opening + purchased - sold;
+
+      return `
+        <tr>
+          <td>${d.name || ""}</td>
+          <td>${d.category || ""}</td>
+          <td>${d.brand || ""}</td>
+          <td>${location}</td>
+          <td>${opening}</td>
+          <td>${purchased}</td>
+          <td>${sold}</td>
+          <td>${closing}</td>
+        </tr>
+      `;
+    }).join("");
+  }).join("");
 }
 
 // Pagination helpers
@@ -7122,6 +7134,7 @@ function changeInventoryPage(direction) {
 function exportInventoryReport() {
   alert("Exporting Inventory Report... (implement PDF/CSV export here)");
 }
+
 
 
 function showFinancialSummary() {
