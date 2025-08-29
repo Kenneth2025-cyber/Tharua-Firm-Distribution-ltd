@@ -6986,70 +6986,74 @@ async function loadInventoryReport(page = 1) {
   const categoryFilter = document.getElementById("inventoryCategoryFilter").value;
   const brandFilter = document.getElementById("inventoryBrandFilter").value;
 
-  // Query products
-  let query = firestore.collection("products");
-  if (categoryFilter) query = query.where("category", "==", categoryFilter);
-  if (brandFilter) query = query.where("brand", "==", brandFilter);
+  // --- Fetch products first ---
+  let productQuery = firestore.collection("products");
+  if (categoryFilter) productQuery = productQuery.where("category", "==", categoryFilter);
+  if (brandFilter) productQuery = productQuery.where("brand", "==", brandFilter);
+  const productSnap = await productQuery.get();
 
-  const snap = await query.get();
+  let products = {};
+  productSnap.forEach(doc => {
+    products[doc.id] = { id: doc.id, ...doc.data(), stock: 0 };
+  });
+
+  // --- Fetch transactions in bulk ---
+  const locationCondition = locationFilter ? ["==", locationFilter] : null;
+
+  async function bulkFetch(collection, field, sign = 1) {
+    let q = firestore.collection(collection);
+    if (locationCondition) q = q.where(field, locationCondition[0], locationCondition[1]);
+    const snap = await q.get();
+    snap.forEach(d => {
+      const t = d.data();
+      if (products[t.productId]) {
+        products[t.productId].stock += (t.quantity || 0) * sign;
+      }
+    });
+  }
+
+  // Opening stock (always +)
+  await bulkFetch("openingStocks", "locationId", 1);
+
+  // Purchases (always +)
+  await bulkFetch("purchases", "locationId", 1);
+
+  // Sales (subtract)
+  await bulkFetch("sales", "locationId", -1);
+
+  // Adjustments (+ or -)
+  await bulkFetch("stockAdjustments", "locationId", 1);
+
+  // Transfers In
+  let transfersInQuery = firestore.collection("stockTransfers");
+  if (locationFilter) transfersInQuery = transfersInQuery.where("toLocationId", "==", locationFilter);
+  const transfersInSnap = await transfersInQuery.get();
+  transfersInSnap.forEach(d => {
+    const t = d.data();
+    if (products[t.productId]) {
+      products[t.productId].stock += (t.quantity || 0);
+    }
+  });
+
+  // Transfers Out
+  let transfersOutQuery = firestore.collection("stockTransfers");
+  if (locationFilter) transfersOutQuery = transfersOutQuery.where("fromLocationId", "==", locationFilter);
+  const transfersOutSnap = await transfersOutQuery.get();
+  transfersOutSnap.forEach(d => {
+    const t = d.data();
+    if (products[t.productId]) {
+      products[t.productId].stock -= (t.quantity || 0);
+    }
+  });
+
+  // --- Build rows ---
   let rows = [];
   let totalBuying = 0, totalSelling = 0, totalRevenue = 0;
 
-  for (let doc of snap.docs) {
-    const product = { id: doc.id, ...doc.data() };
-
-    // --- Stock balance computation ---
-    let stock = 0;
-
-    // Opening stock
-    const openingSnap = await firestore.collection("openingStocks")
-      .where("productId", "==", product.id)
-      .where("locationId", "==", locationFilter || product.defaultLocation || "")
-      .get();
-    openingSnap.forEach(d => stock += d.data().quantity);
-
-    // Purchases
-    const purchasesSnap = await firestore.collection("purchases")
-      .where("productId", "==", product.id)
-      .where("locationId", "==", locationFilter || product.defaultLocation || "")
-      .get();
-    purchasesSnap.forEach(d => stock += d.data().quantity);
-
-    // Sales
-    const salesSnap = await firestore.collection("sales")
-      .where("productId", "==", product.id)
-      .where("locationId", "==", locationFilter || product.defaultLocation || "")
-      .get();
-    salesSnap.forEach(d => stock -= d.data().quantity);
-
-    // Adjustments
-    const adjustSnap = await firestore.collection("stockAdjustments")
-      .where("productId", "==", product.id)
-      .where("locationId", "==", locationFilter || product.defaultLocation || "")
-      .get();
-    adjustSnap.forEach(d => stock += d.data().quantity);
-
-    // Transfers In
-    const transfersInSnap = await firestore.collection("stockTransfers")
-      .where("productId", "==", product.id)
-      .where("toLocationId", "==", locationFilter || product.defaultLocation || "")
-      .get();
-    transfersInSnap.forEach(d => stock += d.data().quantity);
-
-    // Transfers Out
-    const transfersOutSnap = await firestore.collection("stockTransfers")
-      .where("productId", "==", product.id)
-      .where("fromLocationId", "==", locationFilter || product.defaultLocation || "")
-      .get();
-    transfersOutSnap.forEach(d => stock -= d.data().quantity);
-
-    if (locationFilter && (!product.defaultLocation || product.defaultLocation !== locationFilter)) {
-      // skip products not in this location
-    }
-
-    // --- Value calculations ---
-    const buyingValue = stock * (product.buyingPrice || 0);
-    const sellingValue = stock * (product.sellingPrice || 0);
+  Object.values(products).forEach(p => {
+    const stock = p.stock || 0;
+    const buyingValue = stock * (p.buyingPrice || 0);
+    const sellingValue = stock * (p.sellingPrice || 0);
     const revenue = sellingValue - buyingValue;
 
     totalBuying += buyingValue;
@@ -7058,15 +7062,15 @@ async function loadInventoryReport(page = 1) {
 
     rows.push(`
       <tr>
-        <td>${product.name}</td>
-        <td>${locationFilter ? locationFilter : (product.defaultLocationName || "N/A")}</td>
+        <td>${p.name}</td>
+        <td>${locationFilter ? locationFilter : "All Locations"}</td>
         <td>${stock}</td>
         <td>${buyingValue.toFixed(2)}</td>
         <td>${sellingValue.toFixed(2)}</td>
         <td>${revenue.toFixed(2)}</td>
       </tr>
     `);
-  }
+  });
 
   // Update totals
   document.getElementById("buyingValueCard").innerText = `Value by Buying Price: ${totalBuying.toFixed(2)}`;
