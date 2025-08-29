@@ -6411,9 +6411,9 @@ function nextExpensesPage() {
   }
 }
 
-// Add Payment
+// Add Payment with history logging
 async function addPayment(id, total, currentPaid) {
-  const { value: amount } = await Swal.fire({
+  const { value: payment } = await Swal.fire({
     title: "Add Payment",
     input: "number",
     inputLabel: `Total: KES ${total.toLocaleString()} | Already Paid: KES ${currentPaid.toLocaleString()}`,
@@ -6422,20 +6422,37 @@ async function addPayment(id, total, currentPaid) {
     showCancelButton: true
   });
 
-  if (amount) {
-    const payment = Number(amount);
-    const newPaid = currentPaid + payment;
+  if (payment) {
+    const amount = Number(payment);
+    const newPaid = currentPaid + amount;
     const newDue = total - newPaid;
 
-    await firebase.firestore().collection("expenses").doc(id).update({
+    const expenseRef = firebase.firestore().collection("expenses").doc(id);
+
+    // Write batch to ensure consistency
+    const batch = firebase.firestore().batch();
+
+    // Update expense totals
+    batch.update(expenseRef, {
       paidAmount: newPaid,
       dueAmount: newDue
     });
 
-    Swal.fire("Success", `Payment of KES ${payment.toLocaleString()} added.`, "success");
+    // Add new payment entry to sub-collection
+    const payRef = expenseRef.collection("payments").doc();
+    batch.set(payRef, {
+      amount,
+      date: new Date(),
+      balanceAfter: newDue
+    });
+
+    await batch.commit();
+
+    Swal.fire("Success", `Payment of KES ${amount.toLocaleString()} recorded.`, "success");
     loadExpenses();
   }
 }
+
 
 // Export Functions
 function exportExpensesExcel() {
@@ -6480,7 +6497,55 @@ function exportExpensesPDF() {
 }
 
 // Placeholders for actions
-function viewExpense(id) { alert("View expense " + id); }
+async function viewExpense(id) {
+  const expenseRef = firebase.firestore().collection("expenses").doc(id);
+  const docSnap = await expenseRef.get();
+  if (!docSnap.exists) {
+    Swal.fire("Error", "Expense not found", "error");
+    return;
+  }
+
+  const e = docSnap.data();
+
+  // Load payments sub-collection
+  const paymentsSnap = await expenseRef.collection("payments").orderBy("date", "asc").get();
+  let paymentRows = "";
+  paymentsSnap.forEach(p => {
+    const d = p.data();
+    const dt = d.date?.toDate ? d.date.toDate().toLocaleString() : new Date(d.date).toLocaleString();
+    paymentRows += `<tr>
+      <td>${dt}</td>
+      <td>KES ${d.amount.toLocaleString()}</td>
+      <td>KES ${d.balanceAfter.toLocaleString()}</td>
+    </tr>`;
+  });
+
+  if (!paymentRows) {
+    paymentRows = `<tr><td colspan="3" style="text-align:center;">No payments yet</td></tr>`;
+  }
+
+  Swal.fire({
+    title: "Expense Details",
+    width: 700,
+    html: `
+      <p><b>Date:</b> ${e.expenseDate?.toDate().toLocaleDateString() || ""}</p>
+      <p><b>Location:</b> ${e.location || ""}</p>
+      <p><b>Category:</b> ${e.category || ""}</p>
+      <p><b>Salesperson:</b> ${e.salesperson || ""}</p>
+      <p><b>Total:</b> KES ${Number(e.totalAmount || 0).toLocaleString()}</p>
+      <p><b>Paid:</b> KES ${Number(e.paidAmount || 0).toLocaleString()}</p>
+      <p><b>Due:</b> KES ${Number(e.dueAmount || 0).toLocaleString()}</p>
+
+      <h3>Payment History</h3>
+      <table border="1" style="width:100%; border-collapse:collapse; text-align:left;">
+        <tr><th>Date</th><th>Amount</th><th>Balance After</th></tr>
+        ${paymentRows}
+      </table>
+    `,
+    confirmButtonText: "Close"
+  });
+}
+
 function editExpense(id) { alert("Edit expense " + id); }
 function deleteExpense(id) { alert("Delete expense " + id); }
 
