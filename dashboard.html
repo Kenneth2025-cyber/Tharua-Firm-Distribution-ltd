@@ -6590,8 +6590,76 @@ async function viewExpense(id) {
   });
 }
 
-function editExpense(id) { alert("Edit expense " + id); }
-function deleteExpense(id) { alert("Delete expense " + id); }
+async function editExpense(id) {
+  const doc = await firebase.firestore().collection("expenses").doc(id).get();
+  if (!doc.exists) {
+    Swal.fire("Error", "Expense not found", "error");
+    return;
+  }
+  const e = doc.data();
+
+  const { value: formValues } = await Swal.fire({
+    title: "Edit Expense",
+    html: `
+      <div style="max-height:300px; overflow-y:auto; text-align:left; padding-right:10px;">
+        <label>Category:</label>
+        <input id="swalCategory" class="swal2-input" value="${e.category || ""}">
+        
+        <label>Total Amount (KES):</label>
+        <input id="swalTotal" type="number" class="swal2-input" value="${e.totalAmount || 0}">
+        
+        <label>Paid Amount (KES):</label>
+        <input id="swalPaid" type="number" class="swal2-input" value="${e.paidAmount || 0}">
+        
+        <label>Note:</label>
+        <input id="swalNote" class="swal2-input" value="${e.note || ""}">
+      </div>
+    `,
+    focusConfirm: false,
+    width: 500,
+    preConfirm: () => {
+      return {
+        category: document.getElementById("swalCategory").value,
+        totalAmount: Number(document.getElementById("swalTotal").value),
+        paidAmount: Number(document.getElementById("swalPaid").value),
+        note: document.getElementById("swalNote").value
+      };
+    },
+    showCancelButton: true
+  });
+
+  if (formValues) {
+    const dueAmount = formValues.totalAmount - formValues.paidAmount;
+    await firebase.firestore().collection("expenses").doc(id).update({
+      category: formValues.category,
+      totalAmount: formValues.totalAmount,
+      paidAmount: formValues.paidAmount,
+      dueAmount: dueAmount,
+      note: formValues.note
+    });
+    Swal.fire("Updated", "Expense updated successfully", "success");
+    loadExpenses();
+  }
+}
+
+
+async function deleteExpense(id) {
+  const confirm = await Swal.fire({
+    title: "Are you sure?",
+    text: "This will permanently delete the expense.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it!",
+    cancelButtonText: "Cancel"
+  });
+
+  if (confirm.isConfirmed) {
+    await firebase.firestore().collection("expenses").doc(id).delete();
+    Swal.fire("Deleted!", "Expense has been deleted.", "success");
+    loadExpenses();
+  }
+}
+
 
 
 async function showAddExpense() {
