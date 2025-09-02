@@ -975,16 +975,12 @@ function toggleSidebar() {
    function showHome() {
   saveLastPage("showHome");
 
-  const savedLocation = localStorage.getItem("dashboardLocation") || "all";
   const savedStartDate = localStorage.getItem("dashboardStartDate") || "";
   const savedEndDate = localStorage.getItem("dashboardEndDate") || "";
 
   document.getElementById("content").innerHTML = `
     <h2>Dashboard Overview</h2>
     <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
-      <select id="locationFilter" style="flex:1;">
-        <option value="all">All Locations</option>
-      </select>
       <input type="date" id="startDateFilter" style="flex:1;" />
       <input type="date" id="endDateFilter" style="flex:1;" />
       <button onclick="applyFilters()">Apply</button>
@@ -1008,57 +1004,64 @@ function toggleSidebar() {
   document.getElementById("startDateFilter").value = savedStartDate;
   document.getElementById("endDateFilter").value = savedEndDate;
 
-  // ✅ Run after DOM has been updated
+  // Load totals (no location anymore)
   setTimeout(() => {
-    console.log("Running loadLocations + loadTotals...");
-    loadLocations(savedLocation);
-    loadTotal("sales", "salesTotal", savedLocation, savedStartDate, savedEndDate);
-    loadTotal("purchases", "purchasesTotal", savedLocation, savedStartDate, savedEndDate);
-    loadTotal("expenses", "expensesTotal", savedLocation, savedStartDate, savedEndDate);
+    loadTotal("sales", "salesTotal", savedStartDate, savedEndDate);
+    loadTotal("purchases", "purchasesTotal", savedStartDate, savedEndDate);
+    loadTotal("expenses", "expensesTotal", savedStartDate, savedEndDate);
   }, 0);
 }
 
-async function loadLocations(selectedValue) {
-  const locationSelect = document.getElementById("locationFilter");
-  if (!locationSelect) {
-    console.error("❌ Location filter element (#locationFilter) not found in DOM");
-    return;
+function applyFilters() {
+  const start = document.getElementById("startDateFilter").value;
+  const end = document.getElementById("endDateFilter").value;
+
+  localStorage.setItem("dashboardStartDate", start);
+  localStorage.setItem("dashboardEndDate", end);
+
+  showHome();
+}
+
+function loadTotal(type, elementId, startDate, endDate) {
+  const dateFieldMap = { sales: "saleDate", purchases: "purchaseDate", expenses: "expenseDate" };
+  const amountFieldMap = { sales: "totalAmount", purchases: "totalAmount", expenses: "amount" };
+
+  const dateField = dateFieldMap[type] || "date";
+  const amountField = amountFieldMap[type] || "amount";
+
+  let query = firebase.firestore().collection(type);
+
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setDate(end.getDate() + 1);
+    query = query.where(dateField, ">=", start).where(dateField, "<", end);
   }
 
-  locationSelect.innerHTML = `<option value="all">All Locations</option>`;
-  locationSelect.disabled = true;
+  query.get().then(snap => {
+    console.log(`📊 ${type} docs found:`, snap.size);
 
-  try {
-    const snapshot = await firebase.firestore()
-      .collection("businessLocations")
-      .orderBy("name")
-      .get();
-
-    if (snapshot.empty) {
-      console.warn("⚠️ No locations found in businessLocations collection");
-      locationSelect.disabled = false;
-      return;
-    }
-
-    snapshot.forEach(doc => {
-      const loc = doc.data();
-      console.log("📍 Found location:", loc);
-      if (loc.name) {
-        const opt = document.createElement("option");
-        opt.value = loc.name;
-        opt.textContent = loc.name;
-        if (loc.name === selectedValue) opt.selected = true;
-        locationSelect.appendChild(opt);
-      }
+    let total = 0;
+    snap.forEach(doc => {
+      const data = doc.data();
+      const value =
+        (data && (
+          (amountField in data ? data[amountField] : undefined) ??
+          data.totalAmount ??
+          data.amount ??
+          data.net ??
+          0
+        )) || 0;
+      total += Number(value) || 0;
     });
 
-    locationSelect.disabled = false;
-  } catch (err) {
-    console.error("❌ Error loading locations:", err);
-    locationSelect.innerHTML = `<option value="all">Error loading locations</option>`;
-    locationSelect.disabled = true;
-    showNotification("Failed to load locations: " + err.message, "error");
-  }
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = "KES " + total.toLocaleString();
+  }).catch(err => {
+    console.error("❌ loadTotal error:", err);
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = "Error";
+  });
 }
 
 
