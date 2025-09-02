@@ -5785,6 +5785,7 @@ function toggleSell() {
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
 }
 
+
 let saleItems = []; // store sale items globally
 
 async function showAddSale() {
@@ -5916,25 +5917,61 @@ async function showAddSale() {
     salesSelect.innerHTML += `<option value="${doc.id}">${s.name || doc.id}</option>`;
   });
 
-  // Load products with stock
+  // Load products with stock balances
   const prodSnapshot = await firebase.firestore().collection("products").orderBy("name").get();
   const prodList = document.getElementById("productsList");
   window.productsMap = {}; // store product info globally
 
-  prodSnapshot.forEach(doc => {
+  for (const doc of prodSnapshot.docs) {
     const p = doc.data();
-    const stock = p.stock || 0;
+    const prodName = p.name;
 
+    // Opening stock
+    const openingStock = parseFloat(p.openingStock || 0);
+
+    // Purchases total
+    const purchasesSnapshot = await firebase.firestore().collection("purchases").get();
+    let totalPurchased = 0;
+    purchasesSnapshot.forEach(purDoc => {
+      const pur = purDoc.data();
+      if (pur.items && Array.isArray(pur.items)) {
+        pur.items.forEach(item => {
+          if (item.productName === prodName) {
+            totalPurchased += parseFloat(item.quantity || 0);
+          }
+        });
+      }
+    });
+
+    // Sales total
+    const salesSnapshot2 = await firebase.firestore().collection("sales").get();
+    let totalSold = 0;
+    salesSnapshot2.forEach(saleDoc => {
+      const sale = saleDoc.data();
+      if (sale.items && Array.isArray(sale.items)) {
+        sale.items.forEach(item => {
+          if (item.prodName === prodName) {
+            totalSold += parseFloat(item.qty || 0);
+          }
+        });
+      }
+    });
+
+    // Stock balance = opening + purchases - sales
+    const stock = openingStock + totalPurchased - totalSold;
+
+    // Add to datalist
     const opt = document.createElement("option");
-    opt.value = p.name;
-    opt.label = `${p.name} (Stock: ${stock})`;
+    opt.value = prodName;
+    opt.label = `${prodName} (Stock: ${stock})`;
     prodList.appendChild(opt);
 
-    window.productsMap[p.name] = {
+    // Save product info
+    window.productsMap[prodName] = {
       price: p.sellingPrice || 0,
       stock: stock
     };
-  });
+  }
 
   // Auto-fill price when product selected
   const saleProductInput = document.getElementById("saleProduct");
@@ -6040,7 +6077,6 @@ function calculateTotals() {
   document.getElementById("saleNet").value = net.toFixed(2);
   document.getElementById("saleBalance").value = balance.toFixed(2);
 }
-
 
 
 /* -------------------------------
