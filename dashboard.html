@@ -717,6 +717,21 @@ button {
   font-weight: bold;
 }
 
+.remove-cell {
+  text-align: center;
+  color: red;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: normal;
+  transition: color 0.2s, font-weight 0.2s;
+}
+
+.remove-cell:hover {
+  color: darkred;
+  font-weight: bold;
+}
+
+
   </style>
 </head>
 <body>
@@ -5968,11 +5983,12 @@ function renderSaleItems() {
       <td>${item.qty}</td>
       <td>${item.price.toFixed(2)}</td>
       <td>${item.subtotal.toFixed(2)}</td>
-      <td style="text-align:center; color:red; cursor:pointer;" onclick="removeSaleItem(${index})">&times;</td>
+      <td class="remove-cell" onclick="removeSaleItem(${index})">&times;</td>
     `;
     tbody.appendChild(tr);
   });
 }
+
 
 function removeSaleItem(index) {
   saleItems.splice(index, 1);
