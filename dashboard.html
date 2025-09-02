@@ -5785,10 +5785,14 @@ async function showAddSale() {
         </select>
 
         <label for="saleCustomer">Customer</label>
-        <input type="text" id="saleCustomer" placeholder="Search customer (default Walk-in)" />
+        <select id="saleCustomer">
+          <option value="">Walk-in (Optional)</option>
+        </select>
 
-        <label for="saleSalesperson">Field Salesperson</label>
-        <input type="text" id="saleSalesperson" placeholder="Search salesperson..." />
+        <label for="saleSalesperson">Field Salesperson *</label>
+        <select id="saleSalesperson" required>
+          <option value="">-- Select Salesperson --</option>
+        </select>
       </div>
     </div>
 
@@ -5796,7 +5800,8 @@ async function showAddSale() {
     <div class="form-container">
       <div class="form-group">
         <label for="saleProduct">Product</label>
-        <input type="text" id="saleProduct" placeholder="Search product..." />
+        <input type="text" id="saleProduct" placeholder="Search product..." list="productsList" />
+        <datalist id="productsList"></datalist>
 
         <label for="saleQty">Quantity</label>
         <input type="number" id="saleQty" min="1" />
@@ -5868,7 +5873,7 @@ async function showAddSale() {
     <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
   `;
 
-  // Load locations into dropdown
+  // Load locations
   const locSnapshot = await firebase.firestore().collection("businessLocations").get();
   const locSelect = document.getElementById("saleLocation");
   locSelect.innerHTML = `<option value="">Select Location</option>`;
@@ -5877,9 +5882,36 @@ async function showAddSale() {
     locSelect.innerHTML += `<option value="${loc.name}">${loc.name}</option>`;
   });
 
+  // Load customers (optional)
+  const custSnapshot = await firebase.firestore().collection("customers").orderBy("name").get();
+  const custSelect = document.getElementById("saleCustomer");
+  custSnapshot.forEach(doc => {
+    const c = doc.data();
+    custSelect.innerHTML += `<option value="${doc.id}">${c.name || doc.id}</option>`;
+  });
+
+  // Load salespersons (mandatory)
+  const salesSnapshot = await firebase.firestore().collection("fieldSalespersons").orderBy("name").get();
+  const salesSelect = document.getElementById("saleSalesperson");
+  salesSnapshot.forEach(doc => {
+    const s = doc.data();
+    salesSelect.innerHTML += `<option value="${doc.id}">${s.name || doc.id}</option>`;
+  });
+
+  // Load products for search
+  const prodSnapshot = await firebase.firestore().collection("products").orderBy("name").get();
+  const prodList = document.getElementById("productsList");
+  prodSnapshot.forEach(doc => {
+    const p = doc.data();
+    const opt = document.createElement("option");
+    opt.value = p.name; // can be product name or SKU
+    prodList.appendChild(opt);
+  });
+
   // Initialize totals
   calculateTotals();
 }
+
 function calculateTotals() {
   const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
   const expenses = parseFloat(document.getElementById("saleExpenses").value) || 0;
@@ -5892,6 +5924,8 @@ function calculateTotals() {
   document.getElementById("saleNet").value = net.toFixed(2);
   document.getElementById("saleBalance").value = balance.toFixed(2);
 }
+
+
 /* -------------------------------
    EXPENSES DROPDOWN + PAGES
 --------------------------------*/
