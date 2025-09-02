@@ -5968,7 +5968,7 @@ function renderSaleItems() {
       <td>${item.qty}</td>
       <td>${item.price.toFixed(2)}</td>
       <td>${item.subtotal.toFixed(2)}</td>
-      <td><button onclick="removeSaleItem(${index})">Remove</button></td>
+      <td style="text-align:center; color:red; cursor:pointer;" onclick="removeSaleItem(${index})">&times;</td>
     `;
     tbody.appendChild(tr);
   });
