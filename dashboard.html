@@ -5975,7 +5975,13 @@ function renderSaleItems() {
     return;
   }
 
+  let totalQty = 0;
+  let totalSubtotal = 0;
+
   saleItems.forEach((item, index) => {
+    totalQty += item.qty;
+    totalSubtotal += item.subtotal;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${index + 1}</td>
@@ -5987,7 +5993,23 @@ function renderSaleItems() {
     `;
     tbody.appendChild(tr);
   });
+
+  // Add styled totals row
+  const totalsRow = document.createElement("tr");
+  totalsRow.style.backgroundColor = "#f8f9fa";
+  totalsRow.style.fontWeight = "bold";
+  totalsRow.style.borderTop = "2px solid #000";
+
+  totalsRow.innerHTML = `
+    <td colspan="2" style="text-align:right;">Totals:</td>
+    <td>${totalQty}</td>
+    <td></td>
+    <td>${totalSubtotal.toFixed(2)}</td>
+    <td></td>
+  `;
+  tbody.appendChild(totalsRow);
 }
+
 
 
 function removeSaleItem(index) {
