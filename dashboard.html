@@ -5901,11 +5901,25 @@ async function showAddSale() {
   // Load products for search
   const prodSnapshot = await firebase.firestore().collection("products").orderBy("name").get();
   const prodList = document.getElementById("productsList");
+  const productsMap = {}; // store products with price lookup
+
   prodSnapshot.forEach(doc => {
     const p = doc.data();
     const opt = document.createElement("option");
-    opt.value = p.name; // can be product name or SKU
+    opt.value = p.name; // you could also include SKU if needed
     prodList.appendChild(opt);
+
+    // store selling price by name
+    productsMap[p.name] = p.sellingPrice || 0;
+  });
+
+  // Auto-fill price when product selected/typed
+  const saleProductInput = document.getElementById("saleProduct");
+  saleProductInput.addEventListener("change", () => {
+    const prodName = saleProductInput.value.trim();
+    if (productsMap[prodName] !== undefined) {
+      document.getElementById("salePrice").value = productsMap[prodName];
+    }
   });
 
   // Initialize totals
