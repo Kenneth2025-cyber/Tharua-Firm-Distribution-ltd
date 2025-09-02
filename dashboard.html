@@ -5916,27 +5916,32 @@ async function showAddSale() {
     salesSelect.innerHTML += `<option value="${doc.id}">${s.name || doc.id}</option>`;
   });
 
-  // Load products for search
+  // Load products with stock
   const prodSnapshot = await firebase.firestore().collection("products").orderBy("name").get();
   const prodList = document.getElementById("productsList");
-  window.productsMap = {}; // store products globally
+  window.productsMap = {}; // store product info globally
 
   prodSnapshot.forEach(doc => {
     const p = doc.data();
+    const stock = p.stock || 0;
+
     const opt = document.createElement("option");
     opt.value = p.name;
+    opt.label = `${p.name} (Stock: ${stock})`;
     prodList.appendChild(opt);
 
-    // store selling price by name
-    window.productsMap[p.name] = p.sellingPrice || 0;
+    window.productsMap[p.name] = {
+      price: p.sellingPrice || 0,
+      stock: stock
+    };
   });
 
-  // Auto-fill price when product selected/typed
+  // Auto-fill price when product selected
   const saleProductInput = document.getElementById("saleProduct");
   saleProductInput.addEventListener("change", () => {
     const prodName = saleProductInput.value.trim();
-    if (window.productsMap[prodName] !== undefined) {
-      document.getElementById("salePrice").value = window.productsMap[prodName];
+    if (window.productsMap[prodName]) {
+      document.getElementById("salePrice").value = window.productsMap[prodName].price;
     }
   });
 
@@ -5951,6 +5956,13 @@ function addProductToSale() {
 
   if (!prodName || isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) {
     alert("Please enter valid product, quantity, and price.");
+    return;
+  }
+
+  // Stock validation
+  const productInfo = window.productsMap[prodName];
+  if (productInfo && qty > productInfo.stock) {
+    alert(`Not enough stock for ${prodName}. Available: ${productInfo.stock}`);
     return;
   }
 
@@ -6010,8 +6022,6 @@ function renderSaleItems() {
   tbody.appendChild(totalsRow);
 }
 
-
-
 function removeSaleItem(index) {
   saleItems.splice(index, 1);
   renderSaleItems();
@@ -6030,6 +6040,7 @@ function calculateTotals() {
   document.getElementById("saleNet").value = net.toFixed(2);
   document.getElementById("saleBalance").value = balance.toFixed(2);
 }
+
 
 
 /* -------------------------------
