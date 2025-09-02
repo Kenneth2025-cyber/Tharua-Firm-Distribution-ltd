@@ -5770,6 +5770,8 @@ function toggleSell() {
   submenu.style.display = submenu.style.display === "none" ? "flex" : "none";
 }
 
+let saleItems = []; // store sale items globally
+
 async function showAddSale() {
   saveLastPage("showAddSale");
 
@@ -5818,6 +5820,7 @@ async function showAddSale() {
       <table class="users-table">
         <thead>
           <tr>
+            <th>#</th>
             <th>Product</th>
             <th>Qty</th>
             <th>Price</th>
@@ -5826,7 +5829,7 @@ async function showAddSale() {
           </tr>
         </thead>
         <tbody id="saleItemsTbody">
-          <tr><td colspan="5" style="text-align:center;">No items yet</td></tr>
+          <tr><td colspan="6" style="text-align:center;">No items yet</td></tr>
         </tbody>
       </table>
     </div>
@@ -5901,24 +5904,24 @@ async function showAddSale() {
   // Load products for search
   const prodSnapshot = await firebase.firestore().collection("products").orderBy("name").get();
   const prodList = document.getElementById("productsList");
-  const productsMap = {}; // store products with price lookup
+  window.productsMap = {}; // store products globally
 
   prodSnapshot.forEach(doc => {
     const p = doc.data();
     const opt = document.createElement("option");
-    opt.value = p.name; // you could also include SKU if needed
+    opt.value = p.name;
     prodList.appendChild(opt);
 
     // store selling price by name
-    productsMap[p.name] = p.sellingPrice || 0;
+    window.productsMap[p.name] = p.sellingPrice || 0;
   });
 
   // Auto-fill price when product selected/typed
   const saleProductInput = document.getElementById("saleProduct");
   saleProductInput.addEventListener("change", () => {
     const prodName = saleProductInput.value.trim();
-    if (productsMap[prodName] !== undefined) {
-      document.getElementById("salePrice").value = productsMap[prodName];
+    if (window.productsMap[prodName] !== undefined) {
+      document.getElementById("salePrice").value = window.productsMap[prodName];
     }
   });
 
@@ -5926,11 +5929,62 @@ async function showAddSale() {
   calculateTotals();
 }
 
+function addProductToSale() {
+  const prodName = document.getElementById("saleProduct").value.trim();
+  const qty = parseFloat(document.getElementById("saleQty").value);
+  const price = parseFloat(document.getElementById("salePrice").value);
+
+  if (!prodName || isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) {
+    alert("Please enter valid product, quantity, and price.");
+    return;
+  }
+
+  const subtotal = qty * price;
+  saleItems.push({ prodName, qty, price, subtotal });
+
+  renderSaleItems();
+  calculateTotals();
+
+  // reset product input
+  document.getElementById("saleProduct").value = "";
+  document.getElementById("saleQty").value = "";
+  document.getElementById("salePrice").value = "";
+}
+
+function renderSaleItems() {
+  const tbody = document.getElementById("saleItemsTbody");
+  tbody.innerHTML = "";
+
+  if (saleItems.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No items yet</td></tr>`;
+    return;
+  }
+
+  saleItems.forEach((item, index) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${item.prodName}</td>
+      <td>${item.qty}</td>
+      <td>${item.price.toFixed(2)}</td>
+      <td>${item.subtotal.toFixed(2)}</td>
+      <td><button onclick="removeSaleItem(${index})">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function removeSaleItem(index) {
+  saleItems.splice(index, 1);
+  renderSaleItems();
+  calculateTotals();
+}
+
 function calculateTotals() {
   const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
   const expenses = parseFloat(document.getElementById("saleExpenses").value) || 0;
   const net = total - expenses;
-  const paid = parseFloat(document.getElementById("salePaid").value) || 0;
+  const paid = parseFloat(document.getElementById("salePaid")?.value) || 0;
   const balance = net - paid;
 
   document.getElementById("saleTotal").value = total.toFixed(2);
