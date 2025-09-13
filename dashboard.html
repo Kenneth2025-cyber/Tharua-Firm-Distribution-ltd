@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -972,57 +971,102 @@ function toggleSidebar() {
   saveSidebarState(sidebar.classList.contains("collapsed") ? "collapsed" : "expanded");
 }
 
-   function showHome() {
-  saveLastPage("showHome");
+    function showHome() {
+      saveLastPage("showHome");
 
-  const savedStartDate = localStorage.getItem("dashboardStartDate") || "";
-  const savedEndDate = localStorage.getItem("dashboardEndDate") || "";
+      const savedLocation = localStorage.getItem("dashboardLocation") || "all";
+      const savedStartDate = localStorage.getItem("dashboardStartDate") || "";
+      const savedEndDate = localStorage.getItem("dashboardEndDate") || "";
 
-  document.getElementById("content").innerHTML = `
-    <h2>Dashboard Overview</h2>
-    <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
-      <input type="date" id="startDateFilter" style="flex:1;" />
-      <input type="date" id="endDateFilter" style="flex:1;" />
-      <button onclick="applyFilters()">Apply</button>
-    </div>
-    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
-      <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
-        <h3>Sales</h3>
-        <p id="salesTotal">Loading...</p>
-      </div>
-      <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
-        <h3>Purchases</h3>
-        <p id="purchasesTotal">Loading...</p>
-      </div>
-      <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
-        <h3>Expenses</h3>
-        <p id="expensesTotal">Loading...</p>
-      </div>
-    </div>
-  `;
+      document.getElementById("content").innerHTML = `
+        <h2>Dashboard Overview</h2>
+        <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
+          <select id="locationFilter" style="flex:1;">
+            <option value="all">All Locations</option>
+          </select>
+          <input type="date" id="startDateFilter" style="flex:1;" />
+          <input type="date" id="endDateFilter" style="flex:1;" />
+          <button onclick="applyFilters()">Apply</button>
+        </div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+          <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
+            <h3>Sales</h3>
+            <p id="salesTotal">Loading...</p>
+          </div>
+          <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
+            <h3>Purchases</h3>
+            <p id="purchasesTotal">Loading...</p>
+          </div>
+          <div style="flex:1; min-width:200px; background:#f9f9f9; padding:20px; border-radius:8px;">
+            <h3>Expenses</h3>
+            <p id="expensesTotal">Loading...</p>
+          </div>
+        </div>
+      `;
 
-  document.getElementById("startDateFilter").value = savedStartDate;
-  document.getElementById("endDateFilter").value = savedEndDate;
+      document.getElementById("startDateFilter").value = savedStartDate;
+      document.getElementById("endDateFilter").value = savedEndDate;
 
-  // Load totals (no location anymore)
-  setTimeout(() => {
-    loadTotal("sales", "salesTotal", savedStartDate, savedEndDate);
-    loadTotal("purchases", "purchasesTotal", savedStartDate, savedEndDate);
-    loadTotal("expenses", "expensesTotal", savedStartDate, savedEndDate);
-  }, 0);
+      loadLocations(savedLocation);
+      loadTotal("sales", "salesTotal", savedLocation, savedStartDate, savedEndDate);
+      loadTotal("purchases", "purchasesTotal", savedLocation, savedStartDate, savedEndDate);
+      loadTotal("expenses", "expensesTotal", savedLocation, savedStartDate, savedEndDate);
+    }
+
+ async function loadLocations(selectedValue) {
+  const locationSelect = document.getElementById("locationFilter");
+  if (!locationSelect) {
+    console.error("Location filter element (#locationFilter) not found in DOM");
+    return;
+  }
+
+  // Set initial state
+  locationSelect.innerHTML = `<option value="all">All Locations</option>`;
+  locationSelect.disabled = true; // Disable while loading
+
+  try {
+    const snapshot = await firebase.firestore().collection("businessLocations").orderBy("name").get();
+    
+    if (snapshot.empty) {
+      console.warn("No locations found in businessLocations collection");
+      locationSelect.disabled = false;
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const loc = doc.data();
+      if (loc.name) { // Ensure name exists
+        const opt = document.createElement("option");
+        opt.value = loc.name;
+        opt.textContent = loc.name;
+        if (loc.name === selectedValue) opt.selected = true;
+        locationSelect.appendChild(opt);
+      }
+    });
+
+    locationSelect.disabled = false;
+  } catch (err) {
+    console.error("Error loading locations:", err);
+    locationSelect.innerHTML = `<option value="all">Error loading locations</option>`;
+    locationSelect.disabled = true;
+    showNotification("Failed to load locations: " + err.message, "error"); // Use existing notification function
+  }
 }
 
-function applyFilters() {
-  const start = document.getElementById("startDateFilter").value;
-  const end = document.getElementById("endDateFilter").value;
+    function applyFilters() {
+      const loc = document.getElementById("locationFilter").value;
+      const start = document.getElementById("startDateFilter").value;
+      const end = document.getElementById("endDateFilter").value;
 
-  localStorage.setItem("dashboardStartDate", start);
-  localStorage.setItem("dashboardEndDate", end);
+      localStorage.setItem("dashboardLocation", loc);
+      localStorage.setItem("dashboardStartDate", start);
+      localStorage.setItem("dashboardEndDate", end);
 
-  showHome();
-}
+      showHome();
+    }
 
-function loadTotal(type, elementId, startDate, endDate) {
+    function loadTotal(type, elementId, location, startDate, endDate) {
+  // Map each collection to its date and amount fields
   const dateFieldMap = { sales: "saleDate", purchases: "purchaseDate", expenses: "expenseDate" };
   const amountFieldMap = { sales: "totalAmount", purchases: "totalAmount", expenses: "amount" };
 
@@ -1031,19 +1075,22 @@ function loadTotal(type, elementId, startDate, endDate) {
 
   let query = firebase.firestore().collection(type);
 
+  if (location && location !== "all") {
+    query = query.where("location", "==", location);
+  }
+
   if (startDate && endDate) {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    end.setDate(end.getDate() + 1);
+    end.setDate(end.getDate() + 1); // make end exclusive
     query = query.where(dateField, ">=", start).where(dateField, "<", end);
   }
 
   query.get().then(snap => {
-    console.log(`📊 ${type} docs found:`, snap.size);
-
     let total = 0;
     snap.forEach(doc => {
       const data = doc.data();
+      // Prefer the mapped amount field, but fall back gracefully
       const value =
         (data && (
           (amountField in data ? data[amountField] : undefined) ??
@@ -1058,12 +1105,11 @@ function loadTotal(type, elementId, startDate, endDate) {
     const el = document.getElementById(elementId);
     if (el) el.textContent = "KES " + total.toLocaleString();
   }).catch(err => {
-    console.error("❌ loadTotal error:", err);
+    console.error("loadTotal error:", err);
     const el = document.getElementById(elementId);
     if (el) el.textContent = "Error";
   });
 }
-
 
 function clearContent() { saveLastPage("clearContent"); document.getElementById("content").innerHTML = `<h2>Section Under Development</h2><p>Content will be added soon. Please check back later.</p>`; }
     function toggleContacts() { const s = document.getElementById("contactsSubmenu"); s.style.display = s.style.display === "none" ? "flex" : "none"; }
