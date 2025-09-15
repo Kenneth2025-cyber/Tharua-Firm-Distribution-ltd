@@ -3441,15 +3441,14 @@ async function showPriceList() {
         border: 1px solid #ccc;
         background: #fff;
       }
-      button.action-btn {
-        padding: 6px 12px;
-        background: #007bff;
-        color: white;
+      .action-btn {
         border: none;
-        border-radius: 4px;
+        background: transparent;
         cursor: pointer;
+        font-size: 16px;
       }
-      button.action-btn:hover { background: #0056b3; }
+      .edit-icon { color: #007bff; }
+      .save-icon { color: #28a745; }
     </style>
 
     <div class="header-bar">
@@ -3525,7 +3524,12 @@ async function loadPriceMatrix() {
         </td>`;
     });
 
-    row.innerHTML += `<td><button class="action-btn" onclick="toggleEditRow(this)">Edit</button></td>`;
+    row.innerHTML += `
+      <td>
+        <button class="action-btn" onclick="toggleEditRow(this)">
+          <i class="fas fa-edit edit-icon"></i>
+        </button>
+      </td>`;
     body.appendChild(row);
   });
 }
@@ -3533,14 +3537,16 @@ async function loadPriceMatrix() {
 function toggleEditRow(btn) {
   const row = btn.closest("tr");
   const inputs = row.querySelectorAll("input.price-input");
+  const icon = btn.querySelector("i");
 
-  if (btn.innerText === "Edit") {
+  if (icon.classList.contains("fa-edit")) {
     // Switch to edit mode
     inputs.forEach(input => {
       input.removeAttribute("readonly");
       input.classList.add("editing");
     });
-    btn.innerText = "Save";
+    icon.classList.remove("fa-edit", "edit-icon");
+    icon.classList.add("fa-save", "save-icon");
   } else {
     // Save changes
     saveMatrixRow(row).then(() => {
@@ -3548,7 +3554,8 @@ function toggleEditRow(btn) {
         input.setAttribute("readonly", true);
         input.classList.remove("editing");
       });
-      btn.innerText = "Edit";
+      icon.classList.remove("fa-save", "save-icon");
+      icon.classList.add("fa-edit", "edit-icon");
     });
   }
 }
