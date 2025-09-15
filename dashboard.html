@@ -3414,98 +3414,54 @@ async function showPriceList() {
         gap: 10px;
       }
       .header-bar h2 { margin: 0; font-size: 22px; }
-      .search-bar {
-        flex: 1;
-        max-width: 300px;
-      }
+      .search-bar { flex: 1; max-width: 300px; }
       .search-bar input {
-        width: 100%;
-        padding: 8px 10px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
+        width: 100%; padding: 8px 10px;
+        border: 1px solid #ccc; border-radius: 6px;
         font-size: 14px;
       }
-      .update-menu {
-        position: relative;
-      }
+      .update-menu { position: relative; }
       .update-btn {
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 8px 12px;
-        cursor: pointer;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        background: #007bff; color: white;
+        border: none; border-radius: 6px;
+        padding: 8px 12px; cursor: pointer;
+        font-size: 14px; display: flex; align-items: center; gap: 6px;
       }
       .update-btn:hover { background: #0056b3; }
       .dropdown-content {
-        display: none;
-        position: absolute;
-        right: 0;
-        top: 100%;
-        background: white;
-        min-width: 180px;
+        display: none; position: absolute; right: 0; top: 100%;
+        background: white; min-width: 180px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        border-radius: 6px;
-        overflow: hidden;
-        z-index: 10;
+        border-radius: 6px; overflow: hidden; z-index: 10;
       }
-      .dropdown-content button, 
-      .dropdown-content label {
-        display: block;
-        width: 100%;
-        text-align: left;
-        padding: 10px;
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-size: 14px;
+      .dropdown-content button, .dropdown-content label {
+        display: block; width: 100%; text-align: left;
+        padding: 10px; border: none; background: none;
+        cursor: pointer; font-size: 14px;
       }
-      .dropdown-content button:hover,
-      .dropdown-content label:hover {
+      .dropdown-content button:hover, .dropdown-content label:hover {
         background: #f5f5f5;
       }
-      .update-menu:hover .dropdown-content {
-        display: block;
-      }
+      .update-menu:hover .dropdown-content { display: block; }
       .table-container {
-        background: white;
-        border-radius: 8px;
+        background: white; border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         overflow-x: auto;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 1000px;
-      }
+      table { width: 100%; border-collapse: collapse; min-width: 1000px; }
       th, td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        font-size: 13px;
-        text-align: center;
+        border: 1px solid #ddd; padding: 8px;
+        font-size: 13px; text-align: center;
       }
       th { background: #f0f0f0; }
       input.price-input {
-        width: 80px;
-        padding: 4px;
-        text-align: right;
-        border: none;
-        background: transparent;
+        width: 80px; padding: 4px; text-align: right;
+        border: none; background: transparent;
       }
       input.price-input.editing {
-        border: 1px solid #ccc;
-        background: #fff;
+        border: 1px solid #ccc; background: #fff;
       }
-      .action-btn {
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 16px;
-      }
+      .action-btn { border: none; background: transparent; cursor: pointer; font-size: 16px; }
       .edit-icon { color: #007bff; }
       .save-icon { color: #28a745; }
     </style>
@@ -3544,12 +3500,12 @@ async function showPriceList() {
   `;
 
   await loadPriceMatrix();
-
-  // Attach search listener
   document.getElementById("productSearch").addEventListener("input", filterProducts);
 }
 
-let allProductRows = []; // cache rows for search
+let allProductRows = [];
+let productMap = {}; // { name -> id }
+let groupMap = {};   // { groupName -> id }
 
 async function loadPriceMatrix() {
   const headRow = document.getElementById("priceMatrixHead").querySelector("tr");
@@ -3568,14 +3524,20 @@ async function loadPriceMatrix() {
     return;
   }
 
-  // Map existing prices
+  // build maps
+  productMap = {};
+  productsSnap.forEach(p => { productMap[p.data().name] = p.id; });
+  groupMap = {};
+  groupsSnap.forEach(g => { groupMap[g.data().name] = g.id; });
+
+  // existing prices
   const priceMap = {};
   pricesSnap.forEach(doc => {
     const d = doc.data();
     priceMap[`${d.productId}_${d.priceGroupId}`] = d.price;
   });
 
-  // Add group headers
+  // headers
   headRow.innerHTML = "<th>Product</th><th>Buying Price</th><th>Default Selling Price</th>";
   groupsSnap.forEach(group => {
     const g = group.data();
@@ -3583,27 +3545,23 @@ async function loadPriceMatrix() {
   });
   headRow.innerHTML += "<th>Action</th>";
 
-  // Build product rows
+  // rows
   body.innerHTML = "";
-  allProductRows = []; // reset
-
+  allProductRows = [];
   productsSnap.forEach(product => {
     const p = product.data();
-    const buyingPrice = p.buyingPrice || "";
-    const defaultPrice = p.sellingPrice || "";
     const row = document.createElement("tr");
     row.setAttribute("data-name", p.name.toLowerCase());
-    row.innerHTML = `<td>${p.name}</td><td>${buyingPrice}</td><td>${defaultPrice}</td>`;
+    row.innerHTML = `<td>${p.name}</td><td>${p.buyingPrice || ""}</td><td>${p.sellingPrice || ""}</td>`;
 
     groupsSnap.forEach(group => {
-      const g = group.data();
       const key = `${product.id}_${group.id}`;
       const val = priceMap[key] || "";
       row.innerHTML += `
         <td>
-          <input type="number" class="price-input" 
-            data-product="${product.id}" 
-            data-group="${group.id}" 
+          <input type="number" class="price-input"
+            data-product="${product.id}"
+            data-group="${group.id}"
             value="${val}" readonly>
         </td>`;
     });
@@ -3660,7 +3618,6 @@ async function saveMatrixRow(row) {
     const productId = input.dataset.product;
     const groupId = input.dataset.group;
     const price = parseFloat(input.value);
-
     if (!isNaN(price)) {
       const docRef = priceCol.doc(`${productId}_${groupId}`);
       batch.set(docRef, { productId, priceGroupId: groupId, price }, { merge: true });
@@ -3671,18 +3628,66 @@ async function saveMatrixRow(row) {
   showSuccessNotification("Prices saved successfully.");
 }
 
-// Placeholder: Export to Excel
+// ✅ Export to Excel
 function exportPriceList() {
-  alert("Export functionality coming soon (use SheetJS to generate Excel).");
+  const wb = XLSX.utils.book_new();
+  const ws_data = [];
+
+  const headerCells = Array.from(document.querySelectorAll("#priceMatrixHead th"))
+    .map(th => th.innerText);
+  ws_data.push(headerCells);
+
+  document.querySelectorAll("#priceMatrixBody tr").forEach(row => {
+    const cells = Array.from(row.querySelectorAll("td")).map(td => {
+      const input = td.querySelector("input");
+      return input ? input.value : td.innerText;
+    });
+    ws_data.push(cells);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  XLSX.utils.book_append_sheet(wb, ws, "PriceList");
+  XLSX.writeFile(wb, "price_list.xlsx");
 }
 
-// Placeholder: Import from Excel
+// ✅ Import from Excel
 function importPriceList(event) {
   const file = event.target.files[0];
   if (!file) return;
-  alert("Import functionality coming soon (parse Excel and update Firestore).");
-}
 
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    const headers = rows[0];
+    const batch = firebase.firestore().batch();
+    const priceCol = firebase.firestore().collection("priceList");
+
+    rows.slice(1).forEach(row => {
+      const productName = row[0];
+      const productId = productMap[productName];
+      if (!productId) return;
+
+      headers.forEach((h, idx) => {
+        if (idx <= 2 || idx === headers.length - 1) return; // skip name/buying/default/Action
+        const groupId = groupMap[h];
+        const price = parseFloat(row[idx]);
+        if (groupId && !isNaN(price)) {
+          const docRef = priceCol.doc(`${productId}_${groupId}`);
+          batch.set(docRef, { productId, priceGroupId: groupId, price }, { merge: true });
+        }
+      });
+    });
+
+    await batch.commit();
+    showSuccessNotification("Price list imported successfully.");
+    loadPriceMatrix();
+  };
+  reader.readAsArrayBuffer(file);
+}
 
 function showPriceGroups() {
   saveLastPage("showPriceGroups");
