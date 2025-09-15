@@ -3407,11 +3407,24 @@ async function showPriceList() {
     <style>
       .header-bar {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 15px;
+        gap: 10px;
       }
       .header-bar h2 { margin: 0; font-size: 22px; }
+      .search-bar {
+        flex: 1;
+        max-width: 300px;
+      }
+      .search-bar input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+      }
       .table-container {
         background: white;
         border-radius: 8px;
@@ -3453,6 +3466,9 @@ async function showPriceList() {
 
     <div class="header-bar">
       <h2>Product Price List</h2>
+      <div class="search-bar">
+        <input type="text" id="productSearch" placeholder="Search product...">
+      </div>
     </div>
 
     <div class="table-container">
@@ -3467,8 +3483,13 @@ async function showPriceList() {
     </div>
   `;
 
-  loadPriceMatrix();
+  await loadPriceMatrix();
+
+  // Attach search listener
+  document.getElementById("productSearch").addEventListener("input", filterProducts);
 }
+
+let allProductRows = []; // cache rows for search
 
 async function loadPriceMatrix() {
   const headRow = document.getElementById("priceMatrixHead").querySelector("tr");
@@ -3504,11 +3525,14 @@ async function loadPriceMatrix() {
 
   // Build product rows
   body.innerHTML = "";
+  allProductRows = []; // reset
+
   productsSnap.forEach(product => {
     const p = product.data();
-    const buyingPrice = p.buyingPrice || "";   // assumes field name is buyingPrice
-    const defaultPrice = p.sellingPrice || ""; // assumes field name is sellingPrice
+    const buyingPrice = p.buyingPrice || "";
+    const defaultPrice = p.sellingPrice || "";
     const row = document.createElement("tr");
+    row.setAttribute("data-name", p.name.toLowerCase());
     row.innerHTML = `<td>${p.name}</td><td>${buyingPrice}</td><td>${defaultPrice}</td>`;
 
     groupsSnap.forEach(group => {
@@ -3531,6 +3555,15 @@ async function loadPriceMatrix() {
         </button>
       </td>`;
     body.appendChild(row);
+    allProductRows.push(row);
+  });
+}
+
+function filterProducts() {
+  const query = document.getElementById("productSearch").value.toLowerCase();
+  allProductRows.forEach(row => {
+    const name = row.getAttribute("data-name");
+    row.style.display = name.includes(query) ? "" : "none";
   });
 }
 
