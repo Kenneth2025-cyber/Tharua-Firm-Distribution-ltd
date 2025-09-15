@@ -3420,16 +3420,26 @@ function showPriceGroups() {
         margin-bottom: 15px;
       }
       .header-bar h2 { margin: 0; }
-      .add-btn {
+
+      .add-fab {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 55px;
+        height: 55px;
+        border-radius: 50%;
         background: #007bff;
-        color: white;
+        color: #fff;
         border: none;
-        padding: 10px 16px;
-        border-radius: 6px;
+        font-size: 26px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
         cursor: pointer;
-        font-size: 14px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        z-index: 100;
       }
-      .add-btn:hover { background: #0056b3; }
+      .add-fab:hover { background: #0056b3; }
 
       .table-container {
         background: white;
@@ -3505,7 +3515,6 @@ function showPriceGroups() {
 
     <div class="header-bar">
       <h2>Price Groups</h2>
-      <button class="add-btn" onclick="openPriceGroupModal()">+ Add</button>
     </div>
 
     <div class="table-container">
@@ -3524,10 +3533,17 @@ function showPriceGroups() {
       </table>
     </div>
 
+    <!-- Floating Add Button -->
+    <button class="add-fab" onclick="openPriceGroupModal()">
+      <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Add/Edit Modal -->
     <div id="priceGroupModal" class="modal">
       <div class="modal-content">
         <span class="close-btn" onclick="closePriceGroupModal()">&times;</span>
-        <h3>Add Price Group</h3>
+        <h3 id="pgModalTitle">Add Price Group</h3>
+        <input type="hidden" id="pgId">
         <label for="pgName">Name *</label>
         <input type="text" id="pgName" required>
         <label for="pgDesc">Description</label>
@@ -3540,16 +3556,31 @@ function showPriceGroups() {
   loadPriceGroups();
 }
 
-function openPriceGroupModal() {
+function openPriceGroupModal(id = "") {
+  document.getElementById("pgId").value = id || "";
+  document.getElementById("pgName").value = "";
+  document.getElementById("pgDesc").value = "";
+  document.getElementById("pgModalTitle").innerText = id ? "Edit Price Group" : "Add Price Group";
   document.getElementById("priceGroupModal").style.display = "flex";
+
+  if (id) {
+    firebase.firestore().collection("priceGroups").doc(id).get().then(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        document.getElementById("pgName").value = data.name || "";
+        document.getElementById("pgDesc").value = data.description || "";
+      }
+    });
+  }
 }
 
 function closePriceGroupModal() {
   document.getElementById("priceGroupModal").style.display = "none";
 }
 
-// Save new price group to Firestore
+// Save new or updated price group
 async function savePriceGroup() {
+  const id = document.getElementById("pgId").value;
   const name = document.getElementById("pgName").value.trim();
   const desc = document.getElementById("pgDesc").value.trim();
 
@@ -3559,12 +3590,19 @@ async function savePriceGroup() {
   }
 
   try {
-    await firebase.firestore().collection("priceGroups").add({
-      name, description: desc, active: true,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    if (id) {
+      await firebase.firestore().collection("priceGroups").doc(id).update({
+        name, description: desc
+      });
+      showSuccessNotification("Price Group updated.");
+    } else {
+      await firebase.firestore().collection("priceGroups").add({
+        name, description: desc, active: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showSuccessNotification("Price Group added.");
+    }
     closePriceGroupModal();
-    showSuccessNotification("Price Group added.");
     showPriceGroups();
   } catch (err) {
     alert("Error saving price group: " + err.message);
@@ -3590,8 +3628,8 @@ async function loadPriceGroups() {
           <td>${pg.description || ""}</td>
           <td>${pg.active ? "Active" : "Inactive"}</td>
           <td class="action-icons">
-            <i class="fas fa-edit edit-icon" title="Edit" onclick="editPriceGroup('${doc.id}')"></i>
-            <i class="fas fa-trash delete-icon" title="Delete" onclick="deletePriceGroup('${doc.id}')"></i>
+            <i class="fas fa-edit edit-icon" title="Edit" onclick="openPriceGroupModal('${doc.id}')"></i>
+            <i class="fas fa-trash delete-icon" title="Delete" onclick="confirmDeletePriceGroup('${doc.id}')"></i>
             <i class="fas fa-power-off toggle-icon" title="${pg.active ? "Deactivate" : "Activate"}" onclick="togglePriceGroup('${doc.id}', ${pg.active})"></i>
           </td>
         </tr>
@@ -3602,21 +3640,29 @@ async function loadPriceGroups() {
   }
 }
 
-async function deletePriceGroup(id) {
-  if (!confirm("Delete this price group?")) return;
-  await firebase.firestore().collection("priceGroups").doc(id).delete();
-  showSuccessNotification("Price Group deleted.");
-  showPriceGroups();
+// Sweet confirmation for delete
+function confirmDeletePriceGroup(id) {
+  Swal.fire({
+    title: 'Are you sure?',
+    text: "This will permanently delete this Price Group.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, delete it!'
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      await firebase.firestore().collection("priceGroups").doc(id).delete();
+      showSuccessNotification("Price Group deleted.");
+      showPriceGroups();
+    }
+  });
 }
 
 async function togglePriceGroup(id, active) {
   await firebase.firestore().collection("priceGroups").doc(id).update({ active: !active });
   showSuccessNotification(`Price Group ${active ? "deactivated" : "activated"}.`);
   showPriceGroups();
-}
-
-function editPriceGroup(id) {
-  alert("Edit feature coming soon for ID: " + id);
 }
 
 
