@@ -3412,10 +3412,216 @@ function showPriceList() {
 function showPriceGroups() {
   saveLastPage("showPriceGroups");
   document.getElementById("content").innerHTML = `
-    <h2>Price Groups</h2>
-    <p>Content for Price Groups will go here.</p>
+    <style>
+      .header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .header-bar h2 { margin: 0; }
+      .add-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .add-btn:hover { background: #0056b3; }
+
+      .table-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        font-size: 14px;
+        text-align: left;
+      }
+      th { background: #f0f0f0; }
+
+      .action-btn {
+        padding: 4px 10px;
+        margin: 0 3px;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .edit-btn { background: #007bff; color: white; }
+      .delete-btn { background: #dc3545; color: white; }
+      .deactivate-btn { background: #ffc107; color: #333; }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .modal-content {
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        position: relative;
+      }
+      .modal-content h3 { margin-top: 0; }
+      .modal-content label { display: block; margin-top: 10px; }
+      .modal-content input {
+        width: 100%;
+        padding: 8px;
+        margin-top: 4px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      .modal-content button {
+        margin-top: 15px;
+        padding: 10px 14px;
+        border: none;
+        border-radius: 4px;
+        background: #007bff;
+        color: white;
+        cursor: pointer;
+      }
+      .close-btn {
+        position: absolute;
+        top: 10px; right: 15px;
+        font-size: 20px;
+        cursor: pointer;
+      }
+    </style>
+
+    <div class="header-bar">
+      <h2>Price Groups</h2>
+      <button class="add-btn" onclick="openPriceGroupModal()">+ Add</button>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="priceGroupsTbody">
+          <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="priceGroupModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closePriceGroupModal()">&times;</span>
+        <h3>Add Price Group</h3>
+        <label for="pgName">Name *</label>
+        <input type="text" id="pgName" required>
+        <label for="pgDesc">Description</label>
+        <input type="text" id="pgDesc">
+        <button onclick="savePriceGroup()">Save</button>
+      </div>
+    </div>
   `;
+
+  loadPriceGroups();
 }
+
+function openPriceGroupModal() {
+  document.getElementById("priceGroupModal").style.display = "flex";
+}
+
+function closePriceGroupModal() {
+  document.getElementById("priceGroupModal").style.display = "none";
+}
+
+// Save new price group to Firestore
+async function savePriceGroup() {
+  const name = document.getElementById("pgName").value.trim();
+  const desc = document.getElementById("pgDesc").value.trim();
+
+  if (!name) {
+    alert("Name is required.");
+    return;
+  }
+
+  try {
+    await firebase.firestore().collection("priceGroups").add({
+      name, description: desc, active: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closePriceGroupModal();
+    showSuccessNotification("Price Group added.");
+    showPriceGroups();
+  } catch (err) {
+    alert("Error saving price group: " + err.message);
+  }
+}
+
+async function loadPriceGroups() {
+  const tbody = document.getElementById("priceGroupsTbody");
+  tbody.innerHTML = "<tr><td colspan='4'>Loading...</td></tr>";
+
+  try {
+    const snap = await firebase.firestore().collection("priceGroups").orderBy("createdAt", "desc").get();
+    if (snap.empty) {
+      tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No price groups found.</td></tr>";
+      return;
+    }
+    tbody.innerHTML = "";
+    snap.forEach(doc => {
+      const pg = doc.data();
+      tbody.innerHTML += `
+        <tr>
+          <td>${pg.name || ""}</td>
+          <td>${pg.description || ""}</td>
+          <td>${pg.active ? "Active" : "Inactive"}</td>
+          <td>
+            <button class="action-btn edit-btn" onclick="editPriceGroup('${doc.id}')">Edit</button>
+            <button class="action-btn delete-btn" onclick="deletePriceGroup('${doc.id}')">Delete</button>
+            <button class="action-btn deactivate-btn" onclick="togglePriceGroup('${doc.id}', ${pg.active})">
+              ${pg.active ? "Deactivate" : "Activate"}
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error loading: ${err.message}</td></tr>`;
+  }
+}
+
+async function deletePriceGroup(id) {
+  if (!confirm("Delete this price group?")) return;
+  await firebase.firestore().collection("priceGroups").doc(id).delete();
+  showPriceGroups();
+}
+
+async function togglePriceGroup(id, active) {
+  await firebase.firestore().collection("priceGroups").doc(id).update({ active: !active });
+  showPriceGroups();
+}
+
+function editPriceGroup(id) {
+  alert("Edit feature coming soon for ID: " + id);
+}
+
 
 
 function togglePurchases() {
