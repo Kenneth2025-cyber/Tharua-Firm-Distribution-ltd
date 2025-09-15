@@ -3401,6 +3401,7 @@ async function deleteBrand(id, name) {
   });
 }
 
+// ================== SHOW PRICE LIST ==================
 async function showPriceList() {
   saveLastPage("showPriceList");
   document.getElementById("content").innerHTML = `
@@ -3425,6 +3426,48 @@ async function showPriceList() {
         border-radius: 6px;
         font-size: 14px;
       }
+      .update-menu { position: relative; }
+      .update-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .update-btn:hover { background: #0056b3; }
+      .dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: 100%;
+        background: white;
+        min-width: 180px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        border-radius: 6px;
+        overflow: hidden;
+        z-index: 10;
+      }
+      .dropdown-content button, 
+      .dropdown-content label {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 10px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .dropdown-content button:hover,
+      .dropdown-content label:hover {
+        background: #f5f5f5;
+      }
+      .update-menu:hover .dropdown-content { display: block; }
       .table-container {
         background: white;
         border-radius: 8px;
@@ -3469,6 +3512,20 @@ async function showPriceList() {
       <div class="search-bar">
         <input type="text" id="productSearch" placeholder="Search product...">
       </div>
+      <div class="update-menu">
+        <button class="update-btn">
+          <i class="fas fa-sync-alt"></i> Update Price List
+        </button>
+        <div class="dropdown-content">
+          <button onclick="exportPriceList()">
+            <i class="fas fa-file-excel"></i> Export to Excel
+          </button>
+          <label for="importExcel">
+            <i class="fas fa-upload"></i> Import from Excel
+          </label>
+          <input type="file" id="importExcel" accept=".xlsx, .xls" style="display:none" onchange="importPriceList(event)">
+        </div>
+      </div>
     </div>
 
     <div class="table-container">
@@ -3485,12 +3542,14 @@ async function showPriceList() {
 
   await loadPriceMatrix();
 
-  // Attach search listener
   document.getElementById("productSearch").addEventListener("input", filterProducts);
 }
 
-let allProductRows = []; // cache rows for search
+let allProductRows = [];
+let cachedGroups = []; // store groups for export/import
+let cachedProducts = []; // store products for reference
 
+// ================== LOAD PRICE MATRIX ==================
 async function loadPriceMatrix() {
   const headRow = document.getElementById("priceMatrixHead").querySelector("tr");
   const body = document.getElementById("priceMatrixBody");
@@ -3508,42 +3567,35 @@ async function loadPriceMatrix() {
     return;
   }
 
-  // Map existing prices
+  cachedGroups = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  cachedProducts = productsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
   const priceMap = {};
   pricesSnap.forEach(doc => {
     const d = doc.data();
     priceMap[`${d.productId}_${d.priceGroupId}`] = d.price;
   });
 
-  // Add group headers
   headRow.innerHTML = "<th>Product</th><th>Buying Price</th><th>Default Selling Price</th>";
-  groupsSnap.forEach(group => {
-    const g = group.data();
-    headRow.innerHTML += `<th>${g.name}</th>`;
-  });
+  cachedGroups.forEach(g => headRow.innerHTML += `<th>${g.name}</th>`);
   headRow.innerHTML += "<th>Action</th>";
 
-  // Build product rows
   body.innerHTML = "";
-  allProductRows = []; // reset
+  allProductRows = [];
 
-  productsSnap.forEach(product => {
-    const p = product.data();
-    const buyingPrice = p.buyingPrice || "";
-    const defaultPrice = p.sellingPrice || "";
+  cachedProducts.forEach(p => {
     const row = document.createElement("tr");
     row.setAttribute("data-name", p.name.toLowerCase());
-    row.innerHTML = `<td>${p.name}</td><td>${buyingPrice}</td><td>${defaultPrice}</td>`;
+    row.innerHTML = `<td>${p.name}</td><td>${p.buyingPrice || ""}</td><td>${p.sellingPrice || ""}</td>`;
 
-    groupsSnap.forEach(group => {
-      const g = group.data();
-      const key = `${product.id}_${group.id}`;
+    cachedGroups.forEach(g => {
+      const key = `${p.id}_${g.id}`;
       const val = priceMap[key] || "";
       row.innerHTML += `
         <td>
           <input type="number" class="price-input" 
-            data-product="${product.id}" 
-            data-group="${group.id}" 
+            data-product="${p.id}" 
+            data-group="${g.id}" 
             value="${val}" readonly>
         </td>`;
     });
@@ -3559,6 +3611,7 @@ async function loadPriceMatrix() {
   });
 }
 
+// ================== FILTER ==================
 function filterProducts() {
   const query = document.getElementById("productSearch").value.toLowerCase();
   allProductRows.forEach(row => {
@@ -3567,32 +3620,32 @@ function filterProducts() {
   });
 }
 
+// ================== TOGGLE EDIT ==================
 function toggleEditRow(btn) {
   const row = btn.closest("tr");
   const inputs = row.querySelectorAll("input.price-input");
   const icon = btn.querySelector("i");
 
   if (icon.classList.contains("fa-edit")) {
-    // Switch to edit mode
     inputs.forEach(input => {
       input.removeAttribute("readonly");
       input.classList.add("editing");
     });
-    icon.classList.remove("fa-edit", "edit-icon");
-    icon.classList.add("fa-save", "save-icon");
+    icon.classList.replace("fa-edit", "fa-save");
+    icon.classList.replace("edit-icon", "save-icon");
   } else {
-    // Save changes
     saveMatrixRow(row).then(() => {
       inputs.forEach(input => {
         input.setAttribute("readonly", true);
         input.classList.remove("editing");
       });
-      icon.classList.remove("fa-save", "save-icon");
-      icon.classList.add("fa-edit", "edit-icon");
+      icon.classList.replace("fa-save", "fa-edit");
+      icon.classList.replace("save-icon", "edit-icon");
     });
   }
 }
 
+// ================== SAVE ==================
 async function saveMatrixRow(row) {
   const inputs = row.querySelectorAll("input.price-input");
   const batch = firebase.firestore().batch();
@@ -3602,7 +3655,6 @@ async function saveMatrixRow(row) {
     const productId = input.dataset.product;
     const groupId = input.dataset.group;
     const price = parseFloat(input.value);
-
     if (!isNaN(price)) {
       const docRef = priceCol.doc(`${productId}_${groupId}`);
       batch.set(docRef, { productId, priceGroupId: groupId, price }, { merge: true });
@@ -3611,6 +3663,67 @@ async function saveMatrixRow(row) {
 
   await batch.commit();
   showSuccessNotification("Prices saved successfully.");
+}
+
+// ================== EXPORT TO EXCEL ==================
+function exportPriceList() {
+  const data = [];
+
+  cachedProducts.forEach(p => {
+    const row = {
+      Product: p.name,
+      "Buying Price": p.buyingPrice || "",
+      "Default Selling Price": p.sellingPrice || ""
+    };
+
+    cachedGroups.forEach(g => {
+      const input = document.querySelector(
+        \`input[data-product="\${p.id}"][data-group="\${g.id}"]\`
+      );
+      row[g.name] = input ? input.value : "";
+    });
+
+    data.push(row);
+  });
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "PriceList");
+  XLSX.writeFile(wb, "PriceList.xlsx");
+}
+
+// ================== IMPORT FROM EXCEL ==================
+async function importPriceList(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+
+    const batch = firebase.firestore().batch();
+    const priceCol = firebase.firestore().collection("priceList");
+
+    rows.forEach(r => {
+      const product = cachedProducts.find(p => p.name === r.Product);
+      if (!product) return;
+
+      cachedGroups.forEach(g => {
+        if (r[g.name] !== undefined && r[g.name] !== "") {
+          const docRef = priceCol.doc(\`\${product.id}_\${g.id}\`);
+          batch.set(docRef, { productId: product.id, priceGroupId: g.id, price: parseFloat(r[g.name]) }, { merge: true });
+        }
+      });
+    });
+
+    await batch.commit();
+    showSuccessNotification("Prices imported successfully.");
+    loadPriceMatrix();
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 
@@ -7898,6 +8011,8 @@ function showExpenseReport() {
   </script>
   
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   
 </body>
 </html>
