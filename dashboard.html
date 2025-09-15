@@ -3449,17 +3449,14 @@ function showPriceGroups() {
       }
       th { background: #f0f0f0; }
 
-      .action-btn {
-        padding: 4px 10px;
-        margin: 0 3px;
-        border: none;
-        border-radius: 4px;
-        font-size: 12px;
+      .action-icons i {
         cursor: pointer;
+        margin: 0 5px;
+        font-size: 16px;
       }
-      .edit-btn { background: #007bff; color: white; }
-      .delete-btn { background: #dc3545; color: white; }
-      .deactivate-btn { background: #ffc107; color: #333; }
+      .edit-icon { color: #007bff; }
+      .delete-icon { color: #dc3545; }
+      .toggle-icon { color: #ffc107; }
 
       .modal {
         display: none;
@@ -3592,12 +3589,10 @@ async function loadPriceGroups() {
           <td>${pg.name || ""}</td>
           <td>${pg.description || ""}</td>
           <td>${pg.active ? "Active" : "Inactive"}</td>
-          <td>
-            <button class="action-btn edit-btn" onclick="editPriceGroup('${doc.id}')">Edit</button>
-            <button class="action-btn delete-btn" onclick="deletePriceGroup('${doc.id}')">Delete</button>
-            <button class="action-btn deactivate-btn" onclick="togglePriceGroup('${doc.id}', ${pg.active})">
-              ${pg.active ? "Deactivate" : "Activate"}
-            </button>
+          <td class="action-icons">
+            <i class="fas fa-edit edit-icon" title="Edit" onclick="editPriceGroup('${doc.id}')"></i>
+            <i class="fas fa-trash delete-icon" title="Delete" onclick="deletePriceGroup('${doc.id}')"></i>
+            <i class="fas fa-power-off toggle-icon" title="${pg.active ? "Deactivate" : "Activate"}" onclick="togglePriceGroup('${doc.id}', ${pg.active})"></i>
           </td>
         </tr>
       `;
@@ -3610,11 +3605,13 @@ async function loadPriceGroups() {
 async function deletePriceGroup(id) {
   if (!confirm("Delete this price group?")) return;
   await firebase.firestore().collection("priceGroups").doc(id).delete();
+  showSuccessNotification("Price Group deleted.");
   showPriceGroups();
 }
 
 async function togglePriceGroup(id, active) {
   await firebase.firestore().collection("priceGroups").doc(id).update({ active: !active });
+  showSuccessNotification(`Price Group ${active ? "deactivated" : "activated"}.`);
   showPriceGroups();
 }
 
