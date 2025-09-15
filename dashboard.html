@@ -3407,28 +3407,11 @@ async function showPriceList() {
     <style>
       .header-bar {
         display: flex;
-        flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 15px;
-        gap: 10px;
       }
       .header-bar h2 { margin: 0; font-size: 22px; }
-      .add-btn {
-        background: #007bff;
-        color: #fff;
-        border: none;
-        padding: 10px 18px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .add-btn i { font-size: 16px; }
-      .add-btn:hover { background: #0056b3; }
-
       .table-container {
         background: white;
         border-radius: 8px;
@@ -3438,250 +3421,127 @@ async function showPriceList() {
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 600px;
+        min-width: 800px;
       }
       th, td {
         border: 1px solid #ddd;
-        padding: 10px;
-        font-size: 14px;
-        text-align: left;
-        word-break: break-word;
+        padding: 8px;
+        font-size: 13px;
+        text-align: center;
       }
       th { background: #f0f0f0; }
-
-      .action-icons i {
-        cursor: pointer;
-        margin: 0 5px;
-        font-size: 16px;
+      input.price-input {
+        width: 80px;
+        padding: 4px;
+        text-align: right;
       }
-      .edit-icon { color: #007bff; }
-      .delete-icon { color: #dc3545; }
-
-      @media (max-width: 600px) {
-        .header-bar { flex-direction: column; align-items: flex-start; }
-        .add-btn { width: 100%; justify-content: center; }
-        th, td { font-size: 13px; padding: 8px; }
-      }
-
-      .modal {
-        display: none;
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5);
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-      .modal-content {
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 400px;
-        width: 90%;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        position: relative;
-      }
-      .modal-content h3 { margin-top: 0; }
-      .modal-content label { display: block; margin-top: 10px; }
-      .modal-content input, .modal-content select {
-        width: 100%;
-        padding: 8px;
-        margin-top: 4px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-      }
-      .modal-content button {
-        margin-top: 15px;
-        padding: 10px 14px;
-        border: none;
-        border-radius: 4px;
+      button.save-btn {
+        padding: 6px 12px;
         background: #007bff;
         color: white;
+        border: none;
+        border-radius: 4px;
         cursor: pointer;
       }
-      .close-btn {
-        position: absolute;
-        top: 10px; right: 15px;
-        font-size: 20px;
-        cursor: pointer;
-      }
+      button.save-btn:hover { background: #0056b3; }
     </style>
 
     <div class="header-bar">
-      <h2>Price List</h2>
-      <button class="add-btn" onclick="openPriceModal()">
-        <i class="fas fa-plus"></i> Add Price
-      </button>
+      <h2>Product Price List</h2>
     </div>
 
     <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Price Group</th>
-            <th>Price</th>
-            <th>Action</th>
-          </tr>
+      <table id="priceMatrixTable">
+        <thead id="priceMatrixHead">
+          <tr><th>Product</th></tr>
         </thead>
-        <tbody id="priceListTbody">
-          <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+        <tbody id="priceMatrixBody">
+          <tr><td colspan="100%" style="text-align:center;">Loading...</td></tr>
         </tbody>
       </table>
     </div>
-
-    <!-- Add/Edit Modal -->
-    <div id="priceModal" class="modal">
-      <div class="modal-content">
-        <span class="close-btn" onclick="closePriceModal()">&times;</span>
-        <h3 id="priceModalTitle">Add Price</h3>
-        <input type="hidden" id="priceId">
-        <label>Product *</label>
-        <select id="priceProduct"></select>
-        <label>Price Group *</label>
-        <select id="priceGroup"></select>
-        <label>Price *</label>
-        <input type="number" id="priceValue" required>
-        <button onclick="savePrice()">Save</button>
-      </div>
-    </div>
   `;
 
-  loadPriceList();
+  loadPriceMatrix();
 }
 
-// Load products and price groups into dropdowns
-async function loadDropdownData() {
-  const productSelect = document.getElementById("priceProduct");
-  const groupSelect = document.getElementById("priceGroup");
+async function loadPriceMatrix() {
+  const headRow = document.getElementById("priceMatrixHead").querySelector("tr");
+  const body = document.getElementById("priceMatrixBody");
 
-  productSelect.innerHTML = `<option value="">Loading...</option>`;
-  groupSelect.innerHTML = `<option value="">Loading...</option>`;
+  body.innerHTML = "<tr><td colspan='100%' style='text-align:center;'>Loading...</td></tr>";
 
-  const [productSnap, groupSnap] = await Promise.all([
+  const [productsSnap, groupsSnap, pricesSnap] = await Promise.all([
     firebase.firestore().collection("products").orderBy("name").get(),
-    firebase.firestore().collection("priceGroups").orderBy("name").get()
+    firebase.firestore().collection("priceGroups").orderBy("name").get(),
+    firebase.firestore().collection("priceList").get()
   ]);
 
-  productSelect.innerHTML = `<option value="">-- Select Product --</option>`;
-  groupSnap.empty ? null : null;
-  productSnap.forEach(doc => {
-    const d = doc.data();
-    productSelect.innerHTML += `<option value="${doc.id}">${d.name}</option>`;
-  });
-
-  groupSelect.innerHTML = `<option value="">-- Select Price Group --</option>`;
-  groupSnap.forEach(doc => {
-    const d = doc.data();
-    groupSelect.innerHTML += `<option value="${doc.id}">${d.name}</option>`;
-  });
-}
-
-async function loadPriceList() {
-  const tbody = document.getElementById("priceListTbody");
-  tbody.innerHTML = "<tr><td colspan='4'>Loading...</td></tr>";
-
-  const priceSnap = await firebase.firestore().collection("priceList").get();
-  if (priceSnap.empty) {
-    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No prices found.</td></tr>";
+  if (groupsSnap.empty || productsSnap.empty) {
+    body.innerHTML = "<tr><td colspan='100%' style='text-align:center;'>No products or groups found.</td></tr>";
     return;
   }
 
-  // Load products & groups to map IDs to names
-  const [products, groups] = await Promise.all([
-    firebase.firestore().collection("products").get(),
-    firebase.firestore().collection("priceGroups").get()
-  ]);
+  // Map existing prices
+  const priceMap = {};
+  pricesSnap.forEach(doc => {
+    const d = doc.data();
+    priceMap[`${d.productId}_${d.priceGroupId}`] = d.price;
+  });
 
-  const productMap = {};
-  products.forEach(d => productMap[d.id] = d.data().name);
-  const groupMap = {};
-  groups.forEach(d => groupMap[d.id] = d.data().name);
+  // Add group headers
+  headRow.innerHTML = "<th>Product</th>";
+  groupsSnap.forEach(group => {
+    const g = group.data();
+    headRow.innerHTML += `<th>${g.name}</th>`;
+  });
+  headRow.innerHTML += "<th>Action</th>";
 
-  tbody.innerHTML = "";
-  priceSnap.forEach(doc => {
-    const p = doc.data();
-    tbody.innerHTML += `
-      <tr>
-        <td>${productMap[p.productId] || "Unknown"}</td>
-        <td>${groupMap[p.priceGroupId] || "Unknown"}</td>
-        <td>${p.price}</td>
-        <td class="action-icons">
-          <i class="fas fa-edit edit-icon" onclick="openPriceModal('${doc.id}')"></i>
-          <i class="fas fa-trash delete-icon" onclick="confirmDeletePrice('${doc.id}')"></i>
-        </td>
-      </tr>
-    `;
+  // Build product rows
+  body.innerHTML = "";
+  productsSnap.forEach(product => {
+    const p = product.data();
+    const row = document.createElement("tr");
+    row.innerHTML = `<td>${p.name}</td>`;
+
+    groupsSnap.forEach(group => {
+      const g = group.data();
+      const key = `${product.id}_${group.id}`;
+      const val = priceMap[key] || "";
+      row.innerHTML += `
+        <td>
+          <input type="number" class="price-input" 
+            data-product="${product.id}" 
+            data-group="${group.id}" 
+            value="${val}">
+        </td>`;
+    });
+
+    row.innerHTML += `<td><button class="save-btn" onclick="saveMatrixRow(this)">Save</button></td>`;
+    body.appendChild(row);
   });
 }
 
-function openPriceModal(id = "") {
-  document.getElementById("priceId").value = id || "";
-  document.getElementById("priceModalTitle").innerText = id ? "Edit Price" : "Add Price";
-  document.getElementById("priceModal").style.display = "flex";
+async function saveMatrixRow(btn) {
+  const row = btn.closest("tr");
+  const inputs = row.querySelectorAll("input.price-input");
+  const batch = firebase.firestore().batch();
+  const priceCol = firebase.firestore().collection("priceList");
 
-  loadDropdownData().then(async () => {
-    if (id) {
-      const doc = await firebase.firestore().collection("priceList").doc(id).get();
-      if (doc.exists) {
-        const d = doc.data();
-        document.getElementById("priceProduct").value = d.productId;
-        document.getElementById("priceGroup").value = d.priceGroupId;
-        document.getElementById("priceValue").value = d.price;
-      }
-    } else {
-      document.getElementById("priceProduct").value = "";
-      document.getElementById("priceGroup").value = "";
-      document.getElementById("priceValue").value = "";
+  inputs.forEach(input => {
+    const productId = input.dataset.product;
+    const groupId = input.dataset.group;
+    const price = parseFloat(input.value);
+
+    if (!isNaN(price)) {
+      // Find existing entry
+      const docRef = priceCol.doc(`${productId}_${groupId}`);
+      batch.set(docRef, { productId, priceGroupId: groupId, price }, { merge: true });
     }
   });
-}
 
-function closePriceModal() {
-  document.getElementById("priceModal").style.display = "none";
-}
-
-async function savePrice() {
-  const id = document.getElementById("priceId").value;
-  const product = document.getElementById("priceProduct").value;
-  const group = document.getElementById("priceGroup").value;
-  const price = document.getElementById("priceValue").value;
-
-  if (!product || !group || !price) {
-    alert("All fields are required.");
-    return;
-  }
-
-  const data = { productId: product, priceGroupId: group, price: parseFloat(price) };
-
-  if (id) {
-    await firebase.firestore().collection("priceList").doc(id).update(data);
-    showSuccessNotification("Price updated.");
-  } else {
-    await firebase.firestore().collection("priceList").add(data);
-    showSuccessNotification("Price added.");
-  }
-  closePriceModal();
-  showPriceList();
-}
-
-function confirmDeletePrice(id) {
-  Swal.fire({
-    title: 'Are you sure?',
-    text: "This will delete this price entry.",
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#3085d6',
-    confirmButtonText: 'Yes, delete it!'
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      await firebase.firestore().collection("priceList").doc(id).delete();
-      showSuccessNotification("Price deleted.");
-      showPriceList();
-    }
-  });
+  await batch.commit();
+  showSuccessNotification("Prices saved successfully.");
 }
 
 
