@@ -755,16 +755,22 @@ button {
         <a onclick="clearContent()"><span>Import Contacts</span></a>
       </div>
     </div>
-    <div class="dropdown">
-      <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> <span>Products</span> <i class="fas fa-caret-down" style="margin-left:auto;"></i></a>
-      <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
-        <a onclick="showAddProduct()"><span>Add Product</span></a>
-        <a onclick="showListProducts()"><span>List of Products</span></a>
-        <a onclick="showBusinessLocations()"><span>Business Location</span></a>
-        <a onclick="showCategory()"><span>Category</span></a>
-        <a onclick="showBrand()"><span>Brand</span></a>
-      </div>
-    </div>
+<div class="dropdown">
+  <a onclick="toggleProducts()" id="productsMenu"><i class="fas fa-boxes"></i> 
+    <span>Products</span> 
+    <i class="fas fa-caret-down" style="margin-left:auto;"></i>
+  </a>
+  <div id="productsSubmenu" style="display:none; flex-direction: column; padding-left: 20px;">
+    <a onclick="showAddProduct()"><span>Add Product</span></a>
+    <a onclick="showListProducts()"><span>List of Products</span></a>
+    <a onclick="showBusinessLocations()"><span>Business Location</span></a>
+    <a onclick="showCategory()"><span>Category</span></a>
+    <a onclick="showBrand()"><span>Brand</span></a>
+    <a onclick="showPriceList()"><span>Price List</span></a>
+    <a onclick="showPriceGroups()"><span>Price Groups</span></a>
+  </div>
+</div>
+
     <a onclick="clearContent()"><i class="fas fa-industry"></i> <span>Manufacturing</span></a>
     <div class="dropdown">
       <a onclick="togglePurchases()" id="purchasesMenu">
@@ -3393,6 +3399,22 @@ async function deleteBrand(id, name) {
       showToast("Error deleting brand: " + error.message, "error");
     }
   });
+}
+
+function showPriceList() {
+  saveLastPage("showPriceList");
+  document.getElementById("content").innerHTML = `
+    <h2>Price List</h2>
+    <p>Content for Price List will go here.</p>
+  `;
+}
+
+function showPriceGroups() {
+  saveLastPage("showPriceGroups");
+  document.getElementById("content").innerHTML = `
+    <h2>Price Groups</h2>
+    <p>Content for Price Groups will go here.</p>
+  `;
 }
 
 
