@@ -3421,7 +3421,7 @@ async function showPriceList() {
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 900px;
+        min-width: 1000px;
       }
       th, td {
         border: 1px solid #ddd;
@@ -3453,7 +3453,7 @@ async function showPriceList() {
     <div class="table-container">
       <table id="priceMatrixTable">
         <thead id="priceMatrixHead">
-          <tr><th>Product</th><th>Default Selling Price</th></tr>
+          <tr><th>Product</th><th>Buying Price</th><th>Default Selling Price</th></tr>
         </thead>
         <tbody id="priceMatrixBody">
           <tr><td colspan="100%" style="text-align:center;">Loading...</td></tr>
@@ -3490,7 +3490,7 @@ async function loadPriceMatrix() {
   });
 
   // Add group headers
-  headRow.innerHTML = "<th>Product</th><th>Default Selling Price</th>";
+  headRow.innerHTML = "<th>Product</th><th>Buying Price</th><th>Default Selling Price</th>";
   groupsSnap.forEach(group => {
     const g = group.data();
     headRow.innerHTML += `<th>${g.name}</th>`;
@@ -3501,9 +3501,10 @@ async function loadPriceMatrix() {
   body.innerHTML = "";
   productsSnap.forEach(product => {
     const p = product.data();
+    const buyingPrice = p.buyingPrice || "";   // assumes field name is buyingPrice
     const defaultPrice = p.sellingPrice || ""; // assumes field name is sellingPrice
     const row = document.createElement("tr");
-    row.innerHTML = `<td>${p.name}</td><td>${defaultPrice}</td>`;
+    row.innerHTML = `<td>${p.name}</td><td>${buyingPrice}</td><td>${defaultPrice}</td>`;
 
     groupsSnap.forEach(group => {
       const g = group.data();
