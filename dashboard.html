@@ -3401,7 +3401,6 @@ async function deleteBrand(id, name) {
   });
 }
 
-// ================== SHOW PRICE LIST ==================
 async function showPriceList() {
   saveLastPage("showPriceList");
   document.getElementById("content").innerHTML = `
@@ -3426,7 +3425,9 @@ async function showPriceList() {
         border-radius: 6px;
         font-size: 14px;
       }
-      .update-menu { position: relative; }
+      .update-menu {
+        position: relative;
+      }
       .update-btn {
         background: #007bff;
         color: white;
@@ -3467,7 +3468,9 @@ async function showPriceList() {
       .dropdown-content label:hover {
         background: #f5f5f5;
       }
-      .update-menu:hover .dropdown-content { display: block; }
+      .update-menu:hover .dropdown-content {
+        display: block;
+      }
       .table-container {
         background: white;
         border-radius: 8px;
@@ -3542,14 +3545,12 @@ async function showPriceList() {
 
   await loadPriceMatrix();
 
+  // Attach search listener
   document.getElementById("productSearch").addEventListener("input", filterProducts);
 }
 
-let allProductRows = [];
-let cachedGroups = []; // store groups for export/import
-let cachedProducts = []; // store products for reference
+let allProductRows = []; // cache rows for search
 
-// ================== LOAD PRICE MATRIX ==================
 async function loadPriceMatrix() {
   const headRow = document.getElementById("priceMatrixHead").querySelector("tr");
   const body = document.getElementById("priceMatrixBody");
@@ -3567,35 +3568,42 @@ async function loadPriceMatrix() {
     return;
   }
 
-  cachedGroups = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  cachedProducts = productsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
+  // Map existing prices
   const priceMap = {};
   pricesSnap.forEach(doc => {
     const d = doc.data();
     priceMap[`${d.productId}_${d.priceGroupId}`] = d.price;
   });
 
+  // Add group headers
   headRow.innerHTML = "<th>Product</th><th>Buying Price</th><th>Default Selling Price</th>";
-  cachedGroups.forEach(g => headRow.innerHTML += `<th>${g.name}</th>`);
+  groupsSnap.forEach(group => {
+    const g = group.data();
+    headRow.innerHTML += `<th>${g.name}</th>`;
+  });
   headRow.innerHTML += "<th>Action</th>";
 
+  // Build product rows
   body.innerHTML = "";
-  allProductRows = [];
+  allProductRows = []; // reset
 
-  cachedProducts.forEach(p => {
+  productsSnap.forEach(product => {
+    const p = product.data();
+    const buyingPrice = p.buyingPrice || "";
+    const defaultPrice = p.sellingPrice || "";
     const row = document.createElement("tr");
     row.setAttribute("data-name", p.name.toLowerCase());
-    row.innerHTML = `<td>${p.name}</td><td>${p.buyingPrice || ""}</td><td>${p.sellingPrice || ""}</td>`;
+    row.innerHTML = `<td>${p.name}</td><td>${buyingPrice}</td><td>${defaultPrice}</td>`;
 
-    cachedGroups.forEach(g => {
-      const key = `${p.id}_${g.id}`;
+    groupsSnap.forEach(group => {
+      const g = group.data();
+      const key = `${product.id}_${group.id}`;
       const val = priceMap[key] || "";
       row.innerHTML += `
         <td>
           <input type="number" class="price-input" 
-            data-product="${p.id}" 
-            data-group="${g.id}" 
+            data-product="${product.id}" 
+            data-group="${group.id}" 
             value="${val}" readonly>
         </td>`;
     });
@@ -3611,7 +3619,6 @@ async function loadPriceMatrix() {
   });
 }
 
-// ================== FILTER ==================
 function filterProducts() {
   const query = document.getElementById("productSearch").value.toLowerCase();
   allProductRows.forEach(row => {
@@ -3620,7 +3627,6 @@ function filterProducts() {
   });
 }
 
-// ================== TOGGLE EDIT ==================
 function toggleEditRow(btn) {
   const row = btn.closest("tr");
   const inputs = row.querySelectorAll("input.price-input");
@@ -3631,21 +3637,20 @@ function toggleEditRow(btn) {
       input.removeAttribute("readonly");
       input.classList.add("editing");
     });
-    icon.classList.replace("fa-edit", "fa-save");
-    icon.classList.replace("edit-icon", "save-icon");
+    icon.classList.remove("fa-edit", "edit-icon");
+    icon.classList.add("fa-save", "save-icon");
   } else {
     saveMatrixRow(row).then(() => {
       inputs.forEach(input => {
         input.setAttribute("readonly", true);
         input.classList.remove("editing");
       });
-      icon.classList.replace("fa-save", "fa-edit");
-      icon.classList.replace("save-icon", "edit-icon");
+      icon.classList.remove("fa-save", "save-icon");
+      icon.classList.add("fa-edit", "edit-icon");
     });
   }
 }
 
-// ================== SAVE ==================
 async function saveMatrixRow(row) {
   const inputs = row.querySelectorAll("input.price-input");
   const batch = firebase.firestore().batch();
@@ -3655,6 +3660,7 @@ async function saveMatrixRow(row) {
     const productId = input.dataset.product;
     const groupId = input.dataset.group;
     const price = parseFloat(input.value);
+
     if (!isNaN(price)) {
       const docRef = priceCol.doc(`${productId}_${groupId}`);
       batch.set(docRef, { productId, priceGroupId: groupId, price }, { merge: true });
@@ -3665,65 +3671,16 @@ async function saveMatrixRow(row) {
   showSuccessNotification("Prices saved successfully.");
 }
 
-// ================== EXPORT TO EXCEL ==================
+// Placeholder: Export to Excel
 function exportPriceList() {
-  const data = [];
-
-  cachedProducts.forEach(p => {
-    const row = {
-      Product: p.name,
-      "Buying Price": p.buyingPrice || "",
-      "Default Selling Price": p.sellingPrice || ""
-    };
-
-    cachedGroups.forEach(g => {
-      const input = document.querySelector(
-        \`input[data-product="\${p.id}"][data-group="\${g.id}"]\`
-      );
-      row[g.name] = input ? input.value : "";
-    });
-
-    data.push(row);
-  });
-
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "PriceList");
-  XLSX.writeFile(wb, "PriceList.xlsx");
+  alert("Export functionality coming soon (use SheetJS to generate Excel).");
 }
 
-// ================== IMPORT FROM EXCEL ==================
-async function importPriceList(event) {
+// Placeholder: Import from Excel
+function importPriceList(event) {
   const file = event.target.files[0];
   if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet);
-
-    const batch = firebase.firestore().batch();
-    const priceCol = firebase.firestore().collection("priceList");
-
-    rows.forEach(r => {
-      const product = cachedProducts.find(p => p.name === r.Product);
-      if (!product) return;
-
-      cachedGroups.forEach(g => {
-        if (r[g.name] !== undefined && r[g.name] !== "") {
-          const docRef = priceCol.doc(\`\${product.id}_\${g.id}\`);
-          batch.set(docRef, { productId: product.id, priceGroupId: g.id, price: parseFloat(r[g.name]) }, { merge: true });
-        }
-      });
-    });
-
-    await batch.commit();
-    showSuccessNotification("Prices imported successfully.");
-    loadPriceMatrix();
-  };
-  reader.readAsArrayBuffer(file);
+  alert("Import functionality coming soon (parse Excel and update Firestore).");
 }
 
 
@@ -8011,8 +7968,6 @@ function showExpenseReport() {
   </script>
   
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
   
 </body>
 </html>
