@@ -3422,42 +3422,41 @@ function showPriceGroups() {
         gap: 10px;
       }
       .header-bar h2 { 
-        margin: 0; 
-        font-size: 22px;
+        margin: 0;
+        font-size: 1.5em;
       }
-      .add-btn {
+
+      .add-button {
+        padding: 8px 16px;
+        border-radius: 4px;
         background: #007bff;
         color: #fff;
         border: none;
-        padding: 10px 18px;
-        border-radius: 6px;
-        cursor: pointer;
         font-size: 14px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
+        cursor: pointer;
+        transition: background 0.2s;
       }
-      .add-btn i { font-size: 16px; }
-      .add-btn:hover { background: #0056b3; }
+      .add-button:hover { background: #0056b3; }
 
       .table-container {
         background: white;
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         overflow-x: auto;
-        width: 100%;
       }
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 600px;
+        min-width: 400px;
       }
       th, td {
         border: 1px solid #ddd;
         padding: 10px;
         font-size: 14px;
         text-align: left;
-        word-break: break-word;
       }
       th { background: #f0f0f0; }
 
@@ -3469,22 +3468,6 @@ function showPriceGroups() {
       .edit-icon { color: #007bff; }
       .delete-icon { color: #dc3545; }
       .toggle-icon { color: #ffc107; }
-
-      /* Mobile responsive tweaks */
-      @media (max-width: 600px) {
-        .header-bar {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .add-btn {
-          width: 100%;
-          justify-content: center;
-        }
-        th, td {
-          font-size: 13px;
-          padding: 8px;
-        }
-      }
 
       .modal {
         display: none;
@@ -3513,6 +3496,7 @@ function showPriceGroups() {
         margin-top: 4px;
         border: 1px solid #ccc;
         border-radius: 4px;
+        box-sizing: border-box;
       }
       .modal-content button {
         margin-top: 15px;
@@ -3529,11 +3513,40 @@ function showPriceGroups() {
         font-size: 20px;
         cursor: pointer;
       }
+
+      /* Responsive Design */
+      @media (max-width: 600px) {
+        .header-bar {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .header-bar h2 {
+          font-size: 1.2em;
+        }
+        .add-button {
+          width: 100%;
+          justify-content: center;
+          padding: 10px;
+          font-size: 16px;
+        }
+        th, td {
+          font-size: 12px;
+          padding: 8px;
+        }
+        .action-icons i {
+          font-size: 14px;
+          margin: 0 3px;
+        }
+        .modal-content {
+          width: 95%;
+          padding: 15px;
+        }
+      }
     </style>
 
     <div class="header-bar">
       <h2>Price Groups</h2>
-      <button class="add-btn" onclick="openPriceGroupModal()">
+      <button class="add-button" onclick="openPriceGroupModal()">
         <i class="fas fa-plus"></i> Add Price Group
       </button>
     </div>
@@ -3656,6 +3669,7 @@ async function loadPriceGroups() {
   }
 }
 
+// Sweet confirmation for delete
 function confirmDeletePriceGroup(id) {
   Swal.fire({
     title: 'Are you sure?',
@@ -3676,10 +3690,9 @@ function confirmDeletePriceGroup(id) {
 
 async function togglePriceGroup(id, active) {
   await firebase.firestore().collection("priceGroups").doc(id).update({ active: !active });
-  showSuccessNotification(\`Price Group \${active ? "deactivated" : "activated"}.\`);
+  showSuccessNotification(`Price Group ${active ? "deactivated" : "activated"}.`);
   showPriceGroups();
 }
-
 
 
 function togglePurchases() {
