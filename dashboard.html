@@ -3434,8 +3434,14 @@ async function showPriceList() {
         width: 80px;
         padding: 4px;
         text-align: right;
+        border: none;
+        background: transparent;
       }
-      button.save-btn {
+      input.price-input.editing {
+        border: 1px solid #ccc;
+        background: #fff;
+      }
+      button.action-btn {
         padding: 6px 12px;
         background: #007bff;
         color: white;
@@ -3443,7 +3449,7 @@ async function showPriceList() {
         border-radius: 4px;
         cursor: pointer;
       }
-      button.save-btn:hover { background: #0056b3; }
+      button.action-btn:hover { background: #0056b3; }
     </style>
 
     <div class="header-bar">
@@ -3515,17 +3521,39 @@ async function loadPriceMatrix() {
           <input type="number" class="price-input" 
             data-product="${product.id}" 
             data-group="${group.id}" 
-            value="${val}">
+            value="${val}" readonly>
         </td>`;
     });
 
-    row.innerHTML += `<td><button class="save-btn" onclick="saveMatrixRow(this)">Save</button></td>`;
+    row.innerHTML += `<td><button class="action-btn" onclick="toggleEditRow(this)">Edit</button></td>`;
     body.appendChild(row);
   });
 }
 
-async function saveMatrixRow(btn) {
+function toggleEditRow(btn) {
   const row = btn.closest("tr");
+  const inputs = row.querySelectorAll("input.price-input");
+
+  if (btn.innerText === "Edit") {
+    // Switch to edit mode
+    inputs.forEach(input => {
+      input.removeAttribute("readonly");
+      input.classList.add("editing");
+    });
+    btn.innerText = "Save";
+  } else {
+    // Save changes
+    saveMatrixRow(row).then(() => {
+      inputs.forEach(input => {
+        input.setAttribute("readonly", true);
+        input.classList.remove("editing");
+      });
+      btn.innerText = "Edit";
+    });
+  }
+}
+
+async function saveMatrixRow(row) {
   const inputs = row.querySelectorAll("input.price-input");
   const batch = firebase.firestore().batch();
   const priceCol = firebase.firestore().collection("priceList");
