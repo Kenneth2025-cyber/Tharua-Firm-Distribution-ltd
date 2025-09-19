@@ -7901,20 +7901,33 @@ async function fetchInventoryReports() {
   if (brand) data = data.filter(d => d.brand === brand);
   if (search) data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
 
-  // 🔹 Step 3: render table
+  // 🔹 Step 3: build purchases totals map
+  const purchasesSnap = await firebase.firestore().collection("purchases").get();
+  const purchaseTotals = {}; // productName -> total purchased qty
+  purchasesSnap.forEach(pDoc => {
+    const pdata = pDoc.data();
+    if (pdata.items && Array.isArray(pdata.items)) {
+      pdata.items.forEach(item => {
+        const pname = (item.productName || "").trim();
+        const qty = Number(item.quantity) || 0;
+        if (!purchaseTotals[pname]) purchaseTotals[pname] = 0;
+        purchaseTotals[pname] += qty;
+      });
+    }
+  });
+
+  // 🔹 Step 4: render table
   if (!data.length) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No inventory records found.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = data.map(d => {
-    // if location selected, show only that one, else show all
     const displayLocations = loc ? [loc] : (d.locations || []);
-
     return displayLocations.map(location => {
-      const opening = d.openingStock?.[location] || d.openingStock || 0;
-      const purchased = d.purchased?.[location] || d.purchased || 0;
-      const sold = d.sold?.[location] || d.sold || 0;
+      const opening = Number(d.openingStock) || 0;   // from products collection
+      const purchased = purchaseTotals[d.name] || 0; // from purchases collection
+      const sold = 0; // leave placeholder, sales logic later
       const closing = opening + purchased - sold;
 
       return `
