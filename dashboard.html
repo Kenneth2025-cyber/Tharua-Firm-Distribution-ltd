@@ -6521,7 +6521,7 @@ async function showAddSale() {
   // 🔹 Load customers
   const custSnap = await firebase.firestore().collection("customers").orderBy("name").get();
   const custSelect = document.getElementById("saleCustomer");
-  custSelect.innerHTML = `<option value="">Select Customer</option>`;
+  custSelect.innerHTML = `<option value="">Walk-in (Optional)</option>`;
   custSnap.forEach(doc => {
     const c = doc.data();
     custSelect.innerHTML += `<option value="${doc.id}">${c.name || doc.id}</option>`;
@@ -6530,10 +6530,75 @@ async function showAddSale() {
   // 🔹 Load salespersons
   const salesSnap = await firebase.firestore().collection("fieldSalespersons").orderBy("name").get();
   const salesSelect = document.getElementById("saleSalesperson");
-  salesSelect.innerHTML = `<option value="">Select Salesperson</option>`;
+  salesSelect.innerHTML = `<option value="">-- Select Salesperson --</option>`;
   salesSnap.forEach(doc => {
     const s = doc.data();
     salesSelect.innerHTML += `<option value="${doc.id}">${s.name || doc.id}</option>`;
+  });
+
+  // 🔹 Load products with stock balances
+  const prodSnap = await firebase.firestore().collection("products").orderBy("name").get();
+  const prodList = document.getElementById("productsList");
+  window.productsMap = {};
+
+  for (const doc of prodSnap.docs) {
+    const p = doc.data();
+    const prodName = p.name;
+
+    // Opening stock
+    const openingStock = parseFloat(p.openingStock || 0);
+
+    // Purchases total
+    let totalPurchased = 0;
+    const purchasesSnap = await firebase.firestore().collection("purchases").get();
+    purchasesSnap.forEach(purDoc => {
+      const pur = purDoc.data();
+      if (pur.items && Array.isArray(pur.items)) {
+        pur.items.forEach(item => {
+          if (item.productName === prodName) {
+            totalPurchased += parseFloat(item.quantity || 0);
+          }
+        });
+      }
+    });
+
+    // Sales total
+    let totalSold = 0;
+    const salesSnap2 = await firebase.firestore().collection("sales").get();
+    salesSnap2.forEach(saleDoc => {
+      const sale = saleDoc.data();
+      if (sale.items && Array.isArray(sale.items)) {
+        sale.items.forEach(item => {
+          if (item.prodName === prodName) {
+            totalSold += parseFloat(item.qty || 0);
+          }
+        });
+      }
+    });
+
+    // Stock balance
+    const stock = openingStock + totalPurchased - totalSold;
+
+    // Add to datalist with stock shown
+    const opt = document.createElement("option");
+    opt.value = prodName;
+    opt.label = `${prodName} (Stock: ${stock})`;
+    prodList.appendChild(opt);
+
+    // Save product info
+    window.productsMap[prodName] = {
+      id: doc.id,
+      price: p.sellingPrice || 0,
+      stock: stock
+    };
+  }
+
+  // Auto-fill price when product selected
+  document.getElementById("saleProduct").addEventListener("change", e => {
+    const prodName = e.target.value.trim();
+    if (window.productsMap[prodName]) {
+      document.getElementById("salePrice").value = window.productsMap[prodName].price;
+    }
   });
 
   calculateTotals();
