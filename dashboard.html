@@ -4176,21 +4176,27 @@ async function savePurchase() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    // 2️⃣ Update stock and buying price for each product
-    for (const item of items) {
-      const productRef = firebase.firestore().collection("products").where("name", "==", item.productName);
-      const snapshot = await productRef.get();
+// 2️⃣ Update only the buying price for each product (do NOT touch opening stock)
+for (const item of items) {
+  const productRef = firebase.firestore().collection("products").where("name", "==", item.productName);
+  const snapshot = await productRef.get();
 
-      snapshot.forEach(async doc => {
-        const productData = doc.data();
-        const currentStock = productData.openingStock || 0;
-        const currentBuyingPrice = productData.buyingPrice || 0;
+  snapshot.forEach(async doc => {
+    const productData = doc.data();
+    const currentStock = productData.openingStock || 0;  // only used for calculation
+    const currentBuyingPrice = productData.buyingPrice || 0;
 
-// When saving a purchase, do NOT update openingStock
-await firebase.firestore().collection("products").doc(doc.id).update({
-  buyingPrice: parseFloat(newBuyingPrice.toFixed(2))
-  // openingStock is left untouched
-});
+    const newStock = currentStock + item.quantity; // just for weighted average calc
+    const newBuyingPrice = newStock > 0
+      ? ((currentStock * currentBuyingPrice) + (item.quantity * item.price)) / newStock
+      : item.price;
+
+    // ❌ Removed openingStock update
+    await firebase.firestore().collection("products").doc(doc.id).update({
+      buyingPrice: parseFloat(newBuyingPrice.toFixed(2))
+    });
+  });
+}
 
 
     // 3️⃣ Reset form
