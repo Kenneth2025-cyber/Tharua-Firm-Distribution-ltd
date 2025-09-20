@@ -6777,7 +6777,7 @@ async function saveSale() {
     location,
     customer,
     salesperson,
-    expenses: expenseItems, // full list
+    expenses: expenseItems, // still keep in sale record
     total,
     net,
     paid,
@@ -6787,9 +6787,25 @@ async function saveSale() {
   };
 
   try {
-    await firebase.firestore().collection("sales").add(saleData);
+    // Save sale
+    const saleRef = await firebase.firestore().collection("sales").add(saleData);
+
+    // 🔹 Also save each field expense into the main expenses collection
+    for (const exp of expenseItems) {
+      const expenseData = {
+        category: exp.category,
+        description: exp.description,
+        amount: exp.amount,
+        linkedSaleId: saleRef.id,   // reference back to the sale
+        salesperson,
+        location,
+        createdAt: new Date()
+      };
+      await firebase.firestore().collection("expenses").add(expenseData);
+    }
+
     document.getElementById("addSaleMessage").style.color = "green";
-    document.getElementById("addSaleMessage").innerText = "Sale saved!";
+    document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
     saleItems = [];
     expenseItems = [];
     renderSaleItems();
