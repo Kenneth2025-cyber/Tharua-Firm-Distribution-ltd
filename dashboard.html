@@ -6384,12 +6384,12 @@ async function showAddSale() {
 
         <label for="saleCustomer">Customer</label>
         <select id="saleCustomer">
-          <option value="">Walk-in (Optional)</option>
+          <option value="">Loading...</option>
         </select>
 
         <label for="saleSalesperson">Field Salesperson *</label>
         <select id="saleSalesperson" required>
-          <option value="">-- Select Salesperson --</option>
+          <option value="">Loading...</option>
         </select>
       </div>
     </div>
@@ -6500,7 +6500,7 @@ async function showAddSale() {
     <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
   `;
 
-  // 🔹 Load expense categories from Firestore
+  // 🔹 Load expense categories
   const catSnap = await firebase.firestore().collection("expenseCategories").orderBy("name").get();
   const catSelect = document.getElementById("expenseCategory");
   catSelect.innerHTML = `<option value="">Select Category</option>`;
@@ -6509,7 +6509,32 @@ async function showAddSale() {
     catSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
   });
 
-  // 🔹 your existing Firestore loading for locations, customers, salespersons, products goes here (unchanged)...
+  // 🔹 Load business locations
+  const locSnap = await firebase.firestore().collection("businessLocations").get();
+  const locSelect = document.getElementById("saleLocation");
+  locSelect.innerHTML = `<option value="">Select Location</option>`;
+  locSnap.forEach(doc => {
+    const l = doc.data();
+    locSelect.innerHTML += `<option value="${l.name}">${l.name}</option>`;
+  });
+
+  // 🔹 Load customers
+  const custSnap = await firebase.firestore().collection("customers").orderBy("name").get();
+  const custSelect = document.getElementById("saleCustomer");
+  custSelect.innerHTML = `<option value="">Select Customer</option>`;
+  custSnap.forEach(doc => {
+    const c = doc.data();
+    custSelect.innerHTML += `<option value="${doc.id}">${c.name || doc.id}</option>`;
+  });
+
+  // 🔹 Load salespersons
+  const salesSnap = await firebase.firestore().collection("fieldSalespersons").orderBy("name").get();
+  const salesSelect = document.getElementById("saleSalesperson");
+  salesSelect.innerHTML = `<option value="">Select Salesperson</option>`;
+  salesSnap.forEach(doc => {
+    const s = doc.data();
+    salesSelect.innerHTML += `<option value="${doc.id}">${s.name || doc.id}</option>`;
+  });
 
   calculateTotals();
 }
