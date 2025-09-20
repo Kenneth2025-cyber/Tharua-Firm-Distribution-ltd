@@ -7258,7 +7258,7 @@ async function loadExpenses() {
 
   const snap = await firebase.firestore()
     .collection("expenses")
-    .orderBy("createdAt", "desc")
+    .orderBy("createdAt", "desc")   // 🔹 use createdAt instead of expenseDate (since field expenses use createdAt)
     .get();
 
   let rows = [];
@@ -7268,54 +7268,49 @@ async function loadExpenses() {
   snap.forEach(doc => {
     const e = doc.data();
 
-    // Normalize values between "manual expense" and "field expense"
-    const amount = e.totalAmount || e.amount || 0;
-    const paidAmount = e.paidAmount ?? amount; // assume fully paid if not specified
-    const dueAmount = e.dueAmount ?? (amount - paidAmount);
-    const description = e.note || e.description || "";
-    const date = e.expenseDate?.toDate?.() || e.createdAt?.toDate?.() || null;
-
-    // Apply filters
     if (loc && e.location !== loc) return;
     if (cat && e.category !== cat) return;
     if (sp && e.salesperson !== sp) return;
     if (start && end) {
+      const d = e.expenseDate?.toDate?.() || e.createdAt?.toDate?.();
       const s = new Date(start);
       const ed = new Date(end + "T23:59:59");
-      if (!date || date < s || date > ed) return;
+      if (!d || d < s || d > ed) return;
     }
-    if (search && !description.toLowerCase().includes(search)) return;
+    if (search && !(e.note || e.description || "").toLowerCase().includes(search)) return;
 
-    // Totals
-    total += amount;
-    paid += paidAmount;
-    due += dueAmount;
+    total += e.totalAmount || e.amount || 0;
+    paid += e.paidAmount || 0;
+    due += e.dueAmount || ((e.totalAmount || e.amount || 0) - (e.paidAmount || 0));
+
+    // 🔹 Detect if this expense is linked to a sale
+    const isFieldExpense = !!e.linkedSaleId;
 
     allFilteredExpenses.push({
-      date: date ? date.toLocaleDateString() : "",
+      date: (e.expenseDate?.toDate?.() || e.createdAt?.toDate?.() || new Date()).toLocaleDateString(),
       location: e.location || "",
       category: e.category || "",
       salesperson: e.salesperson || "",
-      total: amount,
-      paid: paidAmount,
-      due: dueAmount,
-      note: description
+      total: e.totalAmount || e.amount || 0,
+      paid: e.paidAmount || 0,
+      due: e.dueAmount || ((e.totalAmount || e.amount || 0) - (e.paidAmount || 0)),
+      note: e.note || e.description || "",
+      tag: isFieldExpense ? "Field Expense" : "Manual"
     });
 
     rows.push(`
       <tr>
-        <td>${date ? date.toLocaleDateString() : ""}</td>
+        <td>${(e.expenseDate?.toDate?.() || e.createdAt?.toDate?.() || new Date()).toLocaleDateString()}</td>
         <td>${e.location || ""}</td>
         <td>${e.category || ""}</td>
         <td>${e.salesperson || ""}</td>
-        <td>KES ${Number(amount).toLocaleString()}</td>
-        <td>KES ${Number(paidAmount).toLocaleString()}</td>
+        <td>KES ${Number(e.totalAmount || e.amount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.dueAmount || ((e.totalAmount || e.amount || 0) - (e.paidAmount || 0))).toLocaleString()}</td>
         <td>
-          KES ${Number(dueAmount).toLocaleString()}
-          <span style="color:purple; margin-left:6px; cursor:pointer;" 
-            onclick="addPayment('${doc.id}', ${amount}, ${paidAmount})">💰</span>
+          ${e.note || e.description || ""}
+          ${isFieldExpense ? `<span style="color:blue; font-weight:bold; margin-left:5px;">[Field]</span>` : ""}
         </td>
-        <td>${description}</td>
         <td>
           <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
           <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
@@ -7325,7 +7320,6 @@ async function loadExpenses() {
     `);
   });
 
-  // Pagination
   expensePage.total = rows.length;
   const startIdx = (expensePage.current - 1) * expensePage.perPage;
   const endIdx = startIdx + expensePage.perPage;
