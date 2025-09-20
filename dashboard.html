@@ -6435,7 +6435,9 @@ async function showAddSale() {
       <h3>Field Expenses (optional)</h3>
       <div class="form-group">
         <label for="expenseCategory">Category</label>
-        <input type="text" id="expenseCategory" placeholder="e.g. Fuel, Meals" />
+        <select id="expenseCategory">
+          <option value="">Loading categories...</option>
+        </select>
 
         <label for="expenseDescription">Description</label>
         <input type="text" id="expenseDescription" placeholder="Short description" />
@@ -6498,6 +6500,15 @@ async function showAddSale() {
     <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
   `;
 
+  // 🔹 Load expense categories from Firestore
+  const catSnap = await firebase.firestore().collection("expenseCategories").orderBy("name").get();
+  const catSelect = document.getElementById("expenseCategory");
+  catSelect.innerHTML = `<option value="">Select Category</option>`;
+  catSnap.forEach(doc => {
+    const c = doc.data();
+    catSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+  });
+
   // 🔹 your existing Firestore loading for locations, customers, salespersons, products goes here (unchanged)...
 
   calculateTotals();
@@ -6514,12 +6525,12 @@ function removeSaleItem(index) { /* unchanged */ }
    Expense Functions
 -------------------- */
 function addFieldExpense() {
-  const category = document.getElementById("expenseCategory").value.trim();
+  const category = document.getElementById("expenseCategory").value;
   const description = document.getElementById("expenseDescription").value.trim();
   const amount = parseFloat(document.getElementById("expenseAmount").value);
 
   if (!category || isNaN(amount) || amount <= 0) {
-    alert("Please enter a valid category and amount.");
+    alert("Please select a category and enter a valid amount.");
     return;
   }
 
