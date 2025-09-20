@@ -7926,12 +7926,20 @@ async function fetchInventoryReports() {
 
   tbody.innerHTML = data.map(d => {
     const displayLocations = loc ? [loc] : (d.locations || []);
+
     return displayLocations.map(location => {
-      const opening = Number(d.openingStock) || 0;   
+      let opening = 0;
 
-      // Match purchases by both product and location
-      const purchased = purchaseTotals[`${d.name}|${location}`] || 0; 
+      // If openingStock is a map, use per-location
+      if (d.openingStock && typeof d.openingStock === "object") {
+        opening = Number(d.openingStock[location]) || 0;
+      } 
+      // If openingStock is just a number, use it for all locations
+      else if (typeof d.openingStock === "number") {
+        opening = d.openingStock;
+      }
 
+      const purchased = purchaseTotals[`${d.name}|${location}`] || 0;
       const sold = 0; // placeholder for now
       const closing = opening + purchased - sold;
 
