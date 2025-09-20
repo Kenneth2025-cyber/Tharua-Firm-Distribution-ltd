@@ -4186,17 +4186,12 @@ async function savePurchase() {
         const currentStock = productData.openingStock || 0;
         const currentBuyingPrice = productData.buyingPrice || 0;
 
-        const newStock = currentStock + item.quantity;
-        const newBuyingPrice = newStock > 0
-          ? ((currentStock * currentBuyingPrice) + (item.quantity * item.price)) / newStock
-          : item.price;
+// When saving a purchase, do NOT update openingStock
+await firebase.firestore().collection("products").doc(doc.id).update({
+  buyingPrice: parseFloat(newBuyingPrice.toFixed(2))
+  // openingStock is left untouched
+});
 
-        await firebase.firestore().collection("products").doc(doc.id).update({
-          openingStock: newStock,
-          buyingPrice: parseFloat(newBuyingPrice.toFixed(2))
-        });
-      });
-    }
 
     // 3️⃣ Reset form
     document.getElementById("addPurchaseForm").reset();
