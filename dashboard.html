@@ -7928,19 +7928,21 @@ async function fetchInventoryReports() {
     const displayLocations = loc ? [loc] : (d.locations || []);
 
     return displayLocations.map(location => {
+      // 🔹 Opening stock: always read original value from Firestore
       let opening = 0;
-
-      // If openingStock is a map, use per-location
       if (d.openingStock && typeof d.openingStock === "object") {
         opening = Number(d.openingStock[location]) || 0;
-      } 
-      // If openingStock is just a number, use it for all locations
-      else if (typeof d.openingStock === "number") {
+      } else if (typeof d.openingStock === "number") {
         opening = d.openingStock;
       }
 
+      // 🔹 Purchases (added separately, does NOT change opening)
       const purchased = purchaseTotals[`${d.name}|${location}`] || 0;
-      const sold = 0; // placeholder for now
+
+      // 🔹 Placeholder for sales (will deduct later if needed)
+      const sold = 0;
+
+      // 🔹 Closing = Opening + Purchases - Sales
       const closing = opening + purchased - sold;
 
       return `
