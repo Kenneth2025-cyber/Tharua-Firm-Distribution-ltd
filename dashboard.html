@@ -6790,19 +6790,40 @@ async function saveSale() {
     // Save sale
     const saleRef = await firebase.firestore().collection("sales").add(saleData);
 
-    // 🔹 Also save each field expense into the main expenses collection
-    for (const exp of expenseItems) {
-      const expenseData = {
-        category: exp.category,
-        description: exp.description,
-        amount: exp.amount,
-        linkedSaleId: saleRef.id,   // reference back to the sale
-        salesperson,
-        location,
-        createdAt: new Date()
-      };
-      await firebase.firestore().collection("expenses").add(expenseData);
-    }
+// Save each field expense into the main expenses collection as "already paid in field"
+for (const exp of expenseItems) {
+  const expenseData = {
+    category: exp.category,
+    description: exp.description,
+    totalAmount: Number(exp.amount) || 0,
+    paidAmount: Number(exp.amount) || 0, // already settled in the field
+    dueAmount: 0,                         // settled => no due
+    paymentMethod: "Field",               // optional: indicates paid on-field
+    salesperson,
+    linkedSaleId: saleRef.id,             // reference back to the sale
+    location,
+    expenseDate: new Date(),
+    status: "Paid",                       // or "Settled in Field"
+    note: `Settled in field when saving sale ${saleRef.id}`,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  // create expense doc
+  const expenseRef = await firebase.firestore().collection("expenses").add(expenseData);
+
+  // add a payment log entry (so UI/history that expects payments subcollection remains consistent)
+  try {
+    await expenseRef.collection("payments").add({
+      amount: Number(exp.amount) || 0,
+      date: firebase.firestore.FieldValue.serverTimestamp(),
+      method: "Field",
+      note: `Auto-logged payment when sale ${saleRef.id} saved`
+    });
+  } catch (err) {
+    console.warn("Could not write payments subcollection for expense:", err);
+  }
+}
+
 
     document.getElementById("addSaleMessage").style.color = "green";
     document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
