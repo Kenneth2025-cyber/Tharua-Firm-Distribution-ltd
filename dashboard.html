@@ -6439,28 +6439,36 @@ async function showAddSale() {
           <option value="">Loading categories...</option>
         </select>
 
-        <label for="expenseDescription">Description</label>
-        <input type="text" id="expenseDescription" placeholder="Short description" />
+<label for="expenseDescription">Description</label>
+<input type="text" id="expenseDescription" placeholder="Short description" />
 
-        <label for="expenseAmount">Amount (KES)</label>
-        <input type="number" id="expenseAmount" min="0" step="0.01" />
+<label for="expenseSalesperson">Incurred by (optional)</label>
+<select id="expenseSalesperson">
+  <option value="">(Use sale salesperson)</option>
+</select>
 
-        <button type="button" class="submit-btn" onclick="addFieldExpense()">Add Expense</button>
+<label for="expenseAmount">Amount (KES)</label>
+<input type="number" id="expenseAmount" min="0" step="0.01" />
+
+<button type="button" class="submit-btn" onclick="addFieldExpense()">Add Expense</button>
+
       </div>
     </div>
 
     <!-- Expense Items Table -->
     <div class="table-container">
       <table class="users-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Category</th>
-            <th>Description</th>
-            <th>Amount (KES)</th>
-            <th>Remove</th>
-          </tr>
-        </thead>
+     <thead>
+  <tr>
+    <th>#</th>
+    <th>Category</th>
+    <th>Description</th>
+    <th>Salesperson</th>
+    <th>Amount (KES)</th>
+    <th>Remove</th>
+  </tr>
+</thead>
+
         <tbody id="expenseItemsTbody">
           <tr><td colspan="5" style="text-align:center;">No expenses yet</td></tr>
         </tbody>
@@ -6527,14 +6535,32 @@ async function showAddSale() {
     custSelect.innerHTML += `<option value="${doc.id}">${c.name || doc.id}</option>`;
   });
 
-  // 🔹 Load salespersons
-  const salesSnap = await firebase.firestore().collection("fieldSalespersons").orderBy("name").get();
-  const salesSelect = document.getElementById("saleSalesperson");
-  salesSelect.innerHTML = `<option value="">-- Select Salesperson --</option>`;
-  salesSnap.forEach(doc => {
-    const s = doc.data();
-    salesSelect.innerHTML += `<option value="${doc.id}">${s.name || doc.id}</option>`;
-  });
+// 🔹 Load salespersons and populate both sale and expense selects
+const salesSnap = await firebase.firestore().collection("fieldSalespersons").orderBy("name").get();
+const salesSelect = document.getElementById("saleSalesperson");
+const expenseSalesSelect = document.getElementById("expenseSalesperson");
+
+// safety: if element missing, skip gracefully
+if (!salesSelect) throw new Error("saleSalesperson element not found");
+if (!expenseSalesSelect) {
+  console.warn("expenseSalesperson element not found - skipping");
+}
+
+salesSelect.innerHTML = `<option value="">-- Select Salesperson --</option>`;
+if (expenseSalesSelect) expenseSalesSelect.innerHTML = `<option value="">(Use sale salesperson)</option>`;
+
+// build in-memory map for id -> name
+window.salespersonsMap = {};
+
+salesSnap.forEach(doc => {
+  const s = doc.data();
+  const id = doc.id;
+  const name = s.name || id;
+  window.salespersonsMap[id] = name;
+  salesSelect.innerHTML += `<option value="${id}">${name}</option>`;
+  if (expenseSalesSelect) expenseSalesSelect.innerHTML += `<option value="${id}">${name}</option>`;
+});
+
 
   // 🔹 Load products with stock balances
   const prodSnap = await firebase.firestore().collection("products").orderBy("name").get();
@@ -6682,6 +6708,7 @@ function removeSaleItem(index) {
 function addFieldExpense() {
   const category = document.getElementById("expenseCategory").value;
   const description = document.getElementById("expenseDescription").value.trim();
+  const salespersonId = document.getElementById("expenseSalesperson")?.value || ""; // optional
   const amount = parseFloat(document.getElementById("expenseAmount").value);
 
   if (!category || isNaN(amount) || amount <= 0) {
@@ -6689,32 +6716,40 @@ function addFieldExpense() {
     return;
   }
 
-  expenseItems.push({ category, description, amount });
+  expenseItems.push({ category, description, amount, salespersonId });
   renderFieldExpenses();
   calculateTotals();
 
+  // reset fields
   document.getElementById("expenseCategory").value = "";
   document.getElementById("expenseDescription").value = "";
+  if (document.getElementById("expenseSalesperson")) document.getElementById("expenseSalesperson").value = "";
   document.getElementById("expenseAmount").value = "";
 }
+
 
 function renderFieldExpenses() {
   const tbody = document.getElementById("expenseItemsTbody");
   tbody.innerHTML = "";
 
   if (expenseItems.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">No expenses yet</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No expenses yet</td></tr>`;
     return;
   }
 
   let total = 0;
   expenseItems.forEach((item, index) => {
     total += item.amount;
+    const salespersonName = item.salespersonId
+      ? (window.salespersonsMap?.[item.salespersonId] || item.salespersonId)
+      : "(Use sale salesperson)";
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${index + 1}</td>
       <td>${item.category}</td>
       <td>${item.description}</td>
+      <td>${salespersonName}</td>
       <td>${item.amount.toFixed(2)}</td>
       <td class="remove-cell" onclick="removeFieldExpense(${index})">&times;</td>
     `;
@@ -6725,12 +6760,13 @@ function renderFieldExpenses() {
   totalsRow.style.backgroundColor = "#f8f9fa";
   totalsRow.style.fontWeight = "bold";
   totalsRow.innerHTML = `
-    <td colspan="3" style="text-align:right;">Total Expenses:</td>
+    <td colspan="4" style="text-align:right;">Total Expenses:</td>
     <td>${total.toFixed(2)}</td>
     <td></td>
   `;
   tbody.appendChild(totalsRow);
 }
+
 
 function removeFieldExpense(index) {
   expenseItems.splice(index, 1);
@@ -6762,7 +6798,7 @@ async function saveSale() {
 
   const location = document.getElementById("saleLocation").value;
   const customer = document.getElementById("saleCustomer").value || "Walk-in";
-  const salesperson = document.getElementById("saleSalesperson").value;
+  const salesperson = document.getElementById("saleSalesperson").value; // this is doc ID
   const total = parseFloat(document.getElementById("saleTotal").value) || 0;
   const net = parseFloat(document.getElementById("saleNet").value) || 0;
   const paid = parseFloat(document.getElementById("salePaid").value) || 0;
@@ -6773,55 +6809,85 @@ async function saveSale() {
     return;
   }
 
+  // resolve sale salesperson name
+  let saleSalespersonName = salesperson;
+  try {
+    const spDoc = await firebase.firestore().collection("fieldSalespersons").doc(salesperson).get();
+    if (spDoc.exists) saleSalespersonName = spDoc.data().name || salesperson;
+  } catch (err) {
+    console.warn("Could not fetch salesperson name:", err);
+  }
+
   const saleData = {
     location,
     customer,
-    salesperson,
-    expenses: expenseItems, // still keep in sale record
+    salespersonId: salesperson,
+    salesperson: saleSalespersonName,
+    expenses: expenseItems, // optional store of raw items
     total,
     net,
     paid,
     balance,
     items: saleItems,
-    createdAt: new Date()
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
   try {
     // Save sale
     const saleRef = await firebase.firestore().collection("sales").add(saleData);
 
-// 🔹 Save each field expense into the main expenses collection as "already paid"
-for (const exp of expenseItems) {
-  const expenseData = {
-    category: exp.category,
-    description: exp.description,
-    totalAmount: Number(exp.amount) || 0,
-    paidAmount: Number(exp.amount) || 0, // already settled in the field
-    dueAmount: 0,
-    paymentMethod: "Field",
-    salesperson,
-    linkedSaleId: saleRef.id,
-    location,
-    expenseDate: new Date(),
-    status: "Paid",
-    note: exp.description, // 👈 use description as the Note value
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
+    // Save each field expense into the main expenses collection
+    for (const exp of expenseItems) {
+      const expenseSalespersonId = exp.salespersonId || salesperson || "";
+      const expenseSalespersonName = expenseSalespersonId
+        ? (window.salespersonsMap?.[expenseSalespersonId] || (expenseSalespersonId === salesperson ? saleSalespersonName : expenseSalespersonId))
+        : saleSalespersonName;
 
-  const expenseRef = await firebase.firestore().collection("expenses").add(expenseData);
+      const expenseData = {
+        category: exp.category,
+        description: exp.description,
+        totalAmount: Number(exp.amount) || 0,
+        paidAmount: Number(exp.amount) || 0, // already settled in the field
+        dueAmount: 0,
+        paymentMethod: "Field",
+        salesperson: expenseSalespersonName, // name for display
+        salespersonId: expenseSalespersonId || null, // optional id for reference
+        linkedSaleId: saleRef.id,   // reference back to the sale
+        location,
+        expenseDate: firebase.firestore.FieldValue.serverTimestamp(),
+        status: "Paid",
+        note: exp.description || "",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
 
-  // optional: add payment record for history consistency
-  try {
-    await expenseRef.collection("payments").add({
-      amount: Number(exp.amount) || 0,
-      date: firebase.firestore.FieldValue.serverTimestamp(),
-      method: "Field",
-      note: exp.description
-    });
+      const expRef = await firebase.firestore().collection("expenses").add(expenseData);
+
+      // write a payment record so payments history shows it as paid
+      try {
+        await expRef.collection("payments").add({
+          amount: Number(exp.amount) || 0,
+          date: firebase.firestore.FieldValue.serverTimestamp(),
+          method: "Field",
+          note: exp.description || ""
+        });
+      } catch (err) {
+        console.warn("Could not add payments subcollection for expense:", err);
+      }
+    }
+
+    document.getElementById("addSaleMessage").style.color = "green";
+    document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
+    saleItems = [];
+    expenseItems = [];
+    renderSaleItems();
+    renderFieldExpenses();
+    calculateTotals();
   } catch (err) {
-    console.warn("Could not write payments subcollection for expense:", err);
+    console.error(err);
+    document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
   }
 }
+
 
 
     document.getElementById("addSaleMessage").style.color = "green";
