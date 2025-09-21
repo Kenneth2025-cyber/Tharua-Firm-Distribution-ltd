@@ -7258,7 +7258,7 @@ async function loadExpenses() {
 
   const snap = await firebase.firestore()
     .collection("expenses")
-    .orderBy("createdAt", "desc")   // 🔹 use createdAt instead of expenseDate (since field expenses use createdAt)
+    .orderBy("expenseDate", "desc")
     .get();
 
   let rows = [];
@@ -7267,49 +7267,56 @@ async function loadExpenses() {
 
   snap.forEach(doc => {
     const e = doc.data();
-
     if (loc && e.location !== loc) return;
     if (cat && e.category !== cat) return;
     if (sp && e.salesperson !== sp) return;
     if (start && end) {
-      const d = e.expenseDate?.toDate?.() || e.createdAt?.toDate?.();
+      const d = e.expenseDate?.toDate();
       const s = new Date(start);
       const ed = new Date(end + "T23:59:59");
       if (!d || d < s || d > ed) return;
     }
-    if (search && !(e.note || e.description || "").toLowerCase().includes(search)) return;
+    if (search && !(e.note || "").toLowerCase().includes(search)) return;
 
-    total += e.totalAmount || e.amount || 0;
+    total += e.totalAmount || 0;
     paid += e.paidAmount || 0;
-    due += e.dueAmount || ((e.totalAmount || e.amount || 0) - (e.paidAmount || 0));
-
-    // 🔹 Detect if this expense is linked to a sale
-    const isFieldExpense = !!e.linkedSaleId;
+    due += e.dueAmount || 0;
 
     allFilteredExpenses.push({
-      date: (e.expenseDate?.toDate?.() || e.createdAt?.toDate?.() || new Date()).toLocaleDateString(),
+      date: e.expenseDate?.toDate().toLocaleDateString() || "",
       location: e.location || "",
       category: e.category || "",
       salesperson: e.salesperson || "",
-      total: e.totalAmount || e.amount || 0,
+      total: e.totalAmount || 0,
       paid: e.paidAmount || 0,
-      due: e.dueAmount || ((e.totalAmount || e.amount || 0) - (e.paidAmount || 0)),
-      note: e.note || e.description || "",
-      tag: isFieldExpense ? "Field Expense" : "Manual"
+      due: e.dueAmount || 0,
+      note: e.note || ""
     });
+
+    // 🔹 Detect if this expense is a field expense
+    const isFieldExpense = !!e.linkedSaleId;
 
     rows.push(`
       <tr>
-        <td>${(e.expenseDate?.toDate?.() || e.createdAt?.toDate?.() || new Date()).toLocaleDateString()}</td>
+        <td>${e.expenseDate?.toDate().toLocaleDateString() || ""}</td>
         <td>${e.location || ""}</td>
         <td>${e.category || ""}</td>
         <td>${e.salesperson || ""}</td>
-        <td>KES ${Number(e.totalAmount || e.amount || 0).toLocaleString()}</td>
+        <td>KES ${Number(e.totalAmount || 0).toLocaleString()}</td>
         <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
-        <td>KES ${Number(e.dueAmount || ((e.totalAmount || e.amount || 0) - (e.paidAmount || 0))).toLocaleString()}</td>
         <td>
-          ${e.note || e.description || ""}
-          ${isFieldExpense ? `<span style="color:blue; font-weight:bold; margin-left:5px;">[Field]</span>` : ""}
+          KES ${Number(e.dueAmount || 0).toLocaleString()}
+          <span style="color:purple; margin-left:6px; cursor:pointer;" 
+            onclick="addPayment('${doc.id}', ${e.totalAmount || 0}, ${e.paidAmount || 0})">💰</span>
+        </td>
+        <td>
+          ${e.note || ""}
+          ${
+            isFieldExpense
+              ? `<span style="color:blue; font-weight:bold; margin-left:5px; cursor:pointer;" 
+                   onclick="viewLinkedSale('${e.linkedSaleId}')">[Field]</span>`
+              : ""
+          }
         </td>
         <td>
           <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
@@ -7607,6 +7614,60 @@ async function deleteExpense(id) {
   }
 }
 
+// Open linked sale details from field expense
+async function viewLinkedSale(saleId) {
+  if (!saleId) {
+    Swal.fire("Error", "No linked sale found.", "error");
+    return;
+  }
+
+  const saleRef = firebase.firestore().collection("sales").doc(saleId);
+  const saleSnap = await saleRef.get();
+
+  if (!saleSnap.exists) {
+    Swal.fire("Error", "Linked sale not found.", "error");
+    return;
+  }
+
+  const s = saleSnap.data();
+
+  // Build sale items table
+  let itemsHtml = "";
+  if (s.items && Array.isArray(s.items)) {
+    itemsHtml = s.items.map(i => `
+      <tr>
+        <td>${i.prodName}</td>
+        <td>${i.qty}</td>
+        <td>${i.price.toFixed(2)}</td>
+        <td>${i.subtotal.toFixed(2)}</td>
+      </tr>
+    `).join("");
+  } else {
+    itemsHtml = `<tr><td colspan="4" style="text-align:center;">No items</td></tr>`;
+  }
+
+  Swal.fire({
+    title: "Linked Sale",
+    width: 800,
+    html: `
+      <p><b>Date:</b> ${s.createdAt?.toDate?.().toLocaleDateString() || ""}</p>
+      <p><b>Location:</b> ${s.location || ""}</p>
+      <p><b>Customer:</b> ${s.customer || ""}</p>
+      <p><b>Salesperson:</b> ${s.salesperson || ""}</p>
+      <p><b>Total:</b> KES ${Number(s.total || 0).toLocaleString()}</p>
+      <p><b>Net:</b> KES ${Number(s.net || 0).toLocaleString()}</p>
+      <p><b>Paid:</b> KES ${Number(s.paid || 0).toLocaleString()}</p>
+      <p><b>Balance:</b> KES ${Number(s.balance || 0).toLocaleString()}</p>
+
+      <h3>Sale Items</h3>
+      <table border="1" style="width:100%; border-collapse:collapse;">
+        <tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>
+        ${itemsHtml}
+      </table>
+    `,
+    confirmButtonText: "Close"
+  });
+}
 
 
 async function showAddExpense() {
