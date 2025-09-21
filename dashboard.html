@@ -6889,22 +6889,6 @@ async function saveSale() {
 }
 
 
-
-    document.getElementById("addSaleMessage").style.color = "green";
-    document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
-    saleItems = [];
-    expenseItems = [];
-    renderSaleItems();
-    renderFieldExpenses();
-    calculateTotals();
-  } catch (err) {
-    console.error(err);
-    document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
-  }
-}
-
-
-
 /* -------------------------------
    EXPENSES DROPDOWN + PAGES
 --------------------------------*/
