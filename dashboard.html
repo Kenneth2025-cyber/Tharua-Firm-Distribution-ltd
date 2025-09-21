@@ -6790,34 +6790,33 @@ async function saveSale() {
     // Save sale
     const saleRef = await firebase.firestore().collection("sales").add(saleData);
 
-// Save each field expense into the main expenses collection as "already paid in field"
+// 🔹 Save each field expense into the main expenses collection as "already paid"
 for (const exp of expenseItems) {
   const expenseData = {
     category: exp.category,
     description: exp.description,
     totalAmount: Number(exp.amount) || 0,
     paidAmount: Number(exp.amount) || 0, // already settled in the field
-    dueAmount: 0,                         // settled => no due
-    paymentMethod: "Field",               // optional: indicates paid on-field
+    dueAmount: 0,
+    paymentMethod: "Field",
     salesperson,
-    linkedSaleId: saleRef.id,             // reference back to the sale
+    linkedSaleId: saleRef.id,
     location,
     expenseDate: new Date(),
-    status: "Paid",                       // or "Settled in Field"
-    note: `Settled in field when saving sale ${saleRef.id}`,
+    status: "Paid",
+    note: exp.description, // 👈 use description as the Note value
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  // create expense doc
   const expenseRef = await firebase.firestore().collection("expenses").add(expenseData);
 
-  // add a payment log entry (so UI/history that expects payments subcollection remains consistent)
+  // optional: add payment record for history consistency
   try {
     await expenseRef.collection("payments").add({
       amount: Number(exp.amount) || 0,
       date: firebase.firestore.FieldValue.serverTimestamp(),
       method: "Field",
-      note: `Auto-logged payment when sale ${saleRef.id} saved`
+      note: exp.description
     });
   } catch (err) {
     console.warn("Could not write payments subcollection for expense:", err);
