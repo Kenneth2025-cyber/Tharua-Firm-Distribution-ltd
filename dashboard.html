@@ -6790,31 +6790,34 @@ async function saveSale() {
     // Save sale
     const saleRef = await firebase.firestore().collection("sales").add(saleData);
 
-    // 🔹 Also save each field expense into the main expenses collection
-    for (const exp of expenseItems) {
-      const expenseData = {
-        category: exp.category,
-        description: exp.description,
-        amount: exp.amount,
-        linkedSaleId: saleRef.id,   // reference back to the sale
-        salesperson,
-        location,
-        createdAt: new Date()
-      };
-      await firebase.firestore().collection("expenses").add(expenseData);
-    }
+// 🔹 Also save each field expense into the main expenses collection
+for (const exp of expenseItems) {
+  const expenseData = {
+    location,
+    category: exp.category,
+    salesperson,
+    expenseDate: new Date(),               // keep a standard expense date
+    totalAmount: exp.amount,               // ✅ total is the entered amount
+    paidAmount: exp.amount,                // ✅ mark as fully paid
+    dueAmount: 0,                          // ✅ no due in field expenses
+    note: exp.description || "",           // description goes here
+    linkedSaleId: saleRef.id,              // reference back to the sale
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
 
-    document.getElementById("addSaleMessage").style.color = "green";
-    document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
-    saleItems = [];
-    expenseItems = [];
-    renderSaleItems();
-    renderFieldExpenses();
-    calculateTotals();
-  } catch (err) {
-    console.error(err);
-    document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
-  }
+  await firebase.firestore().collection("expenses").add(expenseData);
+}
+
+document.getElementById("addSaleMessage").style.color = "green";
+document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
+saleItems = [];
+expenseItems = [];
+renderSaleItems();
+renderFieldExpenses();
+calculateTotals();
+} catch (err) {
+  console.error(err);
+  document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
 }
 
 
