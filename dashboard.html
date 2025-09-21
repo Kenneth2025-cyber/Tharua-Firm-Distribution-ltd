@@ -6796,6 +6796,23 @@ async function saveSale() {
     return;
   }
 
+  // 👇 SweetAlert popup for choosing date
+  const { value: saleDate } = await Swal.fire({
+    title: "Select Sale Date",
+    html: `<input type="date" id="saleDateInput" class="swal2-input" value="${new Date().toISOString().split('T')[0]}">`,
+    focusConfirm: false,
+    preConfirm: () => {
+      const val = document.getElementById("saleDateInput").value;
+      if (!val) {
+        Swal.showValidationMessage("Please select a date");
+        return null;
+      }
+      return val;
+    }
+  });
+
+  if (!saleDate) return; // if user cancels
+
   const location = document.getElementById("saleLocation").value;
   const customer = document.getElementById("saleCustomer").value || "Walk-in";
   const salesperson = document.getElementById("saleSalesperson").value; // this is doc ID
@@ -6818,6 +6835,8 @@ async function saveSale() {
     console.warn("Could not fetch salesperson name:", err);
   }
 
+  const chosenDate = new Date(saleDate);
+
   const saleData = {
     location,
     customer,
@@ -6829,6 +6848,7 @@ async function saveSale() {
     paid,
     balance,
     items: saleItems,
+    saleDate: chosenDate, // ✅ backdatable field
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
@@ -6854,7 +6874,7 @@ async function saveSale() {
         salespersonId: expenseSalespersonId || null, // optional id for reference
         linkedSaleId: saleRef.id,   // reference back to the sale
         location,
-        expenseDate: firebase.firestore.FieldValue.serverTimestamp(),
+        expenseDate: chosenDate,    // ✅ backdated with sale
         status: "Paid",
         note: exp.description || "",
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -6866,7 +6886,7 @@ async function saveSale() {
       try {
         await expRef.collection("payments").add({
           amount: Number(exp.amount) || 0,
-          date: firebase.firestore.FieldValue.serverTimestamp(),
+          date: chosenDate, // ✅ match sale date
           method: "Field",
           note: exp.description || ""
         });
@@ -6875,8 +6895,7 @@ async function saveSale() {
       }
     }
 
-    document.getElementById("addSaleMessage").style.color = "green";
-    document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
+    Swal.fire("Success", "Sale and expenses saved!", "success");
     saleItems = [];
     expenseItems = [];
     renderSaleItems();
@@ -6884,7 +6903,7 @@ async function saveSale() {
     calculateTotals();
   } catch (err) {
     console.error(err);
-    document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
+    Swal.fire("Error", "Error saving sale. Check console.", "error");
   }
 }
 
