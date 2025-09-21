@@ -6790,32 +6790,32 @@ async function saveSale() {
     // Save sale
     const saleRef = await firebase.firestore().collection("sales").add(saleData);
 
-// 🔹 Also save each field expense into the main expenses collection
-for (const exp of expenseItems) {
-  try {
-    const expenseData = {
-      category: exp.category,
-      description: exp.description,
-      amount: exp.amount,
-      linkedSaleId: saleRef.id,    // reference back to the sale
-      salesperson,
-      location,
-      createdAt: firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : new Date()
-    };
+    // 🔹 Also save each field expense into the main expenses collection
+    for (const exp of expenseItems) {
+      const expenseData = {
+        category: exp.category,
+        description: exp.description,
+        amount: exp.amount,
+        linkedSaleId: saleRef.id,   // reference back to the sale
+        salesperson,
+        location,
+        createdAt: new Date()
+      };
+      await firebase.firestore().collection("expenses").add(expenseData);
+    }
 
-    await firebase.firestore().collection("expenses").add(expenseData);
-  } catch (innerErr) {
-    console.error("Failed to save expense:", innerErr);
+    document.getElementById("addSaleMessage").style.color = "green";
+    document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
+    saleItems = [];
+    expenseItems = [];
+    renderSaleItems();
+    renderFieldExpenses();
+    calculateTotals();
+  } catch (err) {
+    console.error(err);
+    document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
   }
 }
-
-document.getElementById("addSaleMessage").style.color = "green";
-document.getElementById("addSaleMessage").innerText = "Sale and expenses saved!";
-saleItems = [];
-expenseItems = [];
-renderSaleItems();
-renderFieldExpenses();
-calculateTotals();
 
 
 
