@@ -6796,10 +6796,10 @@ for (const exp of expenseItems) {
     location,
     category: exp.category,
     salesperson,
-    expenseDate: new Date(),               // keep a standard expense date
-    totalAmount: exp.amount,               // ✅ total is the entered amount
-    paidAmount: exp.amount,                // ✅ mark as fully paid
-    dueAmount: 0,                          // ✅ no due in field expenses
+    expenseDate: new Date(),               // standard expense date
+    amount: exp.amount,                    // ✅ use "amount" (dashboard expects this)
+    paidAmount: exp.amount,                // mark as fully paid
+    dueAmount: 0,                          // no due in field expenses
     note: exp.description || "",           // description goes here
     linkedSaleId: saleRef.id,              // reference back to the sale
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -6815,10 +6815,6 @@ expenseItems = [];
 renderSaleItems();
 renderFieldExpenses();
 calculateTotals();
-} catch (err) {
-  console.error(err);
-  document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
-}
 
 
 
