@@ -7345,10 +7345,11 @@ async function loadExpenses() {
   expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
     ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
 
-  const snap = await firebase.firestore()
-    .collection("expenses")
-    .orderBy("createdAt", "desc") // ✅ works for both manual + field expenses
-    .get();
+const snap = await firebase.firestore()
+  .collection("expenses")
+  .orderBy("expenseDate", "desc") // ✅ newest first, guided by chosen date
+  .get();
+
 
   let rows = [];
   let total = 0, paid = 0, due = 0;
