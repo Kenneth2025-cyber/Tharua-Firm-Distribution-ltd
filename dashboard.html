@@ -6792,19 +6792,21 @@ async function saveSale() {
 
 // 🔹 Also save each field expense into the main expenses collection
 for (const exp of expenseItems) {
-  const expenseData = {
-    location,
-    category: exp.category,
-    salesperson,
-    expenseDate: new Date(),               // standard expense date
-    totalAmount: exp.amount,               // ✅ matches main expenses
-    paidAmount: exp.amount,                // ✅ fully paid
-    dueAmount: 0,                          // ✅ no due in field expenses
-    note: exp.description || "",           // ✅ use 'note' instead of 'description'
-    linkedSaleId: saleRef.id,              // reference back to the sale
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  await firebase.firestore().collection("expenses").add(expenseData);
+  try {
+    const expenseData = {
+      category: exp.category,
+      description: exp.description,
+      amount: exp.amount,
+      linkedSaleId: saleRef.id,    // reference back to the sale
+      salesperson,
+      location,
+      createdAt: firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : new Date()
+    };
+
+    await firebase.firestore().collection("expenses").add(expenseData);
+  } catch (innerErr) {
+    console.error("Failed to save expense:", innerErr);
+  }
 }
 
 document.getElementById("addSaleMessage").style.color = "green";
@@ -6814,10 +6816,6 @@ expenseItems = [];
 renderSaleItems();
 renderFieldExpenses();
 calculateTotals();
-} catch (err) {
-  console.error(err);
-  document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
-}
 
 
 
