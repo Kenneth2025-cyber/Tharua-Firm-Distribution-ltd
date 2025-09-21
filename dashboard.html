@@ -6797,14 +6797,13 @@ for (const exp of expenseItems) {
     category: exp.category,
     salesperson,
     expenseDate: new Date(),               // standard expense date
-    amount: exp.amount,                    // ✅ use "amount" (dashboard expects this)
-    paidAmount: exp.amount,                // mark as fully paid
-    dueAmount: 0,                          // no due in field expenses
-    note: exp.description || "",           // description goes here
+    totalAmount: exp.amount,               // ✅ matches main expenses
+    paidAmount: exp.amount,                // ✅ fully paid
+    dueAmount: 0,                          // ✅ no due in field expenses
+    note: exp.description || "",           // ✅ use 'note' instead of 'description'
     linkedSaleId: saleRef.id,              // reference back to the sale
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
-
   await firebase.firestore().collection("expenses").add(expenseData);
 }
 
@@ -6815,6 +6814,10 @@ expenseItems = [];
 renderSaleItems();
 renderFieldExpenses();
 calculateTotals();
+} catch (err) {
+  console.error(err);
+  document.getElementById("addSaleMessage").innerText = "Error saving sale. Check console.";
+}
 
 
 
