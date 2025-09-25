@@ -6803,17 +6803,39 @@ function removeFieldExpense(index) {
    Totals & Save
 -------------------- */
 function calculateTotals() {
+  // Totals before payments
   const total = saleItems.reduce((sum, i) => sum + i.subtotal, 0);
   const expenses = expenseItems.reduce((sum, e) => sum + e.amount, 0);
   const net = total - expenses;
-  const paid = parseFloat(document.getElementById("salePaid")?.value) || 0;
-  const balance = net - paid;
 
+  // --- NEW: sum all payment method amounts ---
+  let totalPayments = 0;
+  document.querySelectorAll(".paymentAmountInput").forEach(input => {
+    totalPayments += parseFloat(input.value) || 0;
+  });
+
+  const balance = net - totalPayments;
+
+  // Update fields
   document.getElementById("saleTotal").value = total.toFixed(2);
   document.getElementById("saleExpensesDisplay").value = expenses.toFixed(2);
   document.getElementById("saleNet").value = net.toFixed(2);
-  document.getElementById("saleBalance").value = balance.toFixed(2);
+
+  const balanceEl = document.getElementById("saleBalance");
+  balanceEl.value = balance.toFixed(2);
+
+  // --- NEW: apply colors + weight ---
+  balanceEl.style.fontWeight = "bold";
+  if (balance > 0) {
+    balanceEl.style.color = "red";     // still owed
+  } else if (balance === 0) {
+    balanceEl.style.color = "black";   // cleared
+    balanceEl.style.fontWeight = "normal";
+  } else {
+    balanceEl.style.color = "green";   // overpaid
+  }
 }
+
 
 async function saveSale() {
   if (saleItems.length === 0) {
