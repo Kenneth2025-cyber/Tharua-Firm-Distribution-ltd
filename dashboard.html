@@ -6480,7 +6480,7 @@ async function showAddSale() {
 <div class="form-container">
   <h3>Payment Summary</h3>
   <div class="form-group">
-    <table class="summary-table">
+    <table class="summary-table" id="paymentSummaryTable">
       <tr>
         <td><strong>Total Sales (KES):</strong></td>
         <td><input type="text" id="saleTotal" readonly class="summary-input" /></td>
@@ -6494,29 +6494,61 @@ async function showAddSale() {
         <td><input type="text" id="saleNet" readonly class="summary-input net-sales" /></td>
       </tr>
       <tr>
-        <td><strong>Amount Paid (KES):</strong></td>
-        <td><input type="number" id="salePaid" min="0" step="0.01" class="summary-input" oninput="calculateTotals()" /></td>
-      </tr>
-      <tr>
         <td><strong>Balance Due (KES):</strong></td>
         <td><input type="text" id="saleBalance" readonly class="summary-input" /></td>
       </tr>
-      <tr>
+      <!-- First Payment Method Row -->
+      <tr class="payment-method-row">
         <td><strong>Payment Method:</strong></td>
         <td style="display: flex; gap: 5px; align-items: center;">
-          <select id="paymentMethod" class="summary-input" style="flex: 1;">
+          <select class="summary-input paymentMethodSelect" style="flex: 1;">
             <option value="">-- Select Method --</option>
             <option value="cash">Cash</option>
             <option value="mpesa">M-Pesa</option>
             <option value="bank">Bank Transfer</option>
-            <!-- More methods can be added later -->
           </select>
+          <input type="number" class="summary-input paymentAmount" placeholder="Amount (KES)" min="0" step="0.01" style="flex: 1;" />
           <button type="button" id="addPaymentMethod" class="btn btn-sm">+</button>
         </td>
       </tr>
     </table>
   </div>
 </div>
+
+<script>
+  // Handle adding and removing payment method rows
+  document.addEventListener("click", function (e) {
+    // ➕ Add new row
+    if (e.target && e.target.id === "addPaymentMethod") {
+      const table = document.getElementById("paymentSummaryTable");
+      const lastRow = e.target.closest("tr");
+      const newRow = lastRow.cloneNode(true);
+
+      // reset select + amount
+      const select = newRow.querySelector("select");
+      const amount = newRow.querySelector("input.paymentAmount");
+      if (select) select.value = "";
+      if (amount) amount.value = "";
+
+      // replace ➕ button with 🗑
+      const btn = newRow.querySelector("button");
+      if (btn) {
+        btn.textContent = "🗑";
+        btn.removeAttribute("id");
+        btn.classList.add("removePaymentMethod");
+      }
+
+      table.appendChild(newRow);
+    }
+
+    // 🗑 Remove row
+    if (e.target && e.target.classList.contains("removePaymentMethod")) {
+      const row = e.target.closest("tr");
+      row.remove();
+    }
+  });
+</script>
+
 
 
     <button type="button" class="submit-btn" onclick="saveSale()">Save & Print</button>
