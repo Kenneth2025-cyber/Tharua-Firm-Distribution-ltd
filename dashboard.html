@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6475,34 +6476,48 @@ async function showAddSale() {
       </table>
     </div>
 
-    <!-- Payment Section -->
-    <div class="form-container">
-      <h3>Payment Summary</h3>
-      <div class="form-group">
-        <table class="summary-table">
-          <tr>
-            <td><strong>Total Sales (KES):</strong></td>
-            <td><input type="text" id="saleTotal" readonly class="summary-input" /></td>
-          </tr>
-          <tr>
-            <td><strong>Total Expenses (KES):</strong></td>
-            <td><input type="text" id="saleExpensesDisplay" readonly class="summary-input" /></td>
-          </tr>
-          <tr class="highlight-net">
-            <td><strong>Net Sales (after expenses, KES):</strong></td>
-            <td><input type="text" id="saleNet" readonly class="summary-input net-sales" /></td>
-          </tr>
-          <tr>
-            <td><strong>Amount Paid (KES):</strong></td>
-            <td><input type="number" id="salePaid" min="0" step="0.01" class="summary-input" oninput="calculateTotals()" /></td>
-          </tr>
-          <tr>
-            <td><strong>Balance Due (KES):</strong></td>
-            <td><input type="text" id="saleBalance" readonly class="summary-input" /></td>
-          </tr>
-        </table>
-      </div>
-    </div>
+<!-- Payment Section -->
+<div class="form-container">
+  <h3>Payment Summary</h3>
+  <div class="form-group">
+    <table class="summary-table">
+      <tr>
+        <td><strong>Total Sales (KES):</strong></td>
+        <td><input type="text" id="saleTotal" readonly class="summary-input" /></td>
+      </tr>
+      <tr>
+        <td><strong>Total Expenses (KES):</strong></td>
+        <td><input type="text" id="saleExpensesDisplay" readonly class="summary-input" /></td>
+      </tr>
+      <tr class="highlight-net">
+        <td><strong>Net Sales (after expenses, KES):</strong></td>
+        <td><input type="text" id="saleNet" readonly class="summary-input net-sales" /></td>
+      </tr>
+      <tr>
+        <td><strong>Amount Paid (KES):</strong></td>
+        <td><input type="number" id="salePaid" min="0" step="0.01" class="summary-input" oninput="calculateTotals()" /></td>
+      </tr>
+      <tr>
+        <td><strong>Balance Due (KES):</strong></td>
+        <td><input type="text" id="saleBalance" readonly class="summary-input" /></td>
+      </tr>
+      <tr>
+        <td><strong>Payment Method:</strong></td>
+        <td>
+          <select id="paymentMethod" class="summary-input">
+            <option value="">-- Select Method --</option>
+            <option value="cash">Cash</option>
+            <option value="mpesa">M-Pesa</option>
+            <option value="bank">Bank Transfer</option>
+            <!-- More methods can be added later -->
+          </select>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+
 
     <button type="button" class="submit-btn" onclick="saveSale()">Save & Print</button>
     <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
