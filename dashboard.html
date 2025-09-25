@@ -6475,34 +6475,35 @@ async function showAddSale() {
       </table>
     </div>
 
-    <!-- Payment Section -->
-    <div class="form-container">
-      <h3>Payment Summary</h3>
-      <div class="form-group">
-        <table class="summary-table">
-          <tr>
-            <td><strong>Total Sales (KES):</strong></td>
-            <td><input type="text" id="saleTotal" readonly class="summary-input" /></td>
-          </tr>
-          <tr>
-            <td><strong>Total Expenses (KES):</strong></td>
-            <td><input type="text" id="saleExpensesDisplay" readonly class="summary-input" /></td>
-          </tr>
-          <tr class="highlight-net">
-            <td><strong>Net Sales (after expenses, KES):</strong></td>
-            <td><input type="text" id="saleNet" readonly class="summary-input net-sales" /></td>
-          </tr>
-          <tr>
-            <td><strong>Amount Paid (KES):</strong></td>
-            <td><input type="number" id="salePaid" min="0" step="0.01" class="summary-input" oninput="calculateTotals()" /></td>
-          </tr>
-          <tr>
-            <td><strong>Balance Due (KES):</strong></td>
-            <td><input type="text" id="saleBalance" readonly class="summary-input" /></td>
-          </tr>
-        </table>
-      </div>
+<h3>Payment Summary</h3>
+<div id="paymentSection">
+  <!-- First payment row -->
+  <div class="payment-row">
+    <select class="payment-method" required>
+      <option value="">Select Method</option>
+    </select>
+    <input type="number" class="payment-amount" placeholder="Enter amount" min="0" step="0.01" required />
+  </div>
+</div>
+
+<div style="margin-top:10px; display:flex; gap:10px;">
+  <button type="button" class="btn-secondary" onclick="openAddPaymentMethodModal()">➕ Add Payment Method</button>
+  <button type="button" class="btn-primary" onclick="addPaymentRow()">➕ Add Another Payment</button>
+</div>
+
+<!-- Modal to add payment method -->
+<div id="paymentMethodModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeModal('paymentMethodModal')">&times;</span>
+    <h2>Add Payment Method</h2>
+    <input type="text" id="newPaymentMethod" placeholder="Method name (e.g. MPesa, Cash)" />
+    <div class="modal-buttons">
+      <button class="btn-secondary" onclick="closeModal('paymentMethodModal')">Cancel</button>
+      <button class="btn-primary" onclick="savePaymentMethod()">Save</button>
     </div>
+  </div>
+</div>
+
 
     <button type="button" class="submit-btn" onclick="saveSale()">Save & Print</button>
     <div id="addSaleMessage" style="margin-top:10px;color:red;"></div>
@@ -6904,6 +6905,59 @@ async function saveSale() {
   } catch (err) {
     console.error(err);
     Swal.fire("Error", "Error saving sale. Check console.", "error");
+  }
+}
+
+async function loadPaymentMethods() {
+  try {
+    const snapshot = await firebase.firestore().collection("paymentMethods").get();
+    const methods = snapshot.docs.map(doc => doc.data().name);
+    document.querySelectorAll(".payment-method").forEach(select => {
+      select.innerHTML = `<option value="">Select Method</option>`;
+      methods.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        select.appendChild(opt);
+      });
+    });
+  } catch (err) {
+    console.error("Error loading payment methods:", err);
+  }
+}
+
+function addPaymentRow() {
+  const row = document.createElement("div");
+  row.className = "payment-row";
+  row.innerHTML = `
+    <select class="payment-method" required>
+      <option value="">Select Method</option>
+    </select>
+    <input type="number" class="payment-amount" placeholder="Enter amount" min="0" step="0.01" required />
+    <span class="remove-cell" onclick="this.parentElement.remove()">✖</span>
+  `;
+  document.getElementById("paymentSection").appendChild(row);
+  loadPaymentMethods();
+}
+
+function openAddPaymentMethodModal() {
+  document.getElementById("paymentMethodModal").style.display = "flex";
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = "none";
+}
+
+async function savePaymentMethod() {
+  const name = document.getElementById("newPaymentMethod").value.trim();
+  if (!name) { alert("Enter a method name."); return; }
+
+  try {
+    await firebase.firestore().collection("paymentMethods").add({ name });
+    showSuccessNotification("Payment method added.");
+    closeModal("paymentMethodModal");
+    loadPaymentMethods();
+  } catch (err) {
+    alert("Error saving method: " + err.message);
   }
 }
 
