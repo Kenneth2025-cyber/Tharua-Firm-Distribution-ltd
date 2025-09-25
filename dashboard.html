@@ -6491,6 +6491,14 @@ async function showAddSale() {
   <button type="button" class="btn-primary" onclick="addPaymentRow()">➕ Add Another Payment</button>
 </div>
 
+<!-- Deposit + Balance Summary -->
+<div id="depositSummary" style="margin-top:20px; font-size:18px; font-weight:bold;">
+  <div>Total Sales: <span id="summarySales">KES 0.00</span></div>
+  <div>Total Expenses: <span id="summaryExpenses">KES 0.00</span></div>
+  <div>Net to Deposit: <span id="summaryNet">KES 0.00</span></div>
+  <div id="balanceDisplay" style="margin-top:10px;">Balance: KES 0.00</div>
+</div>
+
 <!-- Modal to add payment method -->
 <div id="paymentMethodModal" class="modal">
   <div class="modal-content">
@@ -6503,6 +6511,7 @@ async function showAddSale() {
     </div>
   </div>
 </div>
+
 
 
     <button type="button" class="submit-btn" onclick="saveSale()">Save & Print</button>
@@ -6960,6 +6969,48 @@ async function savePaymentMethod() {
     alert("Error saving method: " + err.message);
   }
 }
+
+function updateDepositSummary() {
+  // Grab sales & expenses from existing totals on the page
+  const sales = parseFloat(document.getElementById("grandTotal").textContent.replace(/[^0-9.]/g, "")) || 0;
+  const expenses = parseFloat(document.getElementById("expenseTotal").textContent.replace(/[^0-9.]/g, "")) || 0;
+  const net = sales - expenses;
+
+  // Sum of payments entered
+  let paid = 0;
+  document.querySelectorAll(".payment-amount").forEach(inp => {
+    paid += parseFloat(inp.value) || 0;
+  });
+
+  const balance = net - paid;
+
+  // Update summary fields
+  document.getElementById("summarySales").textContent = "KES " + sales.toLocaleString();
+  document.getElementById("summaryExpenses").textContent = "KES " + expenses.toLocaleString();
+  document.getElementById("summaryNet").textContent = "KES " + net.toLocaleString();
+
+  const balanceEl = document.getElementById("balanceDisplay");
+  balanceEl.textContent = "Balance: KES " + balance.toLocaleString();
+
+  // Apply styling based on balance
+  if (balance === 0) {
+    balanceEl.style.color = "black"; // Dark Bold = Cleared
+    balanceEl.style.fontWeight = "900";
+  } else if (balance > 0) {
+    balanceEl.style.color = "red"; // Due
+    balanceEl.style.fontWeight = "bold";
+  } else {
+    balanceEl.style.color = "green"; // Overpayment
+    balanceEl.style.fontWeight = "bold";
+  }
+}
+
+// Attach recalculation
+document.addEventListener("input", function(e) {
+  if (e.target.classList.contains("payment-amount")) {
+    updateDepositSummary();
+  }
+});
 
 
 /* -------------------------------
