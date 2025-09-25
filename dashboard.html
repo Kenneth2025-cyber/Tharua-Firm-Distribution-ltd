@@ -6509,7 +6509,12 @@ async function showAddSale() {
 			<option value="bank">Cheque</option>
 			<option value="bank">Customer Mobile Deposite</option>
           </select>
-          <input type="number" class="summary-input paymentAmount" placeholder="Amount (KES)" min="0" step="0.01" style="flex: 1;" />
+          <input type="number" 
+       class="summary-input paymentAmountInput" 
+       placeholder="Amount (KES)" 
+       min="0" step="0.01" 
+       style="flex: 1;" 
+       oninput="calculateTotals()" />
           <button type="button" id="addPaymentMethod" class="btn btn-sm">+</button>
         </td>
       </tr>
@@ -8313,37 +8318,49 @@ function showExpenseReport() {
 
 
   // Handle adding and removing payment method rows
-  document.addEventListener("click", function (e) {
-    // ➕ Add new row
-    if (e.target && e.target.id === "addPaymentMethod") {
-      const table = document.getElementById("paymentSummaryTable");
-      const lastRow = e.target.closest("tr");
-      const newRow = lastRow.cloneNode(true);
+document.addEventListener("click", function (e) {
+  // ➕ Add new row
+  if (e.target && e.target.id === "addPaymentMethod") {
+    const table = document.getElementById("paymentSummaryTable");
+    const lastRow = e.target.closest("tr");
+    const newRow = lastRow.cloneNode(true);
 
-      // reset select + amount
-      const select = newRow.querySelector("select.paymentMethodSelect");
-      const amount = newRow.querySelector("input.paymentAmount");
-      if (select) select.value = "";
-      if (amount) amount.value = "";
-
-      // change ➕ button → 🗑 button
-      const btn = newRow.querySelector("button");
-      if (btn) {
-        btn.textContent = "🗑";
-        btn.removeAttribute("id");
-        btn.classList.remove("btn-sm");
-        btn.classList.add("removePaymentMethod");
-      }
-
-      table.appendChild(newRow);
+    // reset select + amount
+    const select = newRow.querySelector("select.paymentMethodSelect");
+    const amount = newRow.querySelector("input");
+    if (select) select.value = "";
+    if (amount) {
+      amount.value = "";
+      // ✅ ensure correct class + oninput handler
+      amount.classList.remove("paymentAmount");
+      amount.classList.add("paymentAmountInput");
+      amount.setAttribute("oninput", "calculateTotals()");
     }
 
-    // 🗑 Remove row
-    if (e.target && e.target.classList.contains("removePaymentMethod")) {
-      const row = e.target.closest("tr");
-      if (row) row.remove();
+    // change ➕ button → 🗑 button
+    const btn = newRow.querySelector("button");
+    if (btn) {
+      btn.textContent = "🗑";
+      btn.removeAttribute("id");
+      btn.classList.remove("btn-sm");
+      btn.classList.add("removePaymentMethod");
     }
-  });
+
+    table.appendChild(newRow);
+    calculateTotals(); // update after adding
+  }
+
+  // 🗑 Remove row
+  if (e.target && e.target.classList.contains("removePaymentMethod")) {
+    const row = e.target.closest("tr");
+    if (row) {
+      row.remove();
+      calculateTotals(); // update after removing
+    }
+  }
+});
+
+  
 </script>
 
 <!-- External libraries -->
