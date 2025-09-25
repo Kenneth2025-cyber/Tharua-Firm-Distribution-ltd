@@ -8287,10 +8287,43 @@ function showExpenseReport() {
   `;
 }
 
-  </script>
+<script>
+  // Handle adding and removing payment method rows
+  document.addEventListener("click", function (e) {
+    // ➕ Add new row
+    if (e.target && e.target.id === "addPaymentMethod") {
+      const table = document.getElementById("paymentSummaryTable");
+      const lastRow = e.target.closest("tr");
+      const newRow = lastRow.cloneNode(true);
 
-  <!-- External libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+      // reset select + amount
+      const select = newRow.querySelector("select.paymentMethodSelect");
+      const amount = newRow.querySelector("input.paymentAmount");
+      if (select) select.value = "";
+      if (amount) amount.value = "";
+
+      // change ➕ button → 🗑 button
+      const btn = newRow.querySelector("button");
+      if (btn) {
+        btn.textContent = "🗑";
+        btn.removeAttribute("id");
+        btn.classList.remove("btn-sm");
+        btn.classList.add("removePaymentMethod");
+      }
+
+      table.appendChild(newRow);
+    }
+
+    // 🗑 Remove row
+    if (e.target && e.target.classList.contains("removePaymentMethod")) {
+      const row = e.target.closest("tr");
+      if (row) row.remove();
+    }
+  });
+</script>
+
+<!-- External libraries -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </body>
 </html>
