@@ -6842,13 +6842,14 @@ function calculateTotals() {
 }
 
 
+// Replace your existing saveSale() with this function
 async function saveSale() {
-  if (saleItems.length === 0) {
-    alert("Please add at least one product.");
+  if (!saleItems || saleItems.length === 0) {
+    Swal.fire("Warning", "Please add at least one product.", "warning");
     return;
   }
 
-  // 👇 SweetAlert popup for choosing date
+  // Ask the user for the sale date via SweetAlert
   const { value: saleDate } = await Swal.fire({
     title: "Select Sale Date",
     html: `<input type="date" id="saleDateInput" class="swal2-input" value="${new Date().toISOString().split('T')[0]}">`,
@@ -6863,22 +6864,38 @@ async function saveSale() {
     }
   });
 
-  if (!saleDate) return; // if user cancels
+  if (!saleDate) return; // user cancelled
 
-  const location = document.getElementById("saleLocation").value;
-  const customer = document.getElementById("saleCustomer").value || "Walk-in";
-  const salesperson = document.getElementById("saleSalesperson").value; // this is doc ID
-  const total = parseFloat(document.getElementById("saleTotal").value) || 0;
-  const net = parseFloat(document.getElementById("saleNet").value) || 0;
-  const paid = parseFloat(document.getElementById("salePaid").value) || 0;
-  const balance = parseFloat(document.getElementById("saleBalance").value) || 0;
+  // Basic fields
+  const location = document.getElementById("saleLocation")?.value || "";
+  const customer = document.getElementById("saleCustomer")?.value || "Walk-in";
+  const salesperson = document.getElementById("saleSalesperson")?.value || "";
+  const total = parseFloat(document.getElementById("saleTotal")?.value) || 0;
+  const expensesTotal = parseFloat(document.getElementById("saleExpensesDisplay")?.value) || 0;
+  const net = parseFloat(document.getElementById("saleNet")?.value) || 0;
 
   if (!salesperson) {
-    alert("Salesperson is required.");
+    Swal.fire("Missing data", "Please select a salesperson before saving the sale.", "warning");
     return;
   }
 
-  // resolve sale salesperson name
+  // Collect payment-method rows (robust to either class names you might have)
+  const payments = [];
+  const rows = document.querySelectorAll(".payment-method-row");
+  rows.forEach(row => {
+    const methodEl = row.querySelector(".paymentMethodSelect") || row.querySelector("select");
+    const amountEl = row.querySelector(".paymentAmountInput") || row.querySelector(".paymentAmount") || row.querySelector("input[type='number']");
+    const method = (methodEl && methodEl.value) ? methodEl.value : "";
+    const amount = parseFloat(amountEl?.value) || 0;
+    // only record rows that matter
+    if (method || amount > 0) payments.push({ method: method || "unknown", amount: Number(amount) });
+  });
+
+  const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const balance = Number((net - paid).toFixed(2));
+  const chosenDate = new Date(saleDate);
+
+  // Resolve salesperson display name (keeps your previous logic)
   let saleSalespersonName = salesperson;
   try {
     const spDoc = await firebase.firestore().collection("fieldSalespersons").doc(salesperson).get();
@@ -6887,20 +6904,21 @@ async function saveSale() {
     console.warn("Could not fetch salesperson name:", err);
   }
 
-  const chosenDate = new Date(saleDate);
-
+  // Assemble sale object (saves payments array on the sale doc)
   const saleData = {
     location,
     customer,
     salespersonId: salesperson,
     salesperson: saleSalespersonName,
-    expenses: expenseItems, // optional store of raw items
+    expenses: expenseItems || [],
     total,
+    expensesTotal,
     net,
     paid,
     balance,
-    items: saleItems,
-    saleDate: chosenDate, // ✅ backdatable field
+    payments,       // important: saved with the sale
+    items: saleItems || [],
+    saleDate: chosenDate,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
@@ -6908,8 +6926,25 @@ async function saveSale() {
     // Save sale
     const saleRef = await firebase.firestore().collection("sales").add(saleData);
 
-    // Save each field expense into the main expenses collection
-    for (const exp of expenseItems) {
+    // Save each payment as subcollection entry for history / reporting
+    if (payments && payments.length) {
+      for (const p of payments) {
+        if (!p.amount || p.amount <= 0) continue;
+        await firebase.firestore()
+          .collection("sales")
+          .doc(saleRef.id)
+          .collection("payments")
+          .add({
+            method: p.method || "unknown",
+            amount: Number(p.amount),
+            date: chosenDate,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+      }
+    }
+
+    // Save each field expense into your expenses collection and link it to the sale (preserves your existing behavior)
+    for (const exp of (expenseItems || [])) {
       const expenseSalespersonId = exp.salespersonId || salesperson || "";
       const expenseSalespersonName = expenseSalespersonId
         ? (window.salespersonsMap?.[expenseSalespersonId] || (expenseSalespersonId === salesperson ? saleSalespersonName : expenseSalespersonId))
@@ -6919,14 +6954,14 @@ async function saveSale() {
         category: exp.category,
         description: exp.description,
         totalAmount: Number(exp.amount) || 0,
-        paidAmount: Number(exp.amount) || 0, // already settled in the field
+        paidAmount: Number(exp.amount) || 0,
         dueAmount: 0,
         paymentMethod: "Field",
-        salesperson: expenseSalespersonName, // name for display
-        salespersonId: expenseSalespersonId || null, // optional id for reference
-        linkedSaleId: saleRef.id,   // reference back to the sale
+        salesperson: expenseSalespersonName,
+        salespersonId: expenseSalespersonId || null,
+        linkedSaleId: saleRef.id,
         location,
-        expenseDate: chosenDate,    // ✅ backdated with sale
+        expenseDate: chosenDate,
         status: "Paid",
         note: exp.description || "",
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -6934,11 +6969,11 @@ async function saveSale() {
 
       const expRef = await firebase.firestore().collection("expenses").add(expenseData);
 
-      // write a payment record so payments history shows it as paid
+      // add payments subcollection for this expense (keeps your previous pattern)
       try {
         await expRef.collection("payments").add({
           amount: Number(exp.amount) || 0,
-          date: chosenDate, // ✅ match sale date
+          date: chosenDate,
           method: "Field",
           note: exp.description || ""
         });
@@ -6947,15 +6982,101 @@ async function saveSale() {
       }
     }
 
-    Swal.fire("Success", "Sale and expenses saved!", "success");
+    // UI / Feedback: SweetAlert success + sound + toast
+    try { playSuccessSound(); } catch (e) { /* ignore */ }
+    if (typeof showSuccessNotification === "function") showSuccessNotification("Sale saved successfully.");
+
+    Swal.fire({
+      icon: "success",
+      title: "Sale Saved",
+      text: "Sale, payments and expenses have been recorded.",
+      timer: 1500,
+      showConfirmButton: false
+    });
+
+    // Reset local arrays/UI
     saleItems = [];
     expenseItems = [];
     renderSaleItems();
     renderFieldExpenses();
     calculateTotals();
+
+    // Build printable receipt and auto-open print dialog (small delay so popup settles)
+    (function openPrintWindow() {
+      const p = saleData;
+      const paymentsHtml = (payments.length
+        ? payments.map((pt, i) => `<tr><td>${i+1}</td><td>${(pt.method || "").toUpperCase()}</td><td style="text-align:right;">KES ${Number(pt.amount).toFixed(2)}</td></tr>`).join("")
+        : `<tr><td colspan="3">No payments recorded</td></tr>`);
+
+      const itemsHtml = (p.items && p.items.length)
+        ? p.items.map((it, idx) => `
+            <tr>
+              <td>${idx+1}</td>
+              <td>${it.prodName || it.productName || ""}</td>
+              <td style="text-align:right;">${Number(it.qty || it.quantity || 0)}</td>
+              <td style="text-align:right;">${Number(it.price || it.unitPrice || 0).toFixed(2)}</td>
+              <td style="text-align:right;">${Number(it.subtotal || ((it.qty||0)*(it.price||0)) || 0).toFixed(2)}</td>
+            </tr>`).join("")
+        : `<tr><td colspan="5">No items</td></tr>`;
+
+      const html = `
+        <html>
+          <head>
+            <title>Sale Receipt</title>
+            <style>
+              body{font-family:Arial, sans-serif; color:#222; margin:20px}
+              .header{text-align:center}
+              table{width:100%; border-collapse:collapse; margin-top:10px}
+              th,td{border:1px solid #ddd; padding:6px; font-size:13px}
+              th{background:#f4f4f4}
+              .right{text-align:right}
+              .totals{margin-top:10px; float:right; width:320px}
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h2>Sale Receipt</h2>
+              <p><b>Date:</b> ${chosenDate.toLocaleString()}</p>
+              <p><b>Customer:</b> ${p.customer}</p>
+              <p><b>Salesperson:</b> ${p.salesperson}</p>
+              <p><b>Location:</b> ${p.location || "-"}</p>
+            </div>
+
+            <table>
+              <thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Unit (KES)</th><th>Subtotal (KES)</th></tr></thead>
+              <tbody>${itemsHtml}</tbody>
+            </table>
+
+            <div class="totals">
+              <table>
+                <tr><td><b>Total</b></td><td style="text-align:right;">KES ${Number(p.total).toFixed(2)}</td></tr>
+                <tr><td><b>Expenses</b></td><td style="text-align:right;">KES ${Number(p.expensesTotal || 0).toFixed(2)}</td></tr>
+                <tr><td><b>Net</b></td><td style="text-align:right;">KES ${Number(p.net).toFixed(2)}</td></tr>
+                <tr><td><b>Paid</b></td><td style="text-align:right;">KES ${Number(p.paid).toFixed(2)}</td></tr>
+                <tr><td><b>Balance</b></td><td style="text-align:right;">KES ${Number(p.balance).toFixed(2)}</td></tr>
+              </table>
+            </div>
+
+            <h4>Payments</h4>
+            <table>
+              <thead><tr><th>#</th><th>Method</th><th class="right">Amount</th></tr></thead>
+              <tbody>${paymentsHtml}</tbody>
+            </table>
+
+            <p style="margin-top:40px;font-size:12px;color:#666;">Receipt ID: ${saleRef.id}</p>
+          </body>
+        </html>
+      `;
+
+      const w = window.open("", "_blank", "width=900,height=700");
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => { try { w.print(); } catch (e) { console.warn("Print error", e); } }, 700);
+    })();
+
   } catch (err) {
-    console.error(err);
-    Swal.fire("Error", "Error saving sale. Check console.", "error");
+    console.error("saveSale error:", err);
+    Swal.fire("Error", "Failed to save sale: " + (err && err.message ? err.message : err), "error");
   }
 }
 
@@ -8360,63 +8481,7 @@ document.addEventListener("click", function (e) {
   }
 });
 
-  // Notification sound
-const notificationSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
-
-// Save Sale button handler
-document.getElementById("saveSale").addEventListener("click", async () => {
-  const { value: saleDate } = await Swal.fire({
-    title: "Enter Sale Date",
-    input: "date",
-    inputLabel: "Sale Date",
-    inputPlaceholder: "Select sale date",
-    showCancelButton: true
-  });
-
-  if (saleDate) {
-    try {
-      // Build sale data
-      const saleData = {
-        date: saleDate,
-        items: saleItems,  // from your global array
-        expenses: expenseItems,
-        total: parseFloat(document.getElementById("saleTotal").value) || 0,
-        expensesTotal: parseFloat(document.getElementById("saleExpensesDisplay").value) || 0,
-        net: parseFloat(document.getElementById("saleNet").value) || 0,
-        payments: Array.from(document.querySelectorAll(".paymentAmountInput")).map((input, idx) => ({
-          method: input.closest("tr").querySelector("select").value,
-          amount: parseFloat(input.value) || 0
-        })),
-        balance: parseFloat(document.getElementById("saleBalance").value) || 0,
-        timestamp: new Date().toISOString()
-      };
-
-      // Save to Firestore
-      await addDoc(collection(db, "sales"), saleData);
-
-      // Success alert
-      Swal.fire({
-        icon: "success",
-        title: "Sale Saved!",
-        text: "The sale was successfully recorded.",
-        timer: 2000,
-        showConfirmButton: false
-      });
-
-      // Play sound
-      notificationSound.play();
-
-    } catch (error) {
-      Swal.fire("Error", "Failed to save sale: " + error.message, "error");
-    }
-  }
-});
-
-// Print Sale button handler
-document.getElementById("printSale").addEventListener("click", () => {
-  window.print();
-});
-
+  
 </script>
 
 <!-- External libraries -->
