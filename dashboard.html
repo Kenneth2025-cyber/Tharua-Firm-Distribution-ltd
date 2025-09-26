@@ -8360,7 +8360,63 @@ document.addEventListener("click", function (e) {
   }
 });
 
-  
+  // Notification sound
+const notificationSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+
+// Save Sale button handler
+document.getElementById("saveSale").addEventListener("click", async () => {
+  const { value: saleDate } = await Swal.fire({
+    title: "Enter Sale Date",
+    input: "date",
+    inputLabel: "Sale Date",
+    inputPlaceholder: "Select sale date",
+    showCancelButton: true
+  });
+
+  if (saleDate) {
+    try {
+      // Build sale data
+      const saleData = {
+        date: saleDate,
+        items: saleItems,  // from your global array
+        expenses: expenseItems,
+        total: parseFloat(document.getElementById("saleTotal").value) || 0,
+        expensesTotal: parseFloat(document.getElementById("saleExpensesDisplay").value) || 0,
+        net: parseFloat(document.getElementById("saleNet").value) || 0,
+        payments: Array.from(document.querySelectorAll(".paymentAmountInput")).map((input, idx) => ({
+          method: input.closest("tr").querySelector("select").value,
+          amount: parseFloat(input.value) || 0
+        })),
+        balance: parseFloat(document.getElementById("saleBalance").value) || 0,
+        timestamp: new Date().toISOString()
+      };
+
+      // Save to Firestore
+      await addDoc(collection(db, "sales"), saleData);
+
+      // Success alert
+      Swal.fire({
+        icon: "success",
+        title: "Sale Saved!",
+        text: "The sale was successfully recorded.",
+        timer: 2000,
+        showConfirmButton: false
+      });
+
+      // Play sound
+      notificationSound.play();
+
+    } catch (error) {
+      Swal.fire("Error", "Failed to save sale: " + error.message, "error");
+    }
+  }
+});
+
+// Print Sale button handler
+document.getElementById("printSale").addEventListener("click", () => {
+  window.print();
+});
+
 </script>
 
 <!-- External libraries -->
