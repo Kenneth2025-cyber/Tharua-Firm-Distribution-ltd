@@ -7166,22 +7166,34 @@ async function showListSales() {
     </div>
   `;
 
-  // Load data after rendering
   loadSalesData();
 }
 
-async function loadSalesData() {
+/* -------------------------------
+   Load Sales Data with Filters
+-------------------------------- */
+async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
   tbody.innerHTML = "<tr><td colspan='8' style='text-align:center;'>Loading...</td></tr>";
 
   let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
   try {
-    const snapshot = await firebase.firestore()
-      .collection("sales")
-      .orderBy("createdAt", "desc")
-      .get();
+    let query = firebase.firestore().collection("sales");
 
+    // ✅ Apply filters
+    if (filters.location) query = query.where("location", "==", filters.location);
+    if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
+    if (filters.startDate && filters.endDate) {
+      const start = new Date(filters.startDate);
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query = query.where("saleDate", ">=", start).where("saleDate", "<=", end);
+    }
+
+    query = query.orderBy("createdAt", "desc");
+
+    const snapshot = await query.get();
     tbody.innerHTML = "";
 
     if (snapshot.empty) {
@@ -7190,8 +7202,12 @@ async function loadSalesData() {
       return;
     }
 
+    const searchTerm = (filters.search || "").toLowerCase();
+
     snapshot.forEach(doc => {
       const sale = doc.data();
+      const note = sale.note || "-";
+      if (searchTerm && !note.toLowerCase().includes(searchTerm)) return; // 🔍 Search filter
 
       const saleDate = sale.saleDate
         ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString() : sale.saleDate)
@@ -7199,15 +7215,11 @@ async function loadSalesData() {
 
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
-
-      // ✅ Match expense page logic: fetch Firestore fields directly
       const total = Number(sale.totalSales) || Number(sale.totalAmount) || 0;
       const paid = Number(sale.paid) || 0;
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
       const due = total - paid;
-      const note = sale.note || "-";
 
-      // Accumulate totals
       totalSales += total;
       totalPaid += paid;
       totalDue += due;
@@ -7230,7 +7242,6 @@ async function loadSalesData() {
       `;
     });
 
-    // ✅ Update summary totals — same approach as expenses page
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
@@ -7243,6 +7254,23 @@ async function loadSalesData() {
   }
 }
 
+/* -------------------------------
+   Apply Filters from UI
+-------------------------------- */
+function applySalesFilters() {
+  const filters = {
+    location: document.getElementById("locationFilter").value,
+    salesperson: document.getElementById("salespersonFilter").value,
+    startDate: document.getElementById("startDateFilter").value,
+    endDate: document.getElementById("endDateFilter").value,
+    search: document.getElementById("searchNotes").value
+  };
+  loadSalesData(filters);
+}
+
+/* -------------------------------
+   Update Summary Cards
+-------------------------------- */
 function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
   document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
   document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
@@ -7250,6 +7278,9 @@ function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
   document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
 }
 
+/* -------------------------------
+   View & Delete Actions
+-------------------------------- */
 function viewSale(id) {
   alert("View sale details feature coming soon for Sale ID: " + id);
 }
