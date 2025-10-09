@@ -7094,24 +7094,34 @@ async function showListSales() {
           <option value="">All Locations</option>
         </select>
       </div>
+
       <div class="filter-group">
         <label>Salesperson:</label>
-        <select id="salespersonFilter" class="form-select">
-          <option value="">All Salespersons</option>
-        </select>
+        <input list="salespersonList" id="salespersonFilter" class="form-control" placeholder="All Salespersons">
+        <datalist id="salespersonList"></datalist>
       </div>
+
+      <div class="filter-group">
+        <label>Customer:</label>
+        <input list="customerList" id="customerFilter" class="form-control" placeholder="All Customers">
+        <datalist id="customerList"></datalist>
+      </div>
+
       <div class="filter-group">
         <label>Date From:</label>
         <input type="date" id="startDateFilter" class="form-control">
       </div>
+
       <div class="filter-group">
         <label>Date To:</label>
         <input type="date" id="endDateFilter" class="form-control">
       </div>
+
       <div class="filter-group" style="flex:1;">
         <label>Search:</label>
         <input type="text" id="searchNotes" placeholder="Notes / Reference..." class="form-control">
       </div>
+
       <div class="filter-buttons" style="display:flex; align-items:end; gap:10px;">
         <button class="btn" style="background:#007bff; color:white;" onclick="applySalesFilters()">Apply</button>
         <button class="btn" style="background:#198754; color:white;" onclick="exportSalesToExcel()">Export to Excel</button>
@@ -7152,6 +7162,7 @@ async function showListSales() {
             <th>Date</th>
             <th>Location</th>
             <th>Salesperson</th>
+            <th>Customer</th>
             <th>Total (KES)</th>
             <th>Paid (KES)</th>
             <th>Due (KES)</th>
@@ -7160,7 +7171,7 @@ async function showListSales() {
           </tr>
         </thead>
         <tbody id="salesTableBody">
-          <tr><td colspan="8" style="text-align:center;">Loading sales...</td></tr>
+          <tr><td colspan="9" style="text-align:center;">Loading sales...</td></tr>
         </tbody>
       </table>
     </div>
@@ -7175,20 +7186,23 @@ async function showListSales() {
 -------------------------------- */
 async function populateSalesFilters() {
   const locationSelect = document.getElementById("locationFilter");
-  const salespersonSelect = document.getElementById("salespersonFilter");
+  const salespersonList = document.getElementById("salespersonList");
+  const customerList = document.getElementById("customerList");
 
   try {
     const snapshot = await firebase.firestore().collection("sales").get();
     const locations = new Set();
     const salespersons = new Set();
+    const customers = new Set();
 
     snapshot.forEach(doc => {
       const sale = doc.data();
       if (sale.location) locations.add(sale.location);
       if (sale.salesperson) salespersons.add(sale.salesperson);
+      if (sale.customer) customers.add(sale.customer);
     });
 
-    // Populate unique locations
+    // Populate unique locations (dropdown)
     Array.from(locations).sort().forEach(loc => {
       const opt = document.createElement("option");
       opt.value = loc;
@@ -7196,12 +7210,18 @@ async function populateSalesFilters() {
       locationSelect.appendChild(opt);
     });
 
-    // Populate unique salespersons
+    // Populate unique salespersons (autocomplete)
     Array.from(salespersons).sort().forEach(sp => {
       const opt = document.createElement("option");
       opt.value = sp;
-      opt.textContent = sp;
-      salespersonSelect.appendChild(opt);
+      salespersonList.appendChild(opt);
+    });
+
+    // Populate unique customers (autocomplete)
+    Array.from(customers).sort().forEach(cust => {
+      const opt = document.createElement("option");
+      opt.value = cust;
+      customerList.appendChild(opt);
     });
 
   } catch (error) {
@@ -7214,16 +7234,16 @@ async function populateSalesFilters() {
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
-  tbody.innerHTML = "<tr><td colspan='8' style='text-align:center;'>Loading...</td></tr>";
+  tbody.innerHTML = "<tr><td colspan='9' style='text-align:center;'>Loading...</td></tr>";
 
   let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
   try {
     let query = firebase.firestore().collection("sales");
 
-    // Apply filters
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
+    if (filters.customer) query = query.where("customer", "==", filters.customer);
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
@@ -7237,7 +7257,7 @@ async function loadSalesData(filters = {}) {
     tbody.innerHTML = "";
 
     if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='8' style='text-align:center;'>No sales records found.</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='9' style='text-align:center;'>No sales records found.</td></tr>";
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
@@ -7255,6 +7275,7 @@ async function loadSalesData(filters = {}) {
 
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
+      const customer = sale.customer || "-";
       const total = Number(sale.totalSales) || Number(sale.totalAmount) || 0;
       const paid = Number(sale.paid) || 0;
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
@@ -7270,6 +7291,7 @@ async function loadSalesData(filters = {}) {
           <td>${saleDate}</td>
           <td>${location}</td>
           <td>${salesperson}</td>
+          <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
           <td>KES ${paid.toLocaleString()}</td>
           <td>KES ${due.toLocaleString()}</td>
@@ -7287,7 +7309,7 @@ async function loadSalesData(filters = {}) {
   } catch (error) {
     console.error("Error loading sales:", error);
     tbody.innerHTML = `
-      <tr><td colspan='8' style='text-align:center; color:red;'>
+      <tr><td colspan='9' style='text-align:center; color:red;'>
         Error loading sales: ${error.message}
       </td></tr>
     `;
@@ -7301,12 +7323,22 @@ function applySalesFilters() {
   const filters = {
     location: document.getElementById("locationFilter").value,
     salesperson: document.getElementById("salespersonFilter").value,
+    customer: document.getElementById("customerFilter").value,
     startDate: document.getElementById("startDateFilter").value,
     endDate: document.getElementById("endDateFilter").value,
     search: document.getElementById("searchNotes").value
   };
   loadSalesData(filters);
 }
+
+/* -------------------------------
+   🔹 Instant Autocomplete Filtering
+-------------------------------- */
+document.addEventListener("input", e => {
+  if (["salespersonFilter", "customerFilter"].includes(e.target.id)) {
+    applySalesFilters();
+  }
+});
 
 /* -------------------------------
    🔹 Update Summary Cards
