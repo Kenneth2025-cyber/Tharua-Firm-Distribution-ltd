@@ -7083,10 +7083,10 @@ async function saveSale() {
 async function showListSales() {
   saveLastPage("showListSales");
   document.getElementById("content").innerHTML = `
-    <h2>List of Sales</h2>
+    <h2 style="margin-bottom:20px;">List of Sales</h2>
 
     <!-- Filter Section -->
-    <div class="filter-section" 
+    <div class="filter-section"
          style="display:flex; flex-wrap:wrap; gap:10px; background:#f8f9fa; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
       <div class="filter-group">
         <label>Location:</label>
@@ -7113,36 +7113,41 @@ async function showListSales() {
         <input type="text" id="searchNotes" placeholder="Notes / Reference..." class="form-control">
       </div>
       <div class="filter-buttons" style="display:flex; align-items:end; gap:10px;">
-        <button class="btn btn-primary" onclick="applySalesFilters()">Apply</button>
-        <button class="btn btn-success" onclick="exportSalesToExcel()">Export to Excel</button>
-        <button class="btn btn-danger" onclick="exportSalesToPDF()">Export to PDF</button>
+        <button class="btn" style="background:#007bff; color:white;" onclick="applySalesFilters()">Apply</button>
+        <button class="btn" style="background:#198754; color:white;" onclick="exportSalesToExcel()">Export to Excel</button>
+        <button class="btn" style="background:#dc3545; color:white;" onclick="exportSalesToPDF()">Export to PDF</button>
       </div>
     </div>
 
     <!-- Summary Cards -->
-    <div class="summary-cards" 
-         style="display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between; margin-top:20px;">
-      <div class="summary-card" style="flex:1; background:white; padding:20px; border-radius:8px; 
-           box-shadow:0 2px 5px rgba(0,0,0,0.1); text-align:center;">
-        <h3>Total Sales</h3>
-        <p id="totalSales" style="font-size:20px; font-weight:bold;">KES 0</p>
+    <div class="summary-cards"
+         style="display:flex; gap:15px; flex-wrap:wrap; justify-content:space-between; margin-top:20px;">
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #007bff;">
+        <h4 style="color:#007bff; font-size:16px;">Total Sales</h4>
+        <p id="totalSales" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
-      <div class="summary-card" style="flex:1; background:white; padding:20px; border-radius:8px; 
-           box-shadow:0 2px 5px rgba(0,0,0,0.1); text-align:center;">
-        <h3>Total Paid</h3>
-        <p id="totalPaid" style="font-size:20px; font-weight:bold;">KES 0</p>
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #198754;">
+        <h4 style="color:#198754; font-size:16px;">Total Paid</h4>
+        <p id="totalPaid" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
-      <div class="summary-card" style="flex:1; background:white; padding:20px; border-radius:8px; 
-           box-shadow:0 2px 5px rgba(0,0,0,0.1); text-align:center;">
-        <h3>Total Due</h3>
-        <p id="totalDue" style="font-size:20px; font-weight:bold;">KES 0</p>
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #ffc107;">
+        <h4 style="color:#ffc107; font-size:16px;">Total Due</h4>
+        <p id="totalDue" style="font-size:16px; font-weight:bold;">KES 0</p>
+      </div>
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #dc3545;">
+        <h4 style="color:#dc3545; font-size:16px;">Total Expense</h4>
+        <p id="totalExpense" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
     </div>
 
     <!-- Sales Table -->
     <div class="table-container" style="margin-top:20px;">
-      <table class="table table-bordered table-striped" style="width:100%; border-collapse:collapse;">
-        <thead style="background:#f1f1f1; font-weight:bold;">
+      <table class="table table-bordered table-striped" style="width:100%; border-collapse:collapse; border:1px solid #dee2e6;">
+        <thead style="background:#007bff; color:white;">
           <tr>
             <th>Date</th>
             <th>Location</th>
@@ -7168,7 +7173,7 @@ async function loadSalesData() {
   const tbody = document.getElementById("salesTableBody");
   tbody.innerHTML = "<tr><td colspan='8' style='text-align:center;'>Loading...</td></tr>";
 
-  let totalSales = 0, totalPaid = 0, totalDue = 0;
+  let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
   try {
     const snapshot = await firebase.firestore().collection("sales").orderBy("saleDate", "desc").get();
@@ -7192,6 +7197,7 @@ async function loadSalesData() {
       totalSales += total;
       totalPaid += paid;
       totalDue += due;
+      totalExpense += sale.expense || 0; // optional field if available
 
       tbody.innerHTML += `
         <tr>
@@ -7213,6 +7219,7 @@ async function loadSalesData() {
     document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
     document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
     document.getElementById("totalDue").textContent = "KES " + totalDue.toLocaleString();
+    document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
 
   } catch (error) {
     console.error("Error loading sales:", error);
