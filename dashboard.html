@@ -7176,28 +7176,36 @@ async function loadSalesData() {
   let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
   try {
-    const snapshot = await firebase.firestore().collection("sales").orderBy("saleDate", "desc").get();
+    const snapshot = await firebase.firestore()
+      .collection("sales")
+      .orderBy("createdAt", "desc")
+      .get();
+
     tbody.innerHTML = "";
 
     if (snapshot.empty) {
       tbody.innerHTML = "<tr><td colspan='8' style='text-align:center;'>No sales records found.</td></tr>";
+      updateSalesSummary(0, 0, 0, 0);
       return;
     }
 
     snapshot.forEach(doc => {
       const sale = doc.data();
-      const saleDate = sale.saleDate ? sale.saleDate.toDate().toLocaleDateString() : "N/A";
+      const saleDate = sale.saleDate
+        ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString() : sale.saleDate)
+        : "N/A";
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
-      const total = sale.totalAmount || 0;
-      const paid = sale.paid || 0;
+      const total = Number(sale.totalAmount) || 0;
+      const paid = Number(sale.paid) || 0;
+      const expense = Number(sale.expense) || 0;
       const due = total - paid;
       const note = sale.note || "-";
 
       totalSales += total;
       totalPaid += paid;
       totalDue += due;
-      totalExpense += sale.expense || 0; // optional field if available
+      totalExpense += expense;
 
       tbody.innerHTML += `
         <tr>
@@ -7216,16 +7224,21 @@ async function loadSalesData() {
       `;
     });
 
-    document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
-    document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
-    document.getElementById("totalDue").textContent = "KES " + totalDue.toLocaleString();
-    document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
+    updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
     console.error("Error loading sales:", error);
     tbody.innerHTML = `<tr><td colspan='8' style='text-align:center; color:red;'>Error loading sales: ${error.message}</td></tr>`;
   }
 }
+
+function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
+  document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
+  document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
+  document.getElementById("totalDue").textContent = "KES " + totalDue.toLocaleString();
+  document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
+}
+
 
 function viewSale(id) {
   alert("View sale details feature coming soon for Sale ID: " + id);
