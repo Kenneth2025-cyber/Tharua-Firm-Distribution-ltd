@@ -7166,6 +7166,7 @@ async function showListSales() {
     </div>
   `;
 
+  // Load data after rendering
   loadSalesData();
 }
 
@@ -7199,15 +7200,14 @@ async function loadSalesData() {
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
 
-      // ✅ Pull figures directly from Firestore fields
+      // ✅ Match expense page logic: fetch Firestore fields directly
       const total = Number(sale.totalSales) || Number(sale.totalAmount) || 0;
       const paid = Number(sale.paid) || 0;
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
-
       const due = total - paid;
       const note = sale.note || "-";
 
-      // ✅ Add to summary totals
+      // Accumulate totals
       totalSales += total;
       totalPaid += paid;
       totalDue += due;
@@ -7230,7 +7230,7 @@ async function loadSalesData() {
       `;
     });
 
-    // ✅ Update summary cards
+    // ✅ Update summary totals — same approach as expenses page
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
@@ -7250,7 +7250,6 @@ function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
   document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
 }
 
-
 function viewSale(id) {
   alert("View sale details feature coming soon for Sale ID: " + id);
 }
@@ -7264,6 +7263,7 @@ function deleteSale(id) {
     })
     .catch(err => alert("Error deleting sale: " + err.message));
 }
+
 
 
 
