@@ -7176,6 +7176,7 @@ async function loadSalesData() {
   let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
   try {
+    // ✅ Fetch all sales, newest first
     const snapshot = await firebase.firestore()
       .collection("sales")
       .orderBy("createdAt", "desc")
@@ -7191,17 +7192,23 @@ async function loadSalesData() {
 
     snapshot.forEach(doc => {
       const sale = doc.data();
+
+      // 🕒 Handle Firestore Timestamp or string dates
       const saleDate = sale.saleDate
         ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString() : sale.saleDate)
         : "N/A";
+
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
-      const total = Number(sale.totalAmount) || 0;
+
+      // ✅ Firestore “totalSales” and “salesExpense” fields are used here
+      const total = Number(sale.totalSales) || Number(sale.totalAmount) || 0;
       const paid = Number(sale.paid) || 0;
-      const expense = Number(sale.expense) || 0;
+      const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
       const due = total - paid;
       const note = sale.note || "-";
 
+      // ✅ Accumulate the actual stored totals
       totalSales += total;
       totalPaid += paid;
       totalDue += due;
@@ -7224,19 +7231,13 @@ async function loadSalesData() {
       `;
     });
 
+    // ✅ Update the dashboard summary cards
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
     console.error("Error loading sales:", error);
     tbody.innerHTML = `<tr><td colspan='8' style='text-align:center; color:red;'>Error loading sales: ${error.message}</td></tr>`;
   }
-}
-
-function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
-  document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
-  document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
-  document.getElementById("totalDue").textContent = "KES " + totalDue.toLocaleString();
-  document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
 }
 
 
