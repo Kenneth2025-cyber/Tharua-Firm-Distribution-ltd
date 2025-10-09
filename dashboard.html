@@ -7166,11 +7166,51 @@ async function showListSales() {
     </div>
   `;
 
+  await populateSalesFilters();
   loadSalesData();
 }
 
 /* -------------------------------
-   Load Sales Data with Filters
+   🔹 Load unique filter values
+-------------------------------- */
+async function populateSalesFilters() {
+  const locationSelect = document.getElementById("locationFilter");
+  const salespersonSelect = document.getElementById("salespersonFilter");
+
+  try {
+    const snapshot = await firebase.firestore().collection("sales").get();
+    const locations = new Set();
+    const salespersons = new Set();
+
+    snapshot.forEach(doc => {
+      const sale = doc.data();
+      if (sale.location) locations.add(sale.location);
+      if (sale.salesperson) salespersons.add(sale.salesperson);
+    });
+
+    // Populate unique locations
+    Array.from(locations).sort().forEach(loc => {
+      const opt = document.createElement("option");
+      opt.value = loc;
+      opt.textContent = loc;
+      locationSelect.appendChild(opt);
+    });
+
+    // Populate unique salespersons
+    Array.from(salespersons).sort().forEach(sp => {
+      const opt = document.createElement("option");
+      opt.value = sp;
+      opt.textContent = sp;
+      salespersonSelect.appendChild(opt);
+    });
+
+  } catch (error) {
+    console.error("Error loading filter options:", error);
+  }
+}
+
+/* -------------------------------
+   🔹 Load Sales Data with Filters
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
@@ -7181,7 +7221,7 @@ async function loadSalesData(filters = {}) {
   try {
     let query = firebase.firestore().collection("sales");
 
-    // ✅ Apply filters
+    // Apply filters
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.startDate && filters.endDate) {
@@ -7207,7 +7247,7 @@ async function loadSalesData(filters = {}) {
     snapshot.forEach(doc => {
       const sale = doc.data();
       const note = sale.note || "-";
-      if (searchTerm && !note.toLowerCase().includes(searchTerm)) return; // 🔍 Search filter
+      if (searchTerm && !note.toLowerCase().includes(searchTerm)) return;
 
       const saleDate = sale.saleDate
         ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString() : sale.saleDate)
@@ -7255,7 +7295,7 @@ async function loadSalesData(filters = {}) {
 }
 
 /* -------------------------------
-   Apply Filters from UI
+   🔹 Apply Filters from UI
 -------------------------------- */
 function applySalesFilters() {
   const filters = {
@@ -7269,7 +7309,7 @@ function applySalesFilters() {
 }
 
 /* -------------------------------
-   Update Summary Cards
+   🔹 Update Summary Cards
 -------------------------------- */
 function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
   document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
@@ -7279,7 +7319,7 @@ function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
 }
 
 /* -------------------------------
-   View & Delete Actions
+   🔹 View & Delete Actions
 -------------------------------- */
 function viewSale(id) {
   alert("View sale details feature coming soon for Sale ID: " + id);
