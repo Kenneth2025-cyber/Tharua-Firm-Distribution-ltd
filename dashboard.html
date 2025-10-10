@@ -7324,7 +7324,11 @@ async function loadSalesData(filters = {}) {
           <td>${salesperson}</td>
           <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
-          <td>KES ${paid.toLocaleString()}</td>
+          <td>
+  KES ${paid.toLocaleString()}
+  <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${doc.id}')">💰</span>
+</td>
+
           <td>KES ${due.toLocaleString()}</td>
           <td>${note}</td>
           <td style="text-align:center;">
@@ -7429,6 +7433,96 @@ function deleteSale(id) {
 }
 
 
+/* -------------------------------
+   🔹 View & Manage Payments Modal
+-------------------------------- */
+async function viewPayments(saleId) {
+  try {
+    const paymentsSnap = await firebase.firestore()
+      .collection("sales")
+      .doc(saleId)
+      .collection("payments")
+      .orderBy("date", "desc")
+      .get();
+
+    let payments = [];
+    paymentsSnap.forEach(doc => {
+      payments.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Build payments table
+    let paymentRows = payments.length
+      ? payments.map(p => `
+          <tr>
+            <td>${p.date ? (p.date.toDate ? p.date.toDate().toLocaleDateString() : p.date) : "N/A"}</td>
+            <td>${p.method || "-"}</td>
+            <td>KES ${Number(p.amount).toLocaleString()}</td>
+          </tr>
+        `).join("")
+      : `<tr><td colspan="3" style="text-align:center;">No payments recorded yet.</td></tr>`;
+
+    // SweetAlert modal
+    Swal.fire({
+      title: "Payments",
+      html: `
+        <div style="max-height:300px; overflow:auto; text-align:left;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr style="background:#f1f1f1;">
+                <th style="padding:6px;">Date</th>
+                <th style="padding:6px;">Method</th>
+                <th style="padding:6px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>${paymentRows}</tbody>
+          </table>
+        </div>
+        <hr>
+        <h5>Add New Payment</h5>
+        <input type="date" id="newPaymentDate" class="swal2-input" style="width:80%;" placeholder="Date">
+        <select id="newPaymentMethod" class="swal2-input" style="width:80%;">
+          <option value="mpesa">Mpesa</option>
+          <option value="cash">Cash</option>
+          <option value="bank">Bank</option>
+          <option value="cheque">Cheque</option>
+        </select>
+        <input type="number" id="newPaymentAmount" class="swal2-input" style="width:80%;" placeholder="Amount (KES)">
+      `,
+      showCancelButton: true,
+      confirmButtonText: "➕ Add Payment",
+      cancelButtonText: "Close",
+      preConfirm: async () => {
+        const date = document.getElementById("newPaymentDate").value;
+        const method = document.getElementById("newPaymentMethod").value;
+        const amount = Number(document.getElementById("newPaymentAmount").value);
+
+        if (!date || !method || !amount) {
+          Swal.showValidationMessage("Please fill in all fields!");
+          return false;
+        }
+
+        // Save to Firestore
+        await firebase.firestore()
+          .collection("sales")
+          .doc(saleId)
+          .collection("payments")
+          .add({
+            date: new Date(date),
+            method,
+            amount,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+
+        Swal.fire("Saved!", "Payment added successfully.", "success");
+        loadSalesData(); // Refresh table
+      }
+    });
+
+  } catch (error) {
+    console.error("Error loading payments:", error);
+    Swal.fire("Error", "Could not load payments: " + error.message, "error");
+  }
+}
 
 
 
