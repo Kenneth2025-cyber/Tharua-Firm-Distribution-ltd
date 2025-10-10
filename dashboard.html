@@ -7129,28 +7129,36 @@ async function showListSales() {
       </div>
     </div>
 
-    <!-- Summary Cards -->
+    <!-- Summary Cards (Reordered + Updated Labels) -->
     <div class="summary-cards"
          style="display:flex; gap:15px; flex-wrap:wrap; justify-content:space-between; margin-top:20px;">
+      
+      <!-- 1. Total Sales -->
       <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
            box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #007bff;">
         <h4 style="color:#007bff; font-size:16px;">Total Sales</h4>
         <p id="totalSales" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
+
+      <!-- 2. Total Field Expense -->
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #dc3545;">
+        <h4 style="color:#dc3545; font-size:16px;">Total Field Expense</h4>
+        <p id="totalExpense" style="font-size:16px; font-weight:bold;">KES 0</p>
+      </div>
+
+      <!-- 3. Total Paid -->
       <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
            box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #198754;">
         <h4 style="color:#198754; font-size:16px;">Total Paid</h4>
         <p id="totalPaid" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
+
+      <!-- 4. Total Due -->
       <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
            box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #ffc107;">
         <h4 style="color:#ffc107; font-size:16px;">Total Due</h4>
         <p id="totalDue" style="font-size:16px; font-weight:bold;">KES 0</p>
-      </div>
-      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
-           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #dc3545;">
-        <h4 style="color:#dc3545; font-size:16px;">Total Expense</h4>
-        <p id="totalExpense" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
     </div>
 
@@ -7202,7 +7210,7 @@ async function populateSalesFilters() {
       if (sale.customer) customers.add(sale.customer);
     });
 
-    // Populate unique locations (dropdown)
+    // Populate dropdowns and datalists
     Array.from(locations).sort().forEach(loc => {
       const opt = document.createElement("option");
       opt.value = loc;
@@ -7210,14 +7218,12 @@ async function populateSalesFilters() {
       locationSelect.appendChild(opt);
     });
 
-    // Populate unique salespersons (autocomplete)
     Array.from(salespersons).sort().forEach(sp => {
       const opt = document.createElement("option");
       opt.value = sp;
       salespersonList.appendChild(opt);
     });
 
-    // Populate unique customers (autocomplete)
     Array.from(customers).sort().forEach(cust => {
       const opt = document.createElement("option");
       opt.value = cust;
@@ -7252,7 +7258,6 @@ async function loadSalesData(filters = {}) {
     }
 
     query = query.orderBy("createdAt", "desc");
-
     const snapshot = await query.get();
     tbody.innerHTML = "";
 
@@ -7344,10 +7349,28 @@ document.addEventListener("input", e => {
    🔹 Update Summary Cards
 -------------------------------- */
 function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
+  // Update totals
   document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
-  document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
-  document.getElementById("totalDue").textContent = "KES " + totalDue.toLocaleString();
   document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
+  document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
+
+  const totalDueElement = document.getElementById("totalDue");
+  totalDueElement.textContent = "KES " + totalDue.toLocaleString();
+
+  // Apply color logic
+  if (totalDue > 0) {
+    // Positive (customer owes)
+    totalDueElement.style.color = "red";
+    totalDueElement.style.fontWeight = "bold";
+  } else if (totalDue < 0) {
+    // Negative (overpayment)
+    totalDueElement.style.color = "green";
+    totalDueElement.style.fontWeight = "bold";
+  } else {
+    // Zero (balanced)
+    totalDueElement.style.color = "black";
+    totalDueElement.style.fontWeight = "normal";
+  }
 }
 
 /* -------------------------------
@@ -7366,6 +7389,7 @@ function deleteSale(id) {
     })
     .catch(err => alert("Error deleting sale: " + err.message));
 }
+
 
 
 
