@@ -7434,7 +7434,7 @@ function deleteSale(id) {
 
 
 /* -------------------------------
-   🔹 View & Manage Payments Modal (Paid Column Updates Only)
+   🔹 View & Manage Payments Modal (with Firestore Persistence)
 -------------------------------- */
 async function viewPayments(saleId) {
   try {
@@ -7445,11 +7445,10 @@ async function viewPayments(saleId) {
       .orderBy("date", "desc")
       .get();
 
-    let payments = [];
-    paymentsSnap.forEach(doc => payments.push({ id: doc.id, ...doc.data() }));
+    const payments = paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     // Build payments table
-    let paymentRows = payments.length
+    const paymentRows = payments.length
       ? payments.map(p => `
           <tr>
             <td>${p.date ? (p.date.toDate ? p.date.toDate().toLocaleDateString() : p.date) : "N/A"}</td>
@@ -7505,7 +7504,7 @@ async function viewPayments(saleId) {
           return false;
         }
 
-        // Save to Firestore
+        // Save payment to Firestore
         await firebase.firestore()
           .collection("sales")
           .doc(saleId)
@@ -7517,11 +7516,11 @@ async function viewPayments(saleId) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           });
 
-        // Recalculate & update only this sale row
-        await updatePaidColumnForSale(saleId);
+        // ✅ Persist updates to sale and refresh all data
+        await updatePaidColumnForSale(saleId, true);
 
         Swal.fire("Saved!", "Payment added successfully.", "success");
-        setTimeout(() => viewPayments(saleId), 700); // reload modal
+        setTimeout(() => viewPayments(saleId), 800);
       }
     });
 
@@ -7545,53 +7544,61 @@ async function deletePayment(saleId, paymentId) {
     confirmButtonText: "Yes, delete it!",
   });
 
-  if (confirmDelete.isConfirmed) {
-    try {
-      await firebase.firestore()
-        .collection("sales")
-        .doc(saleId)
-        .collection("payments")
-        .doc(paymentId)
-        .delete();
+  if (!confirmDelete.isConfirmed) return;
 
-      // Recalculate & update only this sale row
-      await updatePaidColumnForSale(saleId);
+  try {
+    await firebase.firestore()
+      .collection("sales")
+      .doc(saleId)
+      .collection("payments")
+      .doc(paymentId)
+      .delete();
 
-      Swal.fire("Deleted!", "Payment removed successfully.", "success");
-      setTimeout(() => viewPayments(saleId), 700);
-    } catch (error) {
-      Swal.fire("Error", "Could not delete payment: " + error.message, "error");
-      console.error("Error deleting payment:", error);
-    }
+    // ✅ Persist updates to Firestore + refresh UI + summary
+    await updatePaidColumnForSale(saleId, true);
+
+    Swal.fire("Deleted!", "Payment removed successfully.", "success");
+    setTimeout(() => viewPayments(saleId), 800);
+  } catch (error) {
+    Swal.fire("Error", "Could not delete payment: " + error.message, "error");
+    console.error("Error deleting payment:", error);
   }
 }
 
 /* -------------------------------
-   🔹 Update Only Paid & Due Columns for a Sale Row
+   🔹 Update Firestore + Table + Summary Cards
 -------------------------------- */
-async function updatePaidColumnForSale(saleId) {
+async function updatePaidColumnForSale(saleId, refreshSummary = false) {
   const saleRef = firebase.firestore().collection("sales").doc(saleId);
   const saleDoc = await saleRef.get();
   const saleData = saleDoc.data();
 
   const paymentsSnap = await saleRef.collection("payments").get();
   const totalPaid = paymentsSnap.docs.reduce((sum, p) => sum + (Number(p.data().amount) || 0), 0);
-  const totalSales = Number(saleData.total) || Number(saleData.totalSales) || Number(saleData.totalAmount) || 0;
+  const totalSales = Number(saleData.totalSales) || Number(saleData.totalAmount) || 0;
   const due = totalSales - totalPaid;
 
-  // Update sale record
-  await saleRef.update({ paid: totalPaid, due: due });
+  // ✅ Permanently update Firestore with new totals
+  await saleRef.update({
+    paid: totalPaid,
+    due: due,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
 
-  // Update the row in the visible table
-  const tableRows = document.querySelectorAll("#salesTableBody tr");
-  tableRows.forEach(row => {
+  // ✅ Update UI instantly
+  const rows = document.querySelectorAll("#salesTableBody tr");
+  rows.forEach(row => {
     if (row.innerHTML.includes(`viewSale('${saleId}')`)) {
-      const cells = row.getElementsByTagName("td");
-      // Assuming table order: Date, Location, Salesperson, Customer, Total, Paid, Due, Note, Actions
-      if (cells[5]) cells[5].textContent = `KES ${totalPaid.toLocaleString()}`;
-      if (cells[6]) cells[6].textContent = `KES ${due.toLocaleString()}`;
+      const tds = row.querySelectorAll("td");
+      if (tds[5]) tds[5].textContent = `KES ${totalPaid.toLocaleString()}`;
+      if (tds[6]) tds[6].textContent = `KES ${due.toLocaleString()}`;
     }
   });
+
+  // ✅ Optional: refresh full summary cards (if requested)
+  if (refreshSummary) {
+    loadSalesData(); // ensures total cards recompute from fresh Firestore data
+  }
 }
 
 
