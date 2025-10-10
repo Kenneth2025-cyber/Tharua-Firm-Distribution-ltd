@@ -7248,6 +7248,7 @@ async function loadSalesData(filters = {}) {
   try {
     let query = firebase.firestore().collection("sales");
 
+    // Apply filters
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
@@ -7283,19 +7284,31 @@ async function loadSalesData(filters = {}) {
       const salesperson = sale.salesperson || "-";
       const customer = sale.customer || "-";
 
-      // 🧮 Compute totalSales just like Add Sale page
-      let computedTotal = 0;
+      // ✅ 1. Compute Total Sales (matches Add Sale page)
+      let total = 0;
       if (sale.saleItems && Array.isArray(sale.saleItems)) {
-        computedTotal = sale.saleItems.reduce((sum, item) => {
+        total = sale.saleItems.reduce((sum, item) => {
           const qty = Number(item.quantity) || 0;
           const price = Number(item.price) || 0;
           return sum + qty * price;
         }, 0);
       }
 
-      const total = computedTotal || Number(sale.totalSales) || Number(sale.totalAmount) || 0;
-      const paid = Number(sale.paid) || 0;
+      // ✅ 2. Use fallback totals if saleItems missing
+      total = total || Number(sale.totalSales) || Number(sale.totalAmount) || Number(sale.total) || 0;
+
+      // ✅ 3. Calculate totalPaid from multiple payments
+      let paid = 0;
+      if (Array.isArray(sale.payments)) {
+        paid = sale.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      } else {
+        paid = Number(sale.paid) || 0;
+      }
+
+      // ✅ 4. Expenses (Field)
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
+
+      // ✅ 5. Due = total - paid
       const due = total - paid;
 
       totalSales += total;
@@ -7303,6 +7316,7 @@ async function loadSalesData(filters = {}) {
       totalDue += due;
       totalExpense += expense;
 
+      // ✅ 6. Append row
       tbody.innerHTML += `
         <tr>
           <td>${saleDate}</td>
@@ -7321,6 +7335,7 @@ async function loadSalesData(filters = {}) {
       `;
     });
 
+    // ✅ 7. Update summary cards
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
@@ -7332,6 +7347,7 @@ async function loadSalesData(filters = {}) {
     `;
   }
 }
+
 
 /* -------------------------------
    🔹 Apply Filters from UI
