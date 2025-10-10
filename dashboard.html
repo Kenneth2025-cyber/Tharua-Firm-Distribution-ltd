@@ -7165,19 +7165,20 @@ async function showListSales() {
     <!-- Sales Table -->
     <div class="table-container" style="margin-top:20px;">
       <table class="table table-bordered table-striped" style="width:100%; border-collapse:collapse; border:1px solid #dee2e6;">
-        <thead style="background:#007bff; color:white;">
-          <tr>
-            <th>Date</th>
-            <th>Location</th>
-            <th>Salesperson</th>
-            <th>Customer</th>
-            <th>Total (KES)</th>
-            <th>Paid (KES)</th>
-            <th>Due (KES)</th>
-            <th>Note</th>
-            <th style="text-align:center;">Actions</th>
-          </tr>
-        </thead>
+    <thead style="background:#007bff; color:white;">
+  <tr>
+    <th>Date</th>
+    <th>Location</th>
+    <th>Salesperson</th>
+    <th>Customer</th>
+    <th>Total Sales (KES)</th>  <!-- ✅ Updated -->
+    <th>Paid (KES)</th>
+    <th>Due (KES)</th>
+    <th>Note</th>
+    <th style="text-align:center;">Actions</th>
+  </tr>
+</thead>
+
         <tbody id="salesTableBody">
           <tr><td colspan="9" style="text-align:center;">Loading sales...</td></tr>
         </tbody>
@@ -7281,7 +7282,18 @@ async function loadSalesData(filters = {}) {
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
       const customer = sale.customer || "-";
-      const total = Number(sale.totalSales) || Number(sale.totalAmount) || 0;
+
+      // 🧮 Compute totalSales just like Add Sale page
+      let computedTotal = 0;
+      if (sale.saleItems && Array.isArray(sale.saleItems)) {
+        computedTotal = sale.saleItems.reduce((sum, item) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          return sum + qty * price;
+        }, 0);
+      }
+
+      const total = computedTotal || Number(sale.totalSales) || Number(sale.totalAmount) || 0;
       const paid = Number(sale.paid) || 0;
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
       const due = total - paid;
