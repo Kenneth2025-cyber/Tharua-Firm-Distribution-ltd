@@ -7434,21 +7434,17 @@ function deleteSale(id) {
 
 
 /* -------------------------------
-   🔹 View & Manage Payments Modal (with Delete)
+   🔹 View & Manage Payments Modal (Live Update)
 -------------------------------- */
 async function viewPayments(saleId) {
   try {
-    const paymentsSnap = await firebase.firestore()
-      .collection("sales")
-      .doc(saleId)
-      .collection("payments")
-      .orderBy("date", "desc")
-      .get();
+    const saleRef = firebase.firestore().collection("sales").doc(saleId);
+    const saleDoc = await saleRef.get();
+    const saleData = saleDoc.data();
 
+    const paymentsSnap = await saleRef.collection("payments").orderBy("date", "desc").get();
     let payments = [];
-    paymentsSnap.forEach(doc => {
-      payments.push({ id: doc.id, ...doc.data() });
-    });
+    paymentsSnap.forEach(doc => payments.push({ id: doc.id, ...doc.data() }));
 
     // Build payments table
     let paymentRows = payments.length
@@ -7465,9 +7461,14 @@ async function viewPayments(saleId) {
         `).join("")
       : `<tr><td colspan="4" style="text-align:center;">No payments recorded yet.</td></tr>`;
 
+    // Calculate totals
+    const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalSales = Number(saleData.total) || Number(saleData.totalSales) || 0;
+    const totalDue = totalSales - totalPaid;
+
     // SweetAlert modal
     Swal.fire({
-      title: "Payments",
+      title: `Payments (Total Sales: KES ${totalSales.toLocaleString()})`,
       width: 600,
       html: `
         <div style="max-height:300px; overflow:auto; text-align:left;">
@@ -7482,6 +7483,10 @@ async function viewPayments(saleId) {
             </thead>
             <tbody>${paymentRows}</tbody>
           </table>
+        </div>
+        <div style="margin-top:10px; font-weight:bold;">
+          Total Paid: KES ${totalPaid.toLocaleString()} <br>
+          Due / Overpayment: KES ${totalDue.toLocaleString()}
         </div>
         <hr>
         <h5>Add New Payment</h5>
@@ -7507,23 +7512,24 @@ async function viewPayments(saleId) {
           return false;
         }
 
-        // Save to Firestore
-        await firebase.firestore()
-          .collection("sales")
-          .doc(saleId)
-          .collection("payments")
-          .add({
-            date: new Date(date),
-            method,
-            amount,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
+        // Save new payment
+        await saleRef.collection("payments").add({
+          date: new Date(date),
+          method,
+          amount,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Recalculate totals and update sale record
+        await recalculateSaleTotals(saleId);
 
         Swal.fire("Saved!", "Payment added successfully.", "success");
-        loadSalesData(); // Refresh table
-        setTimeout(() => viewPayments(saleId), 800); // reopen updated modal
+        setTimeout(() => viewPayments(saleId), 600); // refresh modal
       }
     });
+
+    // Update summary cards live
+    updateSalesSummary(totalSales, totalPaid, totalDue, 0);
 
   } catch (error) {
     console.error("Error loading payments:", error);
@@ -7554,14 +7560,39 @@ async function deletePayment(saleId, paymentId) {
         .doc(paymentId)
         .delete();
 
+      // Recalculate totals
+      await recalculateSaleTotals(saleId);
+
       Swal.fire("Deleted!", "Payment removed successfully.", "success");
-      loadSalesData(); // Refresh totals in main table
-      setTimeout(() => viewPayments(saleId), 800); // reopen updated modal
+      setTimeout(() => viewPayments(saleId), 600);
     } catch (error) {
       Swal.fire("Error", "Could not delete payment: " + error.message, "error");
       console.error("Error deleting payment:", error);
     }
   }
+}
+
+/* -------------------------------
+   🔹 Recalculate Sale Totals
+-------------------------------- */
+async function recalculateSaleTotals(saleId) {
+  const saleRef = firebase.firestore().collection("sales").doc(saleId);
+  const saleDoc = await saleRef.get();
+  const saleData = saleDoc.data();
+
+  const paymentsSnap = await saleRef.collection("payments").get();
+  const totalPaid = paymentsSnap.docs.reduce(
+    (sum, p) => sum + (Number(p.data().amount) || 0), 0
+  );
+
+  const totalSales = Number(saleData.total) || Number(saleData.totalSales) || 0;
+  const totalDue = totalSales - totalPaid;
+
+  // Update sale document (optional, for reporting)
+  await saleRef.update({ paid: totalPaid, due: totalDue });
+
+  // Reflect live in summary
+  updateSalesSummary(totalSales, totalPaid, totalDue, 0);
 }
 
 
