@@ -7349,29 +7349,39 @@ document.addEventListener("input", e => {
    🔹 Update Summary Cards
 -------------------------------- */
 function updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense) {
-  // Update totals
+  // Update numeric totals
   document.getElementById("totalSales").textContent = "KES " + totalSales.toLocaleString();
   document.getElementById("totalExpense").textContent = "KES " + totalExpense.toLocaleString();
   document.getElementById("totalPaid").textContent = "KES " + totalPaid.toLocaleString();
 
   const totalDueElement = document.getElementById("totalDue");
+  const totalDueCard = totalDueElement.closest(".summary-card"); // grab the card container
+  const totalDueTitle = totalDueCard.querySelector("h4"); // grab the card title
+
   totalDueElement.textContent = "KES " + totalDue.toLocaleString();
 
-  // Apply color logic
+  // Apply color, background, and title logic
   if (totalDue > 0) {
-    // Positive (customer owes)
+    // 🔴 Positive (customer owes)
+    totalDueTitle.textContent = "Total Due";
     totalDueElement.style.color = "red";
     totalDueElement.style.fontWeight = "bold";
+    totalDueCard.style.backgroundColor = "#ffe5e5"; // light red tint
   } else if (totalDue < 0) {
-    // Negative (overpayment)
+    // 🟢 Negative (overpayment)
+    totalDueTitle.textContent = "Overpayment";
     totalDueElement.style.color = "green";
     totalDueElement.style.fontWeight = "bold";
+    totalDueCard.style.backgroundColor = "#e6ffea"; // light green tint
   } else {
-    // Zero (balanced)
+    // ⚫ Zero (balanced)
+    totalDueTitle.textContent = "Cleared";
     totalDueElement.style.color = "black";
     totalDueElement.style.fontWeight = "normal";
+    totalDueCard.style.backgroundColor = "white";
   }
 }
+
 
 /* -------------------------------
    🔹 View & Delete Actions
