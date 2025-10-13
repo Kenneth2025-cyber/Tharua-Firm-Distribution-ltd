@@ -7241,22 +7241,7 @@ async function populateSalesFilters() {
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
-
-  // ✅ Table header (added 'Field Expenses' column)
-  tbody.innerHTML = `
-    <tr>
-      <th>Date</th>
-      <th>Location</th>
-      <th>Salesperson</th>
-      <th>Customer</th>
-      <th>Total Sales</th>
-      <th>Field Expenses</th>
-      <th>Paid</th>
-      <th>Due</th>
-      <th>Note</th>
-      <th>Actions</th>
-    </tr>
-  `;
+  tbody.innerHTML = "<tr><td colspan='10' style='text-align:center;'>Loading...</td></tr>";
 
   let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
@@ -7276,9 +7261,10 @@ async function loadSalesData(filters = {}) {
 
     query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
+    tbody.innerHTML = "";
 
     if (snapshot.empty) {
-      tbody.innerHTML += "<tr><td colspan='10' style='text-align:center;'>No sales records found.</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='10' style='text-align:center;'>No sales records found.</td></tr>";
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
@@ -7308,7 +7294,7 @@ async function loadSalesData(filters = {}) {
     });
     await Promise.all(customerPromises);
 
-    // ✅ Build table
+    // ✅ Build table rows only (no header here)
     for (const doc of snapshot.docs) {
       const sale = doc.data();
       const note = sale.note || "-";
