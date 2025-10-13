@@ -7241,7 +7241,22 @@ async function populateSalesFilters() {
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
-  tbody.innerHTML = "<tr><td colspan='10' style='text-align:center;'>Loading...</td></tr>"; // increased colspan
+
+  // ✅ Table header (added 'Field Expenses' column)
+  tbody.innerHTML = `
+    <tr>
+      <th>Date</th>
+      <th>Location</th>
+      <th>Salesperson</th>
+      <th>Customer</th>
+      <th>Total Sales</th>
+      <th>Field Expenses</th>
+      <th>Paid</th>
+      <th>Due</th>
+      <th>Note</th>
+      <th>Actions</th>
+    </tr>
+  `;
 
   let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
 
@@ -7261,10 +7276,9 @@ async function loadSalesData(filters = {}) {
 
     query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
-    tbody.innerHTML = "";
 
     if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='10' style='text-align:center;'>No sales records found.</td></tr>";
+      tbody.innerHTML += "<tr><td colspan='10' style='text-align:center;'>No sales records found.</td></tr>";
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
@@ -7340,7 +7354,7 @@ async function loadSalesData(filters = {}) {
       totalDue += due;
       totalExpense += expense;
 
-      // ✅ 6. Append row (Field Expenses added after Total Sales)
+      // ✅ 6. Append row with new 'Field Expenses' column
       tbody.innerHTML += `
         <tr>
           <td>${saleDate}</td>
@@ -7348,7 +7362,7 @@ async function loadSalesData(filters = {}) {
           <td>${salesperson}</td>
           <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
-          <td>KES ${expense.toLocaleString()}</td> <!-- 🆕 Field Expenses -->
+          <td>KES ${expense.toLocaleString()}</td>
           <td>
             KES ${paid.toLocaleString()}
             <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;"
@@ -7364,7 +7378,7 @@ async function loadSalesData(filters = {}) {
       `;
     }
 
-    // ✅ 7. Update summary cards
+    // ✅ Update summary cards
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
