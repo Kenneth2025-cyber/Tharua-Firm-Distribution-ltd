@@ -7165,19 +7165,21 @@ async function showListSales() {
     <!-- Sales Table -->
     <div class="table-container" style="margin-top:20px;">
       <table class="table table-bordered table-striped" style="width:100%; border-collapse:collapse; border:1px solid #dee2e6;">
-    <thead style="background:#007bff; color:white;">
+ <thead style="background:#007bff; color:white;">
   <tr>
     <th>Date</th>
     <th>Location</th>
     <th>Salesperson</th>
     <th>Customer</th>
-    <th>Total Sales (KES)</th>  <!-- ✅ Updated -->
+    <th>Total Sales (KES)</th>
+    <th>Field Expenses (KES)</th> <!-- ✅ Added here -->
     <th>Paid (KES)</th>
     <th>Due (KES)</th>
     <th>Note</th>
     <th style="text-align:center;">Actions</th>
   </tr>
 </thead>
+
 
         <tbody id="salesTableBody">
           <tr><td colspan="9" style="text-align:center;">Loading sales...</td></tr>
@@ -7241,9 +7243,14 @@ async function populateSalesFilters() {
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
-  tbody.innerHTML = "<tr><td colspan='10' style='text-align:center;'>Loading...</td></tr>";
 
-  let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
+  // ✅ Clear previous table rows (no header inside tbody)
+  tbody.innerHTML = "";
+
+  let totalSales = 0,
+    totalPaid = 0,
+    totalDue = 0,
+    totalExpense = 0;
 
   try {
     let query = firebase.firestore().collection("sales");
@@ -7261,10 +7268,11 @@ async function loadSalesData(filters = {}) {
 
     query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
-    tbody.innerHTML = "";
 
     if (snapshot.empty) {
-      tbody.innerHTML = "<tr><td colspan='10' style='text-align:center;'>No sales records found.</td></tr>";
+      tbody.innerHTML = `
+        <tr><td colspan="10" style="text-align:center;">No sales records found.</td></tr>
+      `;
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
@@ -7292,9 +7300,10 @@ async function loadSalesData(filters = {}) {
         customerCache[id] = id;
       }
     });
+
     await Promise.all(customerPromises);
 
-    // ✅ Build table rows only (no header here)
+    // ✅ Build table rows only (no header)
     for (const doc of snapshot.docs) {
       const sale = doc.data();
       const note = sale.note || "-";
@@ -7308,7 +7317,7 @@ async function loadSalesData(filters = {}) {
       const salesperson = sale.salesperson || "-";
       const customer = customerCache[sale.customer] || sale.customer || "-";
 
-      // ✅ 1. Compute Total Sales
+      // ✅ Compute totals
       let total = 0;
       if (sale.saleItems && Array.isArray(sale.saleItems)) {
         total = sale.saleItems.reduce((sum, item) => {
@@ -7318,10 +7327,9 @@ async function loadSalesData(filters = {}) {
         }, 0);
       }
 
-      // ✅ 2. Use fallback totals if saleItems missing
       total = total || Number(sale.totalSales) || Number(sale.totalAmount) || Number(sale.total) || 0;
 
-      // ✅ 3. Calculate totalPaid from multiple payments
+      // ✅ Payments
       let paid = 0;
       if (Array.isArray(sale.payments)) {
         paid = sale.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
@@ -7329,10 +7337,10 @@ async function loadSalesData(filters = {}) {
         paid = Number(sale.paid) || 0;
       }
 
-      // ✅ 4. Expenses (Field)
+      // ✅ Field Expense
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
 
-      // ✅ 5. Due = total - paid
+      // ✅ Due
       const due = total - paid;
 
       totalSales += total;
@@ -7340,7 +7348,7 @@ async function loadSalesData(filters = {}) {
       totalDue += due;
       totalExpense += expense;
 
-      // ✅ 6. Append row with new 'Field Expenses' column
+      // ✅ Append data rows only
       tbody.innerHTML += `
         <tr>
           <td>${saleDate}</td>
@@ -7351,8 +7359,7 @@ async function loadSalesData(filters = {}) {
           <td>KES ${expense.toLocaleString()}</td>
           <td>
             KES ${paid.toLocaleString()}
-            <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;"
-              onclick="viewPayments('${doc.id}')">💰</span>
+            <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${doc.id}')">💰</span>
           </td>
           <td>KES ${due.toLocaleString()}</td>
           <td>${note}</td>
@@ -7370,7 +7377,7 @@ async function loadSalesData(filters = {}) {
   } catch (error) {
     console.error("Error loading sales:", error);
     tbody.innerHTML = `
-      <tr><td colspan='10' style='text-align:center; color:red;'>
+      <tr><td colspan="10" style="text-align:center; color:red;">
         Error loading sales: ${error.message}
       </td></tr>
     `;
