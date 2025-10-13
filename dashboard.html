@@ -7271,10 +7271,13 @@ async function loadSalesData(filters = {}) {
 
     const searchTerm = (filters.search || "").toLowerCase();
 
-    snapshot.forEach(doc => {
+    // ✅ Customer name cache
+    const customerCache = {};
+
+    for (const doc of snapshot.docs) {
       const sale = doc.data();
       const note = sale.note || "-";
-      if (searchTerm && !note.toLowerCase().includes(searchTerm)) return;
+      if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
 
       const saleDate = sale.saleDate
         ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString() : sale.saleDate)
@@ -7282,7 +7285,24 @@ async function loadSalesData(filters = {}) {
 
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
-      const customer = sale.customer || "-";
+
+      // ✅ Customer name lookup (only change)
+      let customer = sale.customer || "-";
+      if (customer && customer !== "-") {
+        if (customerCache[customer]) {
+          customer = customerCache[customer];
+        } else {
+          try {
+            const custDoc = await firebase.firestore().collection("customers").doc(customer).get();
+            if (custDoc.exists) {
+              customer = custDoc.data().name || customer;
+              customerCache[sale.customer] = customer;
+            }
+          } catch (err) {
+            console.error("Error fetching customer name:", err);
+          }
+        }
+      }
 
       // ✅ 1. Compute Total Sales (matches Add Sale page)
       let total = 0;
@@ -7325,10 +7345,10 @@ async function loadSalesData(filters = {}) {
           <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
           <td>
-  KES ${paid.toLocaleString()}
-  <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${doc.id}')">💰</span>
-</td>
-
+            KES ${paid.toLocaleString()}
+            <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;"
+              onclick="viewPayments('${doc.id}')">💰</span>
+          </td>
           <td>KES ${due.toLocaleString()}</td>
           <td>${note}</td>
           <td style="text-align:center;">
@@ -7337,7 +7357,7 @@ async function loadSalesData(filters = {}) {
           </td>
         </tr>
       `;
-    });
+    }
 
     // ✅ 7. Update summary cards
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
@@ -7351,6 +7371,7 @@ async function loadSalesData(filters = {}) {
     `;
   }
 }
+
 
 
 /* -------------------------------
