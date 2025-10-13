@@ -7237,7 +7237,7 @@ async function populateSalesFilters() {
 }
 
 /* -------------------------------
-   🔹 Load Sales Data with Filters
+   🔹 Load Sales Data with Filters (Optimized Customer Lookup)
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
@@ -7271,9 +7271,30 @@ async function loadSalesData(filters = {}) {
 
     const searchTerm = (filters.search || "").toLowerCase();
 
-    // ✅ Customer name cache
-    const customerCache = {};
+    // ✅ Collect all unique customer IDs first
+    const customerIds = new Set();
+    snapshot.forEach(doc => {
+      const sale = doc.data();
+      if (sale.customer) customerIds.add(sale.customer);
+    });
 
+    // ✅ Fetch all customers in parallel
+    const customerCache = {};
+    const customerPromises = Array.from(customerIds).map(async id => {
+      try {
+        const docSnap = await firebase.firestore().collection("customers").doc(id).get();
+        if (docSnap.exists) {
+          customerCache[id] = docSnap.data().name || id;
+        } else {
+          customerCache[id] = id;
+        }
+      } catch {
+        customerCache[id] = id;
+      }
+    });
+    await Promise.all(customerPromises);
+
+    // ✅ Build table
     for (const doc of snapshot.docs) {
       const sale = doc.data();
       const note = sale.note || "-";
@@ -7285,26 +7306,9 @@ async function loadSalesData(filters = {}) {
 
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
+      const customer = customerCache[sale.customer] || sale.customer || "-";
 
-      // ✅ Customer name lookup (only change)
-      let customer = sale.customer || "-";
-      if (customer && customer !== "-") {
-        if (customerCache[customer]) {
-          customer = customerCache[customer];
-        } else {
-          try {
-            const custDoc = await firebase.firestore().collection("customers").doc(customer).get();
-            if (custDoc.exists) {
-              customer = custDoc.data().name || customer;
-              customerCache[sale.customer] = customer;
-            }
-          } catch (err) {
-            console.error("Error fetching customer name:", err);
-          }
-        }
-      }
-
-      // ✅ 1. Compute Total Sales (matches Add Sale page)
+      // ✅ 1. Compute Total Sales
       let total = 0;
       if (sale.saleItems && Array.isArray(sale.saleItems)) {
         total = sale.saleItems.reduce((sum, item) => {
@@ -7325,7 +7329,7 @@ async function loadSalesData(filters = {}) {
         paid = Number(sale.paid) || 0;
       }
 
-      // ✅ 4. Expenses (Field)
+      // ✅ 4. Expenses
       const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
 
       // ✅ 5. Due = total - paid
@@ -7359,7 +7363,7 @@ async function loadSalesData(filters = {}) {
       `;
     }
 
-    // ✅ 7. Update summary cards
+    // ✅ Update summary cards
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
