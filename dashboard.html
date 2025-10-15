@@ -7239,7 +7239,7 @@ async function populateSalesFilters() {
 }
 
 /* -------------------------------
-   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date + Sticky Totals Row + expensesTotal + Updated Formula)
+   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date + Sticky Totals Row + expensesTotal + Live Payments from Firestore)
    🔹 Formula: Due = Total Sales − Field Expenses − Paid
 -------------------------------- */
 async function loadSalesData(filters = {}) {
@@ -7346,12 +7346,19 @@ async function loadSalesData(filters = {}) {
       }
       total = total || Number(sale.totalSales) || Number(sale.totalAmount) || Number(sale.total) || 0;
 
-      // ✅ Payments
+      // ✅ Fetch payments from Firestore subcollection
       let paid = 0;
-      if (Array.isArray(sale.payments)) {
-        paid = sale.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-      } else {
-        paid = Number(sale.paid) || 0;
+      try {
+        const paymentsSnap = await firebase.firestore()
+          .collection("sales")
+          .doc(sale.id)
+          .collection("payments")
+          .get();
+        paymentsSnap.forEach(p => {
+          paid += Number(p.data().amount) || 0;
+        });
+      } catch (e) {
+        console.warn(`No payments found for sale ${sale.id}`);
       }
 
       // ✅ Use Firestore field `expensesTotal`
@@ -7426,7 +7433,6 @@ async function loadSalesData(filters = {}) {
     `;
   }
 }
-
 
 
 /* -------------------------------
