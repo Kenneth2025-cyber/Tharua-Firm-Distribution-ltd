@@ -7269,26 +7269,27 @@ async function loadSalesData(filters = {}) {
     }
 
     // ✅ Date filtering with safe logic (no index errors)
+    let hasDateFilter = false;
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
       query = query.where("createdAt", ">=", start).where("createdAt", "<=", end);
+      hasDateFilter = true;
     } else if (filters.startDate) {
       const start = new Date(filters.startDate);
       query = query.where("createdAt", ">=", start);
+      hasDateFilter = true;
     } else if (filters.endDate) {
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
       query = query.where("createdAt", "<=", end);
+      hasDateFilter = true;
     }
 
-    // ✅ Smart ordering logic — no duplicate or conflicting orderBy
-    const hasDateFilter = filters.startDate || filters.endDate;
+    // ✅ Only use orderBy when there are NO other filters to avoid index errors
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
-
-    // Only apply orderBy when no date filters are used (to avoid composite index)
-    if (!hasDateFilter) {
+    if (!hasOtherFilters && !hasDateFilter) {
       query = query.orderBy("createdAt", "desc");
     }
 
@@ -7328,9 +7329,18 @@ async function loadSalesData(filters = {}) {
 
     await Promise.all(customerPromises);
 
+    // ✅ Convert snapshot to array and sort locally if Firestore didn't
+    let salesDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if (hasOtherFilters || hasDateFilter) {
+      salesDocs.sort((a, b) => {
+        const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return bDate - aDate; // latest first
+      });
+    }
+
     // ✅ Build table rows only (no header)
-    for (const doc of snapshot.docs) {
-      const sale = doc.data();
+    for (const sale of salesDocs) {
       const note = sale.note || "-";
       if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
 
@@ -7384,13 +7394,13 @@ async function loadSalesData(filters = {}) {
           <td>KES ${expense.toLocaleString()}</td>
           <td>
             KES ${paid.toLocaleString()}
-            <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${doc.id}')">💰</span>
+            <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${sale.id}')">💰</span>
           </td>
           <td>KES ${due.toLocaleString()}</td>
           <td>${note}</td>
           <td style="text-align:center;">
-            <span title="View" style="cursor:pointer; color:green;" onclick="viewSale('${doc.id}')">👁</span>
-            <span title="Delete" style="cursor:pointer; color:red; margin-left:8px;" onclick="deleteSale('${doc.id}')">🗑</span>
+            <span title="View" style="cursor:pointer; color:green;" onclick="viewSale('${sale.id}')">👁</span>
+            <span title="Delete" style="cursor:pointer; color:red; margin-left:8px;" onclick="deleteSale('${sale.id}')">🗑</span>
           </td>
         </tr>
       `;
