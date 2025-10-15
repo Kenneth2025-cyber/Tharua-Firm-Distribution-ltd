@@ -7239,7 +7239,7 @@ async function populateSalesFilters() {
 }
 
 /* -------------------------------
-   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date + Sticky Totals Row)
+   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date + Sticky Totals Row + expensesTotal)
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
@@ -7253,12 +7253,12 @@ async function loadSalesData(filters = {}) {
   try {
     let query = firebase.firestore().collection("sales");
 
-    // ✅ Apply filters safely (avoid index errors)
+    // ✅ Apply filters safely
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
 
-    // ✅ Date range filters (based on saleDate)
+    // ✅ Date range filters
     let hasDateFilter = false;
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
@@ -7277,7 +7277,7 @@ async function loadSalesData(filters = {}) {
       hasDateFilter = true;
     }
 
-    // ✅ Only use orderBy when there are no filters to avoid index issues
+    // ✅ Only order if no filters (to prevent Firestore index errors)
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
     if (!hasOtherFilters && !hasDateFilter) {
       query = query.orderBy("saleDate", "desc");
@@ -7314,15 +7314,15 @@ async function loadSalesData(filters = {}) {
       })
     );
 
-    // ✅ Convert to array & sort by saleDate (latest first)
+    // ✅ Convert to array & sort by date (latest first)
     let salesDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     salesDocs.sort((a, b) => {
       const aDate = a.saleDate?.toDate ? a.saleDate.toDate() : new Date(a.saleDate || 0);
       const bDate = b.saleDate?.toDate ? b.saleDate.toDate() : new Date(b.saleDate || 0);
-      return bDate - aDate; // 🔹 latest sale first
+      return bDate - aDate;
     });
 
-    // ✅ Render table rows
+    // ✅ Render rows
     for (const sale of salesDocs) {
       const note = sale.note || "-";
       if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
@@ -7334,7 +7334,7 @@ async function loadSalesData(filters = {}) {
       const salesperson = sale.salesperson || "-";
       const customer = customerCache[sale.customer] || sale.customer || "-";
 
-      // ✅ Compute totals
+      // ✅ Compute total sales
       let total = 0;
       if (Array.isArray(sale.saleItems)) {
         total = sale.saleItems.reduce((sum, item) => {
@@ -7353,8 +7353,8 @@ async function loadSalesData(filters = {}) {
         paid = Number(sale.paid) || 0;
       }
 
-      // ✅ Field Expense
-      const expense = Number(sale.salesExpense) || Number(sale.expense) || 0;
+      // ✅ Use Firestore field `expensesTotal`
+      const expense = Number(sale.expensesTotal) || 0;
 
       // ✅ Due
       const due = total - paid;
@@ -7387,7 +7387,7 @@ async function loadSalesData(filters = {}) {
       `;
     }
 
-    // ✅ Sticky Totals Row
+    // ✅ Sticky Totals Row (footer stays visible)
     const table = tbody.closest("table");
     let tfoot = table.querySelector("tfoot");
     if (!tfoot) {
@@ -7399,10 +7399,10 @@ async function loadSalesData(filters = {}) {
       <tr style="
         position: sticky;
         bottom: 0;
-        background: white;
+        background: #f8f9fa;
         font-weight: bold;
         border-top: 3px solid #000;
-        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.15);
       ">
         <td colspan="4" style="text-align:right;">Totals:</td>
         <td style="color:#007bff;">KES ${totalSales.toLocaleString()}</td>
@@ -7413,7 +7413,7 @@ async function loadSalesData(filters = {}) {
       </tr>
     `;
 
-    // ✅ Update summary totals (cards)
+    // ✅ Update summary cards
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
 
   } catch (error) {
