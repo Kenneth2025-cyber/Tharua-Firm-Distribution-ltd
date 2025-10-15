@@ -7255,55 +7255,42 @@ async function loadSalesData(filters = {}) {
   try {
     let query = firebase.firestore().collection("sales");
 
-   // ✅ Apply filters safely (avoids Firestore index errors)
-if (filters.location) {
-  query = query.where("location", "==", filters.location);
-}
+    // ✅ Apply filters safely (avoids Firestore index errors)
+    if (filters.location) {
+      query = query.where("location", "==", filters.location);
+    }
 
-if (filters.salesperson) {
-  query = query.where("salesperson", "==", filters.salesperson);
-}
+    if (filters.salesperson) {
+      query = query.where("salesperson", "==", filters.salesperson);
+    }
 
-if (filters.customer) {
-  query = query.where("customer", "==", filters.customer);
-}
+    if (filters.customer) {
+      query = query.where("customer", "==", filters.customer);
+    }
 
-// ✅ Date filtering with safe logic (no index errors)
-if (filters.startDate && filters.endDate) {
-  const start = new Date(filters.startDate);
-  const end = new Date(filters.endDate);
-  end.setHours(23, 59, 59, 999);
-  query = query.where("createdAt", ">=", start).where("createdAt", "<=", end);
-} else if (filters.startDate) {
-  const start = new Date(filters.startDate);
-  query = query.where("createdAt", ">=", start);
-} else if (filters.endDate) {
-  const end = new Date(filters.endDate);
-  end.setHours(23, 59, 59, 999);
-  query = query.where("createdAt", "<=", end);
-}
+    // ✅ Date filtering with safe logic (no index errors)
+    if (filters.startDate && filters.endDate) {
+      const start = new Date(filters.startDate);
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query = query.where("createdAt", ">=", start).where("createdAt", "<=", end);
+    } else if (filters.startDate) {
+      const start = new Date(filters.startDate);
+      query = query.where("createdAt", ">=", start);
+    } else if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query = query.where("createdAt", "<=", end);
+    }
 
-// ✅ Handle ordering smartly to prevent Firestore index errors
-const hasAnyFilter =
-  filters.location ||
-  filters.salesperson ||
-  filters.customer ||
-  filters.startDate ||
-  filters.endDate;
+    // ✅ Smart ordering logic — no duplicate or conflicting orderBy
+    const hasDateFilter = filters.startDate || filters.endDate;
+    const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
 
-// If no filters are applied → order by createdAt (safe default)
-if (!hasAnyFilter) {
-  query = query.orderBy("createdAt", "desc");
-} else {
-  // When filters exist, skip Firestore ordering to avoid composite index issues
-  // We'll rely on the natural order returned by Firestore instead
-}
-
-// ✅ Avoid ordering conflicts that cause index requirement
-// Only order if no date range filter exists
-if (!filters.startDate && !filters.endDate) {
-  query = query.orderBy("createdAt", "desc");
-}
+    // Only apply orderBy when no date filters are used (to avoid composite index)
+    if (!hasDateFilter) {
+      query = query.orderBy("createdAt", "desc");
+    }
 
     const snapshot = await query.get();
 
@@ -7421,7 +7408,6 @@ if (!filters.startDate && !filters.endDate) {
     `;
   }
 }
-
 
 
 /* -------------------------------
