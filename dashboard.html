@@ -7239,7 +7239,7 @@ async function populateSalesFilters() {
 }
 
 /* -------------------------------
-   🔹 Load Sales Data with Filters (Optimized + Always Sorted by Most Recent)
+   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date)
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
@@ -7258,29 +7258,29 @@ async function loadSalesData(filters = {}) {
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
 
-    // ✅ Date range filters
+    // ✅ Date range filters (based on saleDate)
     let hasDateFilter = false;
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
-      query = query.where("createdAt", ">=", start).where("createdAt", "<=", end);
+      query = query.where("saleDate", ">=", start).where("saleDate", "<=", end);
       hasDateFilter = true;
     } else if (filters.startDate) {
       const start = new Date(filters.startDate);
-      query = query.where("createdAt", ">=", start);
+      query = query.where("saleDate", ">=", start);
       hasDateFilter = true;
     } else if (filters.endDate) {
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
-      query = query.where("createdAt", "<=", end);
+      query = query.where("saleDate", "<=", end);
       hasDateFilter = true;
     }
 
-    // ✅ Order by only when no filters to prevent index conflicts
+    // ✅ Only use orderBy when there are no filters to avoid index issues
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
     if (!hasOtherFilters && !hasDateFilter) {
-      query = query.orderBy("createdAt", "desc");
+      query = query.orderBy("saleDate", "desc");
     }
 
     const snapshot = await query.get();
@@ -7314,12 +7314,12 @@ async function loadSalesData(filters = {}) {
       })
     );
 
-    // ✅ Convert to array & sort newest first (always)
+    // ✅ Convert to array & sort by saleDate (latest first)
     let salesDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     salesDocs.sort((a, b) => {
-      const aDate = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-      const bDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-      return bDate - aDate; // newest first
+      const aDate = a.saleDate?.toDate ? a.saleDate.toDate() : new Date(a.saleDate || 0);
+      const bDate = b.saleDate?.toDate ? b.saleDate.toDate() : new Date(b.saleDate || 0);
+      return bDate - aDate; // 🔹 latest sale first
     });
 
     // ✅ Render table rows
