@@ -7239,7 +7239,7 @@ async function populateSalesFilters() {
 }
 
 /* -------------------------------
-   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date + Totals Row)
+   🔹 Load Sales Data with Filters (Sorted by Latest Sale Date + Sticky Totals Row)
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
@@ -7387,9 +7387,23 @@ async function loadSalesData(filters = {}) {
       `;
     }
 
-    // ✅ Totals Row (added at the bottom of the table)
-    tbody.innerHTML += `
-      <tr style="background:#f8f9fa; font-weight:bold; border-top:2px solid #000;">
+    // ✅ Sticky Totals Row
+    const table = tbody.closest("table");
+    let tfoot = table.querySelector("tfoot");
+    if (!tfoot) {
+      tfoot = document.createElement("tfoot");
+      table.appendChild(tfoot);
+    }
+
+    tfoot.innerHTML = `
+      <tr style="
+        position: sticky;
+        bottom: 0;
+        background: white;
+        font-weight: bold;
+        border-top: 3px solid #000;
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+      ">
         <td colspan="4" style="text-align:right;">Totals:</td>
         <td style="color:#007bff;">KES ${totalSales.toLocaleString()}</td>
         <td style="color:#dc3545;">KES ${totalExpense.toLocaleString()}</td>
