@@ -8289,7 +8289,7 @@ async function populateDropdown(collection, elementId, defaultText) {
 let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
 let allFilteredExpenses = [];
 
-// 🔹 Load expenses with filters (applied in-memory)
+// 🔹 Load all expenses (normal + Field Expenses) and merge properly
 async function loadExpenses() {
   const tbody = document.getElementById("expensesTbody");
   tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Loading...</td></tr>`;
@@ -8300,20 +8300,31 @@ async function loadExpenses() {
   const start = document.getElementById("filterStart").value;
   const end = document.getElementById("filterEnd").value;
   const search = document.getElementById("filterSearch").value.toLowerCase();
-  expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
-    ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
+  expensePage.perPage =
+    document.getElementById("itemsPerPage").value === "all"
+      ? Infinity
+      : parseInt(document.getElementById("itemsPerPage").value);
 
-  // ✅ Load all expenses (includes normal + field expenses)
-  const snap = await firebase.firestore()
-    .collection("expenses")
-    .orderBy("saleDate", "desc") // use saleDate for Field Expenses
-    .get();
+  // ✅ Load both: manually added expenses AND field expenses
+  const [regularSnap, fieldSnap] = await Promise.all([
+    firebase.firestore().collection("expenses").orderBy("expenseDate", "desc").get(),
+    firebase.firestore().collection("expenses").where("type", "==", "Field Expense").orderBy("saleDate", "desc").get(),
+  ]);
+
+  // Merge both (removes duplicates by Firestore ID)
+  const allDocsMap = new Map();
+  regularSnap.forEach((doc) => allDocsMap.set(doc.id, doc));
+  fieldSnap.forEach((doc) => allDocsMap.set(doc.id, doc));
+
+  const mergedDocs = Array.from(allDocsMap.values());
 
   let rows = [];
-  let total = 0, paid = 0, due = 0;
+  let total = 0,
+    paid = 0,
+    due = 0;
   allFilteredExpenses = [];
 
-  snap.forEach(doc => {
+  mergedDocs.forEach((doc) => {
     const e = doc.data();
 
     // ✅ Apply filters
@@ -8331,45 +8342,27 @@ async function loadExpenses() {
       if (!d || d < s || d > ed) return;
     }
 
-    if (search && !(e.note || e.description || "").toLowerCase().includes(search)) return;
+    if (search && !(e.note || e.description || "").toLowerCase().includes(search))
+      return;
 
-    // ✅ Handle totals
     const isFieldExpense = e.type === "Field Expense";
     const expenseAmount = e.amount || e.totalAmount || 0;
 
+    // ✅ Totals: Field expenses are settled immediately
     total += expenseAmount;
     if (isFieldExpense) {
-      // Field expenses are considered already settled
       paid += expenseAmount;
     } else {
       paid += e.paidAmount || 0;
       due += e.dueAmount || 0;
     }
 
-    // ✅ Add to filtered list
-    allFilteredExpenses.push({
-      date:
-        e.saleDate?.toDate?.().toLocaleDateString?.() ||
-        e.expenseDate?.toDate?.().toLocaleDateString?.() ||
-        e.createdAt?.toDate?.().toLocaleDateString?.() ||
-        "",
-      location: e.location || "",
-      category: e.category || "",
-      salesperson: e.salesperson || "",
-      total: expenseAmount,
-      paid: isFieldExpense ? expenseAmount : (e.paidAmount || 0),
-      due: isFieldExpense ? 0 : (e.dueAmount || 0),
-      note: e.note || e.description || ""
-    });
-
-    // ✅ Display proper date
     const expenseDate =
       e.saleDate?.toDate?.().toLocaleDateString?.() ||
       e.expenseDate?.toDate?.().toLocaleDateString?.() ||
       e.createdAt?.toDate?.().toLocaleDateString?.() ||
       "";
 
-    // ✅ Build table row
     rows.push(`
       <tr>
         <td>${expenseDate}</td>
@@ -8394,9 +8387,8 @@ async function loadExpenses() {
           <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
           ${
             e.saleId || e.linkedSaleId
-              ? `<span style="color:orange;margin-left:6px;cursor:pointer;" 
-                    title="Linked to Sale"
-                    onclick="viewLinkedSale('${e.saleId || e.linkedSaleId}')">🔗</span>`
+              ? `<span style="color:orange;margin-left:6px;cursor:pointer;" title="Linked to Sale"
+                   onclick="viewLinkedSale('${e.saleId || e.linkedSaleId}')">🔗</span>`
               : ""
           }
         </td>
@@ -8408,25 +8400,34 @@ async function loadExpenses() {
   expensePage.total = rows.length;
   const startIdx = (expensePage.current - 1) * expensePage.perPage;
   const endIdx = startIdx + expensePage.perPage;
-  const pageRows = expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
+  const pageRows =
+    expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
 
   tbody.innerHTML = pageRows.length
     ? pageRows.join("")
     : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
 
-  // ✅ Summary totals
-  document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
-  document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
-  document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
+  // ✅ Update summary totals
+  document.getElementById("tableTotal").textContent =
+    "KES " + total.toLocaleString();
+  document.getElementById("tablePaid").textContent =
+    "KES " + paid.toLocaleString();
+  document.getElementById("tableDue").textContent =
+    "KES " + due.toLocaleString();
 
-  document.getElementById("summaryTotal").textContent = "KES " + total.toLocaleString();
-  document.getElementById("summaryPaid").textContent = "KES " + paid.toLocaleString();
-  document.getElementById("summaryDue").textContent = "KES " + due.toLocaleString();
+  document.getElementById("summaryTotal").textContent =
+    "KES " + total.toLocaleString();
+  document.getElementById("summaryPaid").textContent =
+    "KES " + paid.toLocaleString();
+  document.getElementById("summaryDue").textContent =
+    "KES " + due.toLocaleString();
 
   document.getElementById("pageInfo").textContent =
     expensePage.perPage === Infinity
       ? `Showing all ${rows.length}`
-      : `Page ${expensePage.current} of ${Math.ceil(expensePage.total / expensePage.perPage)}`;
+      : `Page ${expensePage.current} of ${Math.ceil(
+          expensePage.total / expensePage.perPage
+        )}`;
 
   document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
   document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
@@ -8441,7 +8442,7 @@ function prevExpensesPage() {
 }
 
 function nextExpensesPage() {
-  if ((expensePage.current * expensePage.perPage) < expensePage.total) {
+  if (expensePage.current * expensePage.perPage < expensePage.total) {
     expensePage.current++;
     loadExpenses();
   }
@@ -8455,7 +8456,7 @@ async function addPayment(id, total, currentPaid) {
     inputLabel: `Total: KES ${total.toLocaleString()} | Already Paid: KES ${currentPaid.toLocaleString()}`,
     inputPlaceholder: "Enter payment amount",
     inputAttributes: { min: 1, max: total - currentPaid },
-    showCancelButton: true
+    showCancelButton: true,
   });
 
   if (payment) {
@@ -8464,26 +8465,21 @@ async function addPayment(id, total, currentPaid) {
     const newDue = total - newPaid;
 
     const expenseRef = firebase.firestore().collection("expenses").doc(id);
-
-    // ✅ Write batch to ensure consistency
     const batch = firebase.firestore().batch();
 
-    // Update expense totals
     batch.update(expenseRef, {
       paidAmount: newPaid,
-      dueAmount: newDue
+      dueAmount: newDue,
     });
 
-    // Add new payment entry to sub-collection
     const payRef = expenseRef.collection("payments").doc();
     batch.set(payRef, {
       amount,
       date: new Date(),
-      balanceAfter: newDue
+      balanceAfter: newDue,
     });
 
     await batch.commit();
-
     Swal.fire("Success", `Payment of KES ${amount.toLocaleString()} recorded.`, "success");
     loadExpenses();
   }
