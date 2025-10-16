@@ -7694,7 +7694,7 @@ async function updatePaidColumnForSale(saleId, refreshSummary = false) {
 }
 
 /* -------------------------------
-   🔹 View & Manage Field Expenses Modal (With Dropdown)
+   🔹 View & Manage Field Expenses Modal (With Sync to 'expenses' Collection)
 -------------------------------- */
 async function viewExpenses(saleId) {
   try {
@@ -7731,7 +7731,7 @@ async function viewExpenses(saleId) {
                 <td>${e.description || "-"}</td>
                 <td>${Number(e.amount).toLocaleString()}</td>
                 <td style="text-align:center;">
-                  <span style="color:red; cursor:pointer;" onclick="deleteExpense('${saleId}', ${i})">🗑</span>
+                  <span style="color:red; cursor:pointer;" onclick="deleteExpense('${saleId}', ${i}, '${sale.salesperson || ''}', '${sale.location || ''}', '${sale.customer || ''}')">🗑</span>
                 </td>
               </tr>`
                 )
@@ -7767,14 +7767,81 @@ async function viewExpenses(saleId) {
     });
 
     if (formValues && formValues.amount > 0 && formValues.category) {
+      // ✅ Update in 'sales' document
       expenses.push(formValues);
       const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
       await saleRef.update({ expenses, expensesTotal: total });
+
+      // ✅ Add to 'expenses' collection (so it appears on Expense List page)
+      await firebase.firestore().collection("expenses").add({
+        amount: formValues.amount,
+        category: formValues.category,
+        description: formValues.description,
+        saleId: saleId,
+        salespersonId: sale.salespersonId || "",
+        salesperson: sale.salesperson || "",
+        location: sale.location || "",
+        customer: sale.customer || "",
+        type: "Field Expense",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+
       showSuccessNotification("Expense added successfully.");
       loadSalesData(); // refresh table
     }
   } catch (err) {
     console.error("Error viewing expenses:", err);
+    Swal.fire("Error", err.message, "error");
+  }
+}
+
+/* -------------------------------
+   🔹 Delete Expense (Syncs with 'expenses' Collection)
+-------------------------------- */
+async function deleteExpense(saleId, index, salesperson = "", location = "", customer = "") {
+  const confirm = await Swal.fire({
+    title: "Delete Expense?",
+    text: "Are you sure you want to remove this expense?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it!",
+  });
+
+  if (!confirm.isConfirmed) return;
+
+  try {
+    const saleRef = firebase.firestore().collection("sales").doc(saleId);
+    const saleSnap = await saleRef.get();
+    if (!saleSnap.exists) return;
+
+    const sale = saleSnap.data();
+    const expenses = Array.isArray(sale.expenses) ? sale.expenses : [];
+    const deletedExpense = expenses[index];
+
+    // ✅ Remove from local array
+    expenses.splice(index, 1);
+    const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    // ✅ Update sale document
+    await saleRef.update({ expenses, expensesTotal: total });
+
+    // ✅ Remove corresponding record from 'expenses' collection
+    const expSnap = await firebase.firestore()
+      .collection("expenses")
+      .where("saleId", "==", saleId)
+      .where("category", "==", deletedExpense.category)
+      .where("description", "==", deletedExpense.description)
+      .where("amount", "==", deletedExpense.amount)
+      .limit(1)
+      .get();
+
+    if (!expSnap.empty) {
+      await expSnap.docs[0].ref.delete();
+    }
+
+    showSuccessNotification("Expense deleted successfully.");
+    loadSalesData();
+  } catch (err) {
     Swal.fire("Error", err.message, "error");
   }
 }
