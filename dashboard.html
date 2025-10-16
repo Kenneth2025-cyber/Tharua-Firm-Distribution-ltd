@@ -8300,12 +8300,16 @@ async function loadExpenses() {
   const start = document.getElementById("filterStart").value;
   const end = document.getElementById("filterEnd").value;
   const search = document.getElementById("filterSearch").value.toLowerCase();
-  expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
-    ? Infinity : parseInt(document.getElementById("itemsPerPage").value);
 
+  expensePage.perPage =
+    document.getElementById("itemsPerPage").value === "all"
+      ? Infinity
+      : parseInt(document.getElementById("itemsPerPage").value);
+
+  // ✅ Load from 'expenses' collection normally
   const snap = await firebase.firestore()
     .collection("expenses")
-    .orderBy("expenseDate", "desc") // ✅ newest first, guided by chosen date
+    .orderBy("expenseDate", "desc")
     .get();
 
   let rows = [];
@@ -8314,51 +8318,58 @@ async function loadExpenses() {
 
   snap.forEach(doc => {
     const e = doc.data();
+
+    // ✅ Skip filters that don’t match
     if (loc && e.location !== loc) return;
     if (cat && e.category !== cat) return;
     if (sp && e.salesperson !== sp) return;
 
+    // ✅ Handle date filters (use saleDate if present)
+    const dateObj =
+      e.expenseDate?.toDate?.() ||
+      e.saleDate?.toDate?.() ||
+      e.createdAt?.toDate?.();
+
     if (start && end) {
-      const d = e.expenseDate?.toDate?.() || e.saleDate?.toDate?.() || e.createdAt?.toDate?.();
       const s = new Date(start);
       const ed = new Date(end + "T23:59:59");
-      if (!d || d < s || d > ed) return;
+      if (!dateObj || dateObj < s || dateObj > ed) return;
     }
 
+    // ✅ Text search
     if (search && !(e.note || e.description || "").toLowerCase().includes(search)) return;
 
-    // ✅ (NEW) Detect expenses added from the sales module (Field Expense)
-    const isFieldExpense = e.type === "Field Expense";
+    // ✅ Detect linked sale expenses (either created during or after sale)
+    const isLinkedSaleExpense = e.linkedSaleId || e.saleId;
+    const isFieldExpense = e.type === "Field Expense" || isLinkedSaleExpense;
 
-    // ✅ (NEW) Adjust totals for Field Expenses
+    // ✅ Totals: linked sale expenses are always considered paid
     if (isFieldExpense) {
-      total += e.amount || 0;
-      paid += e.amount || 0; // they are considered fully paid
+      total += e.amount || e.totalAmount || 0;
+      paid += e.amount || e.totalAmount || 0; // fully paid
     } else {
       total += e.totalAmount || 0;
       paid += e.paidAmount || 0;
       due += e.dueAmount || 0;
     }
 
+    // ✅ Format date
+    const expenseDate =
+      dateObj?.toLocaleDateString?.() || "";
+
+    // ✅ Add to filtered list
     allFilteredExpenses.push({
-      date:
-        e.expenseDate?.toDate?.().toLocaleDateString() ||
-        e.saleDate?.toDate?.().toLocaleDateString() ||
-        e.createdAt?.toDate?.().toLocaleDateString() || "",
+      date: expenseDate,
       location: e.location || "",
       category: e.category || "",
       salesperson: e.salesperson || "",
       total: e.totalAmount || e.amount || 0,
-      paid: e.paidAmount || 0,
+      paid: e.paidAmount || e.amount || 0,
       due: e.dueAmount || 0,
       note: e.note || e.description || ""
     });
 
-    const expenseDate =
-      e.expenseDate?.toDate?.().toLocaleDateString() ||
-      e.saleDate?.toDate?.().toLocaleDateString() ||
-      e.createdAt?.toDate?.().toLocaleDateString() || "";
-
+    // ✅ Build HTML row
     rows.push(`
       <tr>
         <td>${expenseDate}</td>
@@ -8366,13 +8377,13 @@ async function loadExpenses() {
         <td>${e.category || ""}</td>
         <td>${e.salesperson || ""}</td>
         <td>KES ${Number(e.totalAmount || e.amount || 0).toLocaleString()}</td>
-        <td>KES ${Number(isFieldExpense ? e.amount : e.paidAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(isFieldExpense ? (e.amount || e.totalAmount || 0) : (e.paidAmount || 0)).toLocaleString()}</td>
         <td>
           ${
             isFieldExpense
               ? "—"
               : `KES ${Number(e.dueAmount || 0).toLocaleString()}
-                 <span style='color:purple; margin-left:6px; cursor:pointer;'
+                 <span style="color:purple; margin-left:6px; cursor:pointer;"
                    onclick="addPayment('${doc.id}', ${e.totalAmount || 0}, ${e.paidAmount || 0})">💰</span>`
           }
         </td>
@@ -8382,7 +8393,7 @@ async function loadExpenses() {
           <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
           <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
           ${
-            e.linkedSaleId || e.saleId
+            isLinkedSaleExpense
               ? `<span style="color:orange;margin-left:6px;cursor:pointer;" onclick="viewLinkedSale('${e.linkedSaleId || e.saleId}')">🔗</span>`
               : ""
           }
@@ -8391,13 +8402,17 @@ async function loadExpenses() {
     `);
   });
 
+  // ✅ Pagination logic
   expensePage.total = rows.length;
   const startIdx = (expensePage.current - 1) * expensePage.perPage;
   const endIdx = startIdx + expensePage.perPage;
   const pageRows = expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
 
-  tbody.innerHTML = pageRows.length ? pageRows.join("") : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
+  tbody.innerHTML = pageRows.length
+    ? pageRows.join("")
+    : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
 
+  // ✅ Summary updates
   document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
   document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
   document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
@@ -8413,6 +8428,51 @@ async function loadExpenses() {
 
   document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
   document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
+}
+
+// ✅ Pagination controls remain unchanged
+function prevExpensesPage() {
+  if (expensePage.current > 1) {
+    expensePage.current--;
+    loadExpenses();
+  }
+}
+
+function nextExpensesPage() {
+  if ((expensePage.current * expensePage.perPage) < expensePage.total) {
+    expensePage.current++;
+    loadExpenses();
+  }
+}
+
+// ✅ Add Payment with history logging (unchanged)
+async function addPayment(id, total, currentPaid) {
+  const { value: payment } = await Swal.fire({
+    title: "Add Payment",
+    input: "number",
+    inputLabel: `Total: KES ${total.toLocaleString()} | Already Paid: KES ${currentPaid.toLocaleString()}`,
+    inputPlaceholder: "Enter payment amount",
+    inputAttributes: { min: 1, max: total - currentPaid },
+    showCancelButton: true
+  });
+
+  if (payment) {
+    const amount = Number(payment);
+    const newPaid = currentPaid + amount;
+    const newDue = total - newPaid;
+
+    const expenseRef = firebase.firestore().collection("expenses").doc(id);
+
+    const batch = firebase.firestore().batch();
+    batch.update(expenseRef, { paidAmount: newPaid, dueAmount: newDue });
+
+    const payRef = expenseRef.collection("payments").doc();
+    batch.set(payRef, { amount, date: new Date(), balanceAfter: newDue });
+
+    await batch.commit();
+    Swal.fire("Success", `Payment of KES ${amount.toLocaleString()} recorded.`, "success");
+    loadExpenses();
+  }
 }
 
 
