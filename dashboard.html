@@ -8300,21 +8300,20 @@ async function loadExpenses() {
   const start = document.getElementById("filterStart").value;
   const end = document.getElementById("filterEnd").value;
   const search = document.getElementById("filterSearch").value.toLowerCase();
+
   expensePage.perPage =
     document.getElementById("itemsPerPage").value === "all"
       ? Infinity
       : parseInt(document.getElementById("itemsPerPage").value);
 
-  // ✅ Load from 'expenses' collection (all types)
+  // ✅ Load all expenses (manual + linked)
   const snap = await firebase.firestore()
     .collection("expenses")
-    .orderBy("createdAt", "desc") // ensure all appear, newest first
+    .orderBy("expenseDate", "desc")
     .get();
 
   let rows = [];
-  let total = 0,
-    paid = 0,
-    due = 0;
+  let total = 0, paid = 0, due = 0;
   allFilteredExpenses = [];
 
   snap.forEach((doc) => {
@@ -8326,10 +8325,7 @@ async function loadExpenses() {
     if (sp && e.salesperson !== sp) return;
 
     if (start && end) {
-      const d =
-        e.saleDate?.toDate?.() ||
-        e.expenseDate?.toDate?.() ||
-        e.createdAt?.toDate?.();
+      const d = e.saleDate?.toDate?.() || e.expenseDate?.toDate?.() || e.createdAt?.toDate?.();
       const s = new Date(start);
       const ed = new Date(end + "T23:59:59");
       if (!d || d < s || d > ed) return;
@@ -8338,19 +8334,29 @@ async function loadExpenses() {
     if (search && !(e.note || e.description || "").toLowerCase().includes(search))
       return;
 
-    // ✅ Include all expenses in totals (Field or not)
+    // ✅ Identify linked/field expenses
+    const isLinked = !!e.linkedSaleId || e.paymentMethod === "Field" || e.type === "Field Expense";
+
+    // ✅ Calculate totals
     const expenseAmount = e.amount || e.totalAmount || 0;
     total += expenseAmount;
-    paid += e.paidAmount || 0;
-    due += e.dueAmount || 0;
 
+    // Linked/field expenses are fully paid
+    if (isLinked || e.status === "Paid") {
+      paid += expenseAmount;
+    } else {
+      paid += e.paidAmount || 0;
+      due += e.dueAmount || 0;
+    }
+
+    // ✅ Choose proper date (saleDate > expenseDate > createdAt)
     const expenseDate =
       e.saleDate?.toDate?.().toLocaleDateString?.() ||
       e.expenseDate?.toDate?.().toLocaleDateString?.() ||
       e.createdAt?.toDate?.().toLocaleDateString?.() ||
       "";
 
-    // ✅ Build table row (with 🔗 if linked to sale)
+    // ✅ Build row
     rows.push(`
       <tr>
         <td>${expenseDate}</td>
@@ -8358,14 +8364,14 @@ async function loadExpenses() {
         <td>${e.category || ""}</td>
         <td>${e.salesperson || ""}</td>
         <td>KES ${Number(expenseAmount).toLocaleString()}</td>
-        <td>KES ${Number(e.paidAmount || 0).toLocaleString()}</td>
+        <td>KES ${Number(isLinked ? expenseAmount : e.paidAmount || 0).toLocaleString()}</td>
         <td>
-          KES ${Number(e.dueAmount || 0).toLocaleString()}
           ${
-            !e.type || e.type !== "Field Expense"
-              ? `<span style="color:purple; margin-left:6px; cursor:pointer;"
+            isLinked
+              ? "—"
+              : `KES ${Number(e.dueAmount || 0).toLocaleString()}
+                 <span style='color:purple; margin-left:6px; cursor:pointer;'
                    onclick="addPayment('${doc.id}', ${expenseAmount}, ${e.paidAmount || 0})">💰</span>`
-              : ""
           }
         </td>
         <td>${e.note || e.description || ""}</td>
@@ -8374,9 +8380,9 @@ async function loadExpenses() {
           <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
           <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
           ${
-            e.saleId
+            isLinked
               ? `<span style="color:orange;margin-left:6px;cursor:pointer;"
-                   onclick="viewLinkedSale('${e.saleId}')">🔗</span>`
+                   onclick="viewLinkedSale('${e.linkedSaleId || e.saleId}')">🔗</span>`
               : ""
           }
         </td>
@@ -8388,95 +8394,28 @@ async function loadExpenses() {
   expensePage.total = rows.length;
   const startIdx = (expensePage.current - 1) * expensePage.perPage;
   const endIdx = startIdx + expensePage.perPage;
-  const pageRows =
-    expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
+  const pageRows = expensePage.perPage === Infinity ? rows : rows.slice(startIdx, endIdx);
 
   tbody.innerHTML = pageRows.length
     ? pageRows.join("")
     : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
 
   // ✅ Totals & summary
-  document.getElementById("tableTotal").textContent =
-    "KES " + total.toLocaleString();
-  document.getElementById("tablePaid").textContent =
-    "KES " + paid.toLocaleString();
-  document.getElementById("tableDue").textContent =
-    "KES " + due.toLocaleString();
+  document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
+  document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
+  document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
 
-  document.getElementById("summaryTotal").textContent =
-    "KES " + total.toLocaleString();
-  document.getElementById("summaryPaid").textContent =
-    "KES " + paid.toLocaleString();
-  document.getElementById("summaryDue").textContent =
-    "KES " + due.toLocaleString();
+  document.getElementById("summaryTotal").textContent = "KES " + total.toLocaleString();
+  document.getElementById("summaryPaid").textContent = "KES " + paid.toLocaleString();
+  document.getElementById("summaryDue").textContent = "KES " + due.toLocaleString();
 
   document.getElementById("pageInfo").textContent =
     expensePage.perPage === Infinity
       ? `Showing all ${rows.length}`
-      : `Page ${expensePage.current} of ${Math.ceil(
-          expensePage.total / expensePage.perPage
-        )}`;
+      : `Page ${expensePage.current} of ${Math.ceil(expensePage.total / expensePage.perPage)}`;
 
   document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
   document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
-}
-
-// ✅ Pagination stays unchanged
-function prevExpensesPage() {
-  if (expensePage.current > 1) {
-    expensePage.current--;
-    loadExpenses();
-  }
-}
-
-function nextExpensesPage() {
-  if (expensePage.current * expensePage.perPage < expensePage.total) {
-    expensePage.current++;
-    loadExpenses();
-  }
-}
-
-// ✅ Add Payment with history logging (unchanged)
-async function addPayment(id, total, currentPaid) {
-  const { value: payment } = await Swal.fire({
-    title: "Add Payment",
-    input: "number",
-    inputLabel: `Total: KES ${total.toLocaleString()} | Already Paid: KES ${currentPaid.toLocaleString()}`,
-    inputPlaceholder: "Enter payment amount",
-    inputAttributes: { min: 1, max: total - currentPaid },
-    showCancelButton: true,
-  });
-
-  if (payment) {
-    const amount = Number(payment);
-    const newPaid = currentPaid + amount;
-    const newDue = total - newPaid;
-
-    const expenseRef = firebase.firestore().collection("expenses").doc(id);
-
-    const batch = firebase.firestore().batch();
-
-    batch.update(expenseRef, {
-      paidAmount: newPaid,
-      dueAmount: newDue,
-    });
-
-    const payRef = expenseRef.collection("payments").doc();
-    batch.set(payRef, {
-      amount,
-      date: new Date(),
-      balanceAfter: newDue,
-    });
-
-    await batch.commit();
-
-    Swal.fire(
-      "Success",
-      `Payment of KES ${amount.toLocaleString()} recorded.`,
-      "success"
-    );
-    loadExpenses();
-  }
 }
 
 
