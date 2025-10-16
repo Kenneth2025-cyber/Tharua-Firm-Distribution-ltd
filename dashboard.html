@@ -8289,7 +8289,7 @@ async function populateDropdown(collection, elementId, defaultText) {
 let expensePage = { current: 1, perPage: 10, total: 0, items: [] };
 let allFilteredExpenses = [];
 
-// 🔹 Load expenses with filters (applied in-memory)
+// 🔹 Load expenses with filters (now includes linked sale & field expenses)
 async function loadExpenses() {
   const tbody = document.getElementById("expensesTbody");
   tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Loading...</td></tr>`;
@@ -8301,12 +8301,10 @@ async function loadExpenses() {
   const end = document.getElementById("filterEnd").value;
   const search = document.getElementById("filterSearch").value.toLowerCase();
 
-  expensePage.perPage =
-    document.getElementById("itemsPerPage").value === "all"
-      ? Infinity
-      : parseInt(document.getElementById("itemsPerPage").value);
+  expensePage.perPage = document.getElementById("itemsPerPage").value === "all"
+    ? Infinity
+    : parseInt(document.getElementById("itemsPerPage").value);
 
-  // ✅ Load from 'expenses' collection normally
   const snap = await firebase.firestore()
     .collection("expenses")
     .orderBy("expenseDate", "desc")
@@ -8319,82 +8317,71 @@ async function loadExpenses() {
   snap.forEach(doc => {
     const e = doc.data();
 
-    // ✅ Skip filters that don’t match
+    // ✅ Apply filters
     if (loc && e.location !== loc) return;
     if (cat && e.category !== cat) return;
     if (sp && e.salesperson !== sp) return;
 
-    // ✅ Handle date filters (use saleDate if present)
-    const dateObj =
-      e.expenseDate?.toDate?.() ||
-      e.saleDate?.toDate?.() ||
-      e.createdAt?.toDate?.();
-
     if (start && end) {
+      const d = e.expenseDate?.toDate?.() || e.createdAt?.toDate?.();
       const s = new Date(start);
       const ed = new Date(end + "T23:59:59");
-      if (!dateObj || dateObj < s || dateObj > ed) return;
+      if (!d || d < s || d > ed) return;
     }
 
-    // ✅ Text search
-    if (search && !(e.note || e.description || "").toLowerCase().includes(search)) return;
+    if (search && !(e.note || "").toLowerCase().includes(search)) return;
 
-    // ✅ Detect linked sale expenses (either created during or after sale)
-    const isLinkedSaleExpense = e.linkedSaleId || e.saleId;
-    const isFieldExpense = e.type === "Field Expense" || isLinkedSaleExpense;
+    // ✅ Identify linked sale / field expenses
+    const isLinked = e.linkedSaleId || e.paymentMethod === "Field";
 
-    // ✅ Totals: linked sale expenses are always considered paid
-    if (isFieldExpense) {
-      total += e.amount || e.totalAmount || 0;
-      paid += e.amount || e.totalAmount || 0; // fully paid
-    } else {
-      total += e.totalAmount || 0;
-      paid += e.paidAmount || 0;
-      due += e.dueAmount || 0;
-    }
+    // ✅ Compute amounts
+    const totalAmount = e.totalAmount || e.amount || 0;
+    const paidAmount = isLinked ? totalAmount : (e.paidAmount || 0);
+    const dueAmount = isLinked ? 0 : (e.dueAmount || 0);
 
-    // ✅ Format date
+    total += totalAmount;
+    paid += paidAmount;
+    due += dueAmount;
+
     const expenseDate =
-      dateObj?.toLocaleDateString?.() || "";
+      e.expenseDate?.toDate?.().toLocaleDateString() ||
+      e.createdAt?.toDate?.().toLocaleDateString() || "";
 
-    // ✅ Add to filtered list
     allFilteredExpenses.push({
       date: expenseDate,
       location: e.location || "",
       category: e.category || "",
       salesperson: e.salesperson || "",
-      total: e.totalAmount || e.amount || 0,
-      paid: e.paidAmount || e.amount || 0,
-      due: e.dueAmount || 0,
-      note: e.note || e.description || ""
+      total: totalAmount,
+      paid: paidAmount,
+      due: dueAmount,
+      note: e.note || ""
     });
 
-    // ✅ Build HTML row
     rows.push(`
       <tr>
         <td>${expenseDate}</td>
         <td>${e.location || ""}</td>
         <td>${e.category || ""}</td>
         <td>${e.salesperson || ""}</td>
-        <td>KES ${Number(e.totalAmount || e.amount || 0).toLocaleString()}</td>
-        <td>KES ${Number(isFieldExpense ? (e.amount || e.totalAmount || 0) : (e.paidAmount || 0)).toLocaleString()}</td>
+        <td>KES ${Number(totalAmount).toLocaleString()}</td>
+        <td>KES ${Number(paidAmount).toLocaleString()}</td>
         <td>
-          ${
-            isFieldExpense
-              ? "—"
-              : `KES ${Number(e.dueAmount || 0).toLocaleString()}
-                 <span style="color:purple; margin-left:6px; cursor:pointer;"
-                   onclick="addPayment('${doc.id}', ${e.totalAmount || 0}, ${e.paidAmount || 0})">💰</span>`
+          ${isLinked
+            ? "—"
+            : `KES ${Number(dueAmount).toLocaleString()}
+               <span style='color:purple; margin-left:6px; cursor:pointer;'
+                 onclick="addPayment('${doc.id}', ${totalAmount}, ${paidAmount})">💰</span>`
           }
         </td>
-        <td>${e.note || e.description || ""}</td>
+        <td>${e.note || ""}</td>
         <td>
           <span style="color:#2980b9;cursor:pointer;" onclick="viewExpense('${doc.id}')">👁</span>
           <span style="color:green;margin-left:6px;cursor:pointer;" onclick="editExpense('${doc.id}')">✏</span>
           <span style="color:red;margin-left:6px;cursor:pointer;" onclick="deleteExpense('${doc.id}')">🗑</span>
           ${
-            isLinkedSaleExpense
-              ? `<span style="color:orange;margin-left:6px;cursor:pointer;" onclick="viewLinkedSale('${e.linkedSaleId || e.saleId}')">🔗</span>`
+            e.linkedSaleId
+              ? `<span style="color:orange;margin-left:6px;cursor:pointer;" onclick="viewLinkedSale('${e.linkedSaleId}')">🔗</span>`
               : ""
           }
         </td>
@@ -8402,7 +8389,6 @@ async function loadExpenses() {
     `);
   });
 
-  // ✅ Pagination logic
   expensePage.total = rows.length;
   const startIdx = (expensePage.current - 1) * expensePage.perPage;
   const endIdx = startIdx + expensePage.perPage;
@@ -8412,7 +8398,7 @@ async function loadExpenses() {
     ? pageRows.join("")
     : `<tr><td colspan="9" style="text-align:center;">No expenses found.</td></tr>`;
 
-  // ✅ Summary updates
+  // ✅ Update totals
   document.getElementById("tableTotal").textContent = "KES " + total.toLocaleString();
   document.getElementById("tablePaid").textContent = "KES " + paid.toLocaleString();
   document.getElementById("tableDue").textContent = "KES " + due.toLocaleString();
@@ -8428,51 +8414,6 @@ async function loadExpenses() {
 
   document.getElementById("prevPageBtn").disabled = expensePage.current <= 1;
   document.getElementById("nextPageBtn").disabled = endIdx >= expensePage.total;
-}
-
-// ✅ Pagination controls remain unchanged
-function prevExpensesPage() {
-  if (expensePage.current > 1) {
-    expensePage.current--;
-    loadExpenses();
-  }
-}
-
-function nextExpensesPage() {
-  if ((expensePage.current * expensePage.perPage) < expensePage.total) {
-    expensePage.current++;
-    loadExpenses();
-  }
-}
-
-// ✅ Add Payment with history logging (unchanged)
-async function addPayment(id, total, currentPaid) {
-  const { value: payment } = await Swal.fire({
-    title: "Add Payment",
-    input: "number",
-    inputLabel: `Total: KES ${total.toLocaleString()} | Already Paid: KES ${currentPaid.toLocaleString()}`,
-    inputPlaceholder: "Enter payment amount",
-    inputAttributes: { min: 1, max: total - currentPaid },
-    showCancelButton: true
-  });
-
-  if (payment) {
-    const amount = Number(payment);
-    const newPaid = currentPaid + amount;
-    const newDue = total - newPaid;
-
-    const expenseRef = firebase.firestore().collection("expenses").doc(id);
-
-    const batch = firebase.firestore().batch();
-    batch.update(expenseRef, { paidAmount: newPaid, dueAmount: newDue });
-
-    const payRef = expenseRef.collection("payments").doc();
-    batch.set(payRef, { amount, date: new Date(), balanceAfter: newDue });
-
-    await batch.commit();
-    Swal.fire("Success", `Payment of KES ${amount.toLocaleString()} recorded.`, "success");
-    loadExpenses();
-  }
 }
 
 
