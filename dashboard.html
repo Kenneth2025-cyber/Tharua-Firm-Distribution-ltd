@@ -7382,7 +7382,15 @@ async function loadSalesData(filters = {}) {
           <td>${salesperson}</td>
           <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
-          <td>KES ${expense.toLocaleString()}</td>
+          <td>
+  KES ${expense.toLocaleString()}
+  <span 
+    title="Manage Field Expenses" 
+    style="cursor:pointer; color:#dc3545; margin-left:6px;" 
+    onclick="viewExpenses('${sale.id}')"
+  >💸</span>
+</td>
+
           <td>
             KES ${paid.toLocaleString()}
             <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${sale.id}')">💰</span>
@@ -7685,6 +7693,115 @@ async function updatePaidColumnForSale(saleId, refreshSummary = false) {
   }
 }
 
+/* -------------------------------
+   🔹 View & Manage Field Expenses Modal
+-------------------------------- */
+async function viewExpenses(saleId) {
+  try {
+    const saleRef = firebase.firestore().collection("sales").doc(saleId);
+    const saleSnap = await saleRef.get();
+    if (!saleSnap.exists) return Swal.fire("Error", "Sale not found", "error");
+
+    const sale = saleSnap.data();
+    const expenses = Array.isArray(sale.expenses) ? sale.expenses : [];
+
+    let html = `
+      <table border="1" width="100%" style="border-collapse:collapse; text-align:left;">
+        <thead>
+          <tr style="background:#f0f0f0;">
+            <th>Category</th>
+            <th>Description</th>
+            <th>Amount (KES)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="expenseRows">
+          ${expenses.length
+            ? expenses
+                .map(
+                  (e, i) => `
+              <tr>
+                <td>${e.category || "-"}</td>
+                <td>${e.description || "-"}</td>
+                <td>${Number(e.amount).toLocaleString()}</td>
+                <td style="text-align:center;">
+                  <span style="color:red; cursor:pointer;" onclick="deleteExpense('${saleId}', ${i})">🗑</span>
+                </td>
+              </tr>`
+                )
+                .join("")
+            : `<tr><td colspan="4" style="text-align:center;">No expenses yet</td></tr>`}
+        </tbody>
+      </table>
+
+      <hr>
+      <h4>Add New Expense</h4>
+      <input id="expCategory" placeholder="Category" class="swal2-input" style="width:90%;">
+      <input id="expDesc" placeholder="Description" class="swal2-input" style="width:90%;">
+      <input id="expAmount" type="number" placeholder="Amount" class="swal2-input" style="width:90%;">
+    `;
+
+    const { value: formValues } = await Swal.fire({
+      title: "Field Expenses",
+      html: html,
+      width: 600,
+      showCancelButton: true,
+      confirmButtonText: "Add Expense",
+      cancelButtonText: "Close",
+      preConfirm: () => {
+        return {
+          category: document.getElementById("expCategory").value.trim(),
+          description: document.getElementById("expDesc").value.trim(),
+          amount: Number(document.getElementById("expAmount").value),
+        };
+      },
+    });
+
+    if (formValues && formValues.amount > 0) {
+      expenses.push(formValues);
+      const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      await saleRef.update({ expenses, expensesTotal: total });
+      showSuccessNotification("Expense added successfully.");
+      loadSalesData(); // refresh table
+    }
+  } catch (err) {
+    console.error("Error viewing expenses:", err);
+    Swal.fire("Error", err.message, "error");
+  }
+}
+
+/* -------------------------------
+   🔹 Delete Expense
+-------------------------------- */
+async function deleteExpense(saleId, index) {
+  const confirm = await Swal.fire({
+    title: "Delete Expense?",
+    text: "Are you sure you want to remove this expense?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it!",
+  });
+
+  if (!confirm.isConfirmed) return;
+
+  try {
+    const saleRef = firebase.firestore().collection("sales").doc(saleId);
+    const saleSnap = await saleRef.get();
+    if (!saleSnap.exists) return;
+
+    const sale = saleSnap.data();
+    const expenses = Array.isArray(sale.expenses) ? sale.expenses : [];
+
+    expenses.splice(index, 1);
+    const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    await saleRef.update({ expenses, expensesTotal: total });
+
+    showSuccessNotification("Expense deleted successfully.");
+    loadSalesData();
+  } catch (err) {
+    Swal.fire("Error", err.message, "error");
+  }
+}
 
 
 /* -------------------------------
