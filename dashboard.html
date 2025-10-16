@@ -7694,7 +7694,7 @@ async function updatePaidColumnForSale(saleId, refreshSummary = false) {
 }
 
 /* -------------------------------
-   🔹 View & Manage Field Expenses Modal
+   🔹 View & Manage Field Expenses Modal (With Dropdown)
 -------------------------------- */
 async function viewExpenses(saleId) {
   try {
@@ -7704,6 +7704,12 @@ async function viewExpenses(saleId) {
 
     const sale = saleSnap.data();
     const expenses = Array.isArray(sale.expenses) ? sale.expenses : [];
+
+    // ✅ Fetch expense categories from Firestore
+    const categoriesSnap = await firebase.firestore().collection("expenseCategories").get();
+    const categoryOptions = categoriesSnap.docs
+      .map(doc => `<option value="${doc.data().name}">${doc.data().name}</option>`)
+      .join("");
 
     let html = `
       <table border="1" width="100%" style="border-collapse:collapse; text-align:left;">
@@ -7736,7 +7742,10 @@ async function viewExpenses(saleId) {
 
       <hr>
       <h4>Add New Expense</h4>
-      <input id="expCategory" placeholder="Category" class="swal2-input" style="width:90%;">
+      <select id="expCategory" class="swal2-select" style="width:90%;">
+        <option value="">-- Select Category --</option>
+        ${categoryOptions}
+      </select>
       <input id="expDesc" placeholder="Description" class="swal2-input" style="width:90%;">
       <input id="expAmount" type="number" placeholder="Amount" class="swal2-input" style="width:90%;">
     `;
@@ -7757,7 +7766,7 @@ async function viewExpenses(saleId) {
       },
     });
 
-    if (formValues && formValues.amount > 0) {
+    if (formValues && formValues.amount > 0 && formValues.category) {
       expenses.push(formValues);
       const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
       await saleRef.update({ expenses, expensesTotal: total });
@@ -7766,39 +7775,6 @@ async function viewExpenses(saleId) {
     }
   } catch (err) {
     console.error("Error viewing expenses:", err);
-    Swal.fire("Error", err.message, "error");
-  }
-}
-
-/* -------------------------------
-   🔹 Delete Expense
--------------------------------- */
-async function deleteExpense(saleId, index) {
-  const confirm = await Swal.fire({
-    title: "Delete Expense?",
-    text: "Are you sure you want to remove this expense?",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Yes, delete it!",
-  });
-
-  if (!confirm.isConfirmed) return;
-
-  try {
-    const saleRef = firebase.firestore().collection("sales").doc(saleId);
-    const saleSnap = await saleRef.get();
-    if (!saleSnap.exists) return;
-
-    const sale = saleSnap.data();
-    const expenses = Array.isArray(sale.expenses) ? sale.expenses : [];
-
-    expenses.splice(index, 1);
-    const total = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    await saleRef.update({ expenses, expensesTotal: total });
-
-    showSuccessNotification("Expense deleted successfully.");
-    loadSalesData();
-  } catch (err) {
     Swal.fire("Error", err.message, "error");
   }
 }
