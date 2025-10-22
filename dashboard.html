@@ -8508,6 +8508,101 @@ async function exportExpensesPDF() {
   printWin.print();
 }
 
+// ✅ Enhanced Add Payment Modal (with history + date input)
+async function addPayment(id, total, currentPaid) {
+  const expenseRef = firebase.firestore().collection("expenses").doc(id);
+  const expenseSnap = await expenseRef.get();
+  if (!expenseSnap.exists) {
+    Swal.fire("Error", "Expense not found", "error");
+    return;
+  }
+
+  const e = expenseSnap.data();
+
+  // 🔹 Load existing payments sorted by date
+  const paymentsSnap = await expenseRef
+    .collection("payments")
+    .orderBy("date", "desc")
+    .get();
+
+  let paymentsHTML = "";
+  paymentsSnap.forEach((p) => {
+    const d = p.data();
+    const dt = d.date?.toDate
+      ? d.date.toDate().toLocaleString()
+      : new Date(d.date).toLocaleString();
+    paymentsHTML += `
+      <tr>
+        <td>${dt}</td>
+        <td>KES ${Number(d.amount).toLocaleString()}</td>
+        <td>KES ${Number(d.balanceAfter).toLocaleString()}</td>
+      </tr>`;
+  });
+
+  if (!paymentsHTML)
+    paymentsHTML = `<tr><td colspan="3" style="text-align:center;">No payments yet</td></tr>`;
+
+  // 🔹 Show modal with history + new payment form
+  const { value: formValues } = await Swal.fire({
+    title: "Manage Payments",
+    width: 700,
+    html: `
+      <p><b>Total:</b> KES ${Number(total).toLocaleString()} | 
+         <b>Paid:</b> KES ${Number(currentPaid).toLocaleString()} | 
+         <b>Due:</b> KES ${(total - currentPaid).toLocaleString()}</p>
+
+      <h3>Add Payment</h3>
+      <input id="payAmount" type="number" class="swal2-input" placeholder="Amount" min="1" max="${total - currentPaid}">
+      <input id="payDate" type="date" class="swal2-input" value="${new Date().toISOString().split("T")[0]}">
+
+      <h3>Existing Payments</h3>
+      <div style="max-height:200px;overflow-y:auto;">
+        <table border="1" style="width:100%;border-collapse:collapse;">
+          <tr><th>Date</th><th>Amount</th><th>Balance After</th></tr>
+          ${paymentsHTML}
+        </table>
+      </div>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: "Save Payment",
+    preConfirm: () => {
+      const amount = Number(document.getElementById("payAmount").value);
+      const date = document.getElementById("payDate").value;
+      if (!amount || amount <= 0) return Swal.showValidationMessage("Enter valid payment amount");
+      if (!date) return Swal.showValidationMessage("Select a payment date");
+      return { amount, date };
+    },
+  });
+
+  if (!formValues) return; // cancelled
+
+  const { amount, date } = formValues;
+  const newPaid = currentPaid + amount;
+  const newDue = total - newPaid;
+
+  const batch = firebase.firestore().batch();
+
+  // 🔹 Update totals
+  batch.update(expenseRef, {
+    paidAmount: newPaid,
+    dueAmount: newDue,
+  });
+
+  // 🔹 Add to payments subcollection
+  const payRef = expenseRef.collection("payments").doc();
+  batch.set(payRef, {
+    amount,
+    date: new Date(date),
+    balanceAfter: newDue,
+  });
+
+  await batch.commit();
+
+  Swal.fire("Success", `Payment of KES ${amount.toLocaleString()} saved!`, "success");
+  loadExpenses();
+}
+
 
 // Placeholders for actions
 async function viewExpense(id) {
