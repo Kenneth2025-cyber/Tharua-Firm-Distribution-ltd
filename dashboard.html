@@ -4002,6 +4002,10 @@ async function showUnits() {
       .btn-outline { background:#fff; border:1px solid #ddd; }
       .btn-danger { background:#dc3545; color:#fff; }
 
+      /* gray buttons (for Columns + PDF) */
+      .btn-gray { background:#6b7280; color:#fff; border:1px solid #6b7280; }
+      .btn-gray:hover { filter:brightness(0.95); }
+
       /* colored export buttons + compact size */
       .export-group{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; white-space:nowrap; }
       .btn-sm{ padding:4px 8px; font-size:12px; line-height:1.2; }
@@ -4070,7 +4074,7 @@ async function showUnits() {
           <button class="btn btn-excel btn-sm" onclick="exportUnitsExcel()">Excel</button>
           <button class="btn btn-print btn-sm" onclick="printUnits()">Print</button>
           <div class="col-visibility">
-            <button class="btn btn-outline btn-sm" onclick="toggleUnitsColPanel()">Columns</button>
+            <button class="btn btn-gray btn-sm" onclick="toggleUnitsColPanel()">Columns</button>
             <div id="unitsColPanel" class="col-panel">
               <label><input type="checkbox" checked onchange="setUnitsCol('name', this.checked)"> Name</label>
               <label><input type="checkbox" checked onchange="setUnitsCol('shortName', this.checked)"> Short name</label>
@@ -4078,7 +4082,7 @@ async function showUnits() {
               <label><input type="checkbox" checked onchange="setUnitsCol('actions', this.checked)"> Action</label>
             </div>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="exportUnitsPDF()">PDF</button>
+          <button class="btn btn-gray btn-sm" onclick="exportUnitsPDF()">PDF</button>
         </div>
 
         <div style="margin-left:auto">
@@ -9831,3 +9835,4 @@ document.addEventListener("click", function (e) {
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </body>
 </html>
+
