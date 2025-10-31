@@ -1841,7 +1841,7 @@ async function getCollectionOptions(collectionName) {
 
 
 function showListProducts() {
-  // ✅ Ensure productManager exists (global) — minimal fix for "productManager is not defined"
+  // ✅ Ensure productManager exists (prevents "not defined" and lets loaders write into it)
   if (!window.productManager) {
     window.productManager = {
       products: [],
@@ -1852,7 +1852,7 @@ function showListProducts() {
       selectedCategory: "",
       selectedBrand: "",
       currentPage: 1,
-      itemsPerPage: 25, // default page size
+      itemsPerPage: 25,
     };
   }
 
@@ -1860,6 +1860,14 @@ function showListProducts() {
 
   document.getElementById("content").innerHTML = `
     <style>
+      /* spinner for the loading row */
+      .spinner {
+        display:inline-block;width:16px;height:16px;
+        border:2px solid #f3f3f3;border-top:2px solid #3498db;border-radius:50%;
+        animation: spin 1s linear infinite;vertical-align:-2px;
+      }
+      @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+
       .filter-section {
         background: #f8f9fa;
         padding: 15px;
@@ -1886,237 +1894,75 @@ function showListProducts() {
         background: #fff;
         transition: border-color 0.2s, box-shadow 0.2s;
       }
-      .filter-section select {
-        width: 140px;
-      }
-      .filter-section input[type="text"] {
-        width: 180px;
-      }
+      .filter-section select { width: 140px; }
+      .filter-section input[type="text"] { width: 180px; }
       .filter-section select:focus, .filter-section input[type="text"]:focus {
-        border-color: #007bff;
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+        border-color: #007bff; outline: none; box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
       }
       .filter-section button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background-color 0.2s, transform 0.1s;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; font-weight: 500;
+        cursor: pointer; transition: background-color 0.2s, transform 0.1s; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
       }
-      .filter-section button:hover {
-        transform: translateY(-1px);
-      }
-      .filter-section .apply-btn {
-        background: #0056b3;
-        color: white;
-      }
-      .filter-section .apply-btn:hover {
-        background: #003d82;
-      }
-      .filter-section .export-btn {
-        background: #218838;
-        color: white;
-      }
-      .filter-section .export-btn:hover {
-        background: #1a6d2e;
-      }
-      .filter-section .search-help {
-        font-size: 12px;
-        color: #666;
-        margin-left: 8px;
-      }
-      .filter-section .filter-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+      .filter-section button:hover { transform: translateY(-1px); }
+      .filter-section .apply-btn { background: #0056b3; color: #fff; }
+      .filter-section .apply-btn:hover { background: #003d82; }
+      .filter-section .export-btn { background: #218838; color: #fff; }
+      .filter-section .export-btn:hover { background: #1a6d2e; }
+      .filter-section .search-help { font-size: 12px; color: #666; margin-left: 8px; }
+      .filter-section .filter-group { display: flex; align-items: center; gap: 8px; }
+
       .table-container {
-        max-height: 500px;
-        overflow-y: auto;
-        width: 100%;
-        position: relative;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        max-height: 500px; overflow-y: auto; width: 100%; position: relative; background: #fff;
+        border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       }
-      .table-container table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .table-container thead {
-        position: sticky;
-        top: 0;
-        background: #f0f0f0;
-        z-index: 1;
-      }
-      .table-container th, .table-container td {
-        padding: 12px;
-        border: 1px solid #ddd;
-        font-size: 14px;
-      }
-      .table-container th {
-        font-weight: 600;
-        color: #333;
-      }
+      .table-container table { width: 100%; border-collapse: collapse; }
+      .table-container thead { position: sticky; top: 0; background: #f0f0f0; z-index: 1; }
+      .table-container th, .table-container td { padding: 12px; border: 1px solid #ddd; font-size: 14px; }
+      .table-container th { font-weight: 600; color: #333; }
+
       .pagination-section {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 15px;
-        font-size: 14px;
+        display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 14px;
       }
       .pagination-section button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
+        padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background-color 0.2s;
       }
-      .pagination-section button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-      .pagination-section .prev-btn, .pagination-section .next-btn {
-        background: #007bff;
-        color: white;
-      }
-      .pagination-section .prev-btn:hover:not(:disabled), .pagination-section .next-btn:hover:not(:disabled) {
-        background: #0056b3;
-      }
-      .pagination-section select {
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-      }
+      .pagination-section button:disabled { background: #ccc; cursor: not-allowed; }
+      .pagination-section .prev-btn, .pagination-section .next-btn { background: #007bff; color: #fff; }
+      .pagination-section .prev-btn:hover:not(:disabled), .pagination-section .next-btn:hover:not(:disabled) { background: #0056b3; }
+      .pagination-section select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+
       /* Modal Styles */
-      .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        justify-content: center;
-        align-items: center;
-      }
+      .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
       .modal-content {
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 500px;
-        width: 90%;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        position: relative;
+        background: #fff; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2); position: relative;
       }
-      .modal-content h2 {
-        margin-top: 0;
-        color: #333;
-        font-size: 20px;
-      }
-      .modal-content p, .modal-content label {
-        font-size: 14px;
-        color: #333;
-        margin: 10px 0;
-      }
-      .modal-content input, .modal-content select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-        margin-bottom: 10px;
-      }
-      .modal-content .modal-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 20px;
-      }
-      .modal-content button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-      .modal-content .btn-primary {
-        background: #007bff;
-        color: white;
-      }
-      .modal-content .btn-primary:hover {
-        background: #0056b3;
-      }
-      .modal-content .btn-secondary {
-        background: #6c757d;
-        color: white.
-      }
-      .modal-content .btn-secondary:hover {
-        background: #5a6268;
-      }
-      .modal-content .btn-danger {
-        background: #dc3545;
-        color: white;
-      }
-      .modal-content .btn-danger:hover {
-        background: #c82333;
-      }
-      .modal-content .close-btn {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        font-size: 20px;
-        cursor: pointer;
-        color: #333;
-      }
-      .modal-content .error-text {
-        color: #dc3545;
-        font-size: 12px;
-        margin-top: -5px;
-        margin-bottom: 10px;
-        display: none;
-      }
+      .modal-content h2 { margin-top: 0; color: #333; font-size: 20px; }
+      .modal-content p, .modal-content label { font-size: 14px; color: #333; margin: 10px 0; }
+      .modal-content input, .modal-content select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 10px; }
+      .modal-content .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+      .modal-content button { padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; transition: background-color 0.2s; }
+      .modal-content .btn-primary { background: #007bff; color: #fff; }
+      .modal-content .btn-primary:hover { background: #0056b3; }
+      .modal-content .btn-secondary { background: #6c757d; color: #fff; } /* fixed typo */
+      .modal-content .btn-secondary:hover { background: #5a6268; }
+      .modal-content .btn-danger { background: #dc3545; color: #fff; }
+      .modal-content .btn-danger:hover { background: #c82333; }
+      .modal-content .close-btn { position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; color: #333; }
+      .modal-content .error-text { color: #dc3545; font-size: 12px; margin-top: -5px; margin-bottom: 10px; display: none; }
+
       @media (min-width: 601px) {
-        .filter-section {
-          flex-wrap: nowrap;
-          justify-content: space-between;
-        }
-        .filter-section .filter-group {
-          flex: 1;
-          max-width: 200px;
-        }
-        .filter-section input[type="text"] {
-          width: 180px;
-        }
-        .filter-section .search-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
+        .filter-section { flex-wrap: nowrap; justify-content: space-between; }
+        .filter-section .filter-group { flex: 1; max-width: 200px; }
+        .filter-section input[type="text"] { width: 180px; }
+        .filter-section .search-group { display: flex; align-items: center; gap: 8px; }
       }
       @media (max-width: 600px) {
-        .filter-section {
-          flex-direction: column;
-          align-items: stretch;
-        }
-        .filter-section select, .filter-section input[type="text"] {
-          width: 100%;
-        }
-        .filter-section .filter-group {
-          width: 100%;
-        }
-        .pagination-section {
-          flex-direction: column;
-          gap: 15px;
-        }
+        .filter-section { flex-direction: column; align-items: stretch; }
+        .filter-section select, .filter-section input[type="text"] { width: 100%; }
+        .filter-section .filter-group { width: 100%; }
+        .pagination-section { flex-direction: column; gap: 15px; }
       }
     </style>
     <h2>List of Products</h2>
@@ -2172,7 +2018,7 @@ function showListProducts() {
           </tr>
         </thead>
         <tbody id="productsTbody" aria-live="polite" aria-busy="true">
-          <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+          <tr><td colspan="8" style="text-align:center;"><span class="spinner"></span> Loading...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2210,40 +2056,40 @@ function showListProducts() {
     </div>
 
     <!-- Edit Modal -->
-  // Update the edit modal HTML in showListProducts
-<div id="editModal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn" onclick="closeModal('editModal')">&times;</span>
-    <h2>Edit Product</h2>
-    <form id="editProductForm">
-      <label for="editName">Product Name:</label>
-      <input type="text" id="editName" required>
-      <label for="editCategory">Category:</label>
-      <select id="editCategory" required>
-        <option value="">Select Category</option>
-      </select>
-      <label for="editBrand">Brand:</label>
-      <select id="editBrand" required>
-        <option value="">Select Brand</option>
-      </select>
-      <label for="editBuyingPrice">Buying Price (KES):</label>
-      <input type="number" id="editBuyingPrice" min="0" step="0.01" required>
-      <label for="editSellingPrice">Selling Price (KES):</label>
-      <input type="number" id="editSellingPrice" min="0" step="0.01" required>
-      <span id="priceError" class="error-text">Selling price must be greater than buying price.</span>
-      <label for="editStock">Opening Stock:</label>
-      <input type="number" id="editStock" min="0" step="1" required>
-      <label for="editLocation">Locations:</label>
-      <select id="editLocation" multiple required>
-        <option value="">Select Locations</option>
-      </select>
-      <div class="modal-buttons">
-        <button type="submit" class="btn-primary">Save</button>
-        <button type="button" class="btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+    // Update the edit modal HTML in showListProducts
+    <div id="editModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('editModal')">&times;</span>
+        <h2>Edit Product</h2>
+        <form id="editProductForm">
+          <label for="editName">Product Name:</label>
+          <input type="text" id="editName" required>
+          <label for="editCategory">Category:</label>
+          <select id="editCategory" required>
+            <option value="">Select Category</option>
+          </select>
+          <label for="editBrand">Brand:</label>
+          <select id="editBrand" required>
+            <option value="">Select Brand</option>
+          </select>
+          <label for="editBuyingPrice">Buying Price (KES):</label>
+          <input type="number" id="editBuyingPrice" min="0" step="0.01" required>
+          <label for="editSellingPrice">Selling Price (KES):</label>
+          <input type="number" id="editSellingPrice" min="0" step="0.01" required>
+          <span id="priceError" class="error-text">Selling price must be greater than buying price.</span>
+          <label for="editStock">Opening Stock:</label>
+          <input type="number" id="editStock" min="0" step="1" required>
+          <label for="editLocation">Locations:</label>
+          <select id="editLocation" multiple required>
+            <option value="">Select Locations</option>
+          </select>
+          <div class="modal-buttons">
+            <button type="submit" class="btn-primary">Save</button>
+            <button type="button" class="btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+          </div>
+        </form>
       </div>
-    </form>
-  </div>
-</div>
+    </div>
 
     <!-- Delete Confirmation Modal -->
     <div id="deleteModal" class="modal">
@@ -2265,14 +2111,23 @@ function showListProducts() {
     loadCategories(),
     loadBrands(),
     loadProducts()
-  ]).then(() => {
+  ])
+  .then(() => {
     renderProductsTable();
-  }).catch(err => {
+  })
+  .catch(err => {
     console.error("Error loading data:", err);
     const tbody = document.getElementById("productsTbody");
     tbody.innerHTML = `<tr><td colspan="8" class="error-row">Failed to load data: ${escapeHTML(err.message)}</td></tr>`;
     tbody.setAttribute("aria-busy", "false");
     showToast(`Failed to load data: ${err.message}`, "error");
+  })
+  .finally(() => {
+    // ✅ Fallback render in case any loader silently stalled
+    const tbody = document.getElementById("productsTbody");
+    if (tbody && tbody.getAttribute("aria-busy") === "true") {
+      try { renderProductsTable(); } catch(e) {}
+    }
   });
 
   // Debounced search (3+ chars)
@@ -2292,7 +2147,7 @@ function showListProducts() {
     applyFilters(searchText);
   });
 
-  // Instant filter on location change
+  // Instant filters
   document.getElementById("locationFilter").addEventListener("change", () => {
     productManager.selectedLocation = document.getElementById("locationFilter").value;
     productManager.currentPage = 1;
@@ -2300,7 +2155,6 @@ function showListProducts() {
     renderProductsTable(searchText);
   });
 
-  // Instant filter on category change
   document.getElementById("categoryFilter").addEventListener("change", () => {
     productManager.selectedCategory = document.getElementById("categoryFilter").value;
     productManager.currentPage = 1;
@@ -2308,7 +2162,6 @@ function showListProducts() {
     renderProductsTable(searchText);
   });
 
-  // Instant filter on brand change
   document.getElementById("brandFilter").addEventListener("change", () => {
     productManager.selectedBrand = document.getElementById("brandFilter").value;
     productManager.currentPage = 1;
@@ -2316,7 +2169,7 @@ function showListProducts() {
     renderProductsTable(searchText);
   });
 
-  // Items per page change
+  // Items per page
   document.getElementById("itemsPerPage").addEventListener("change", () => {
     const value = document.getElementById("itemsPerPage").value;
     productManager.itemsPerPage = value === "all" ? Infinity : parseInt(value, 10);
@@ -2325,7 +2178,7 @@ function showListProducts() {
     renderProductsTable(searchText);
   });
 
-  // Previous page button
+  // Pagination
   document.getElementById("prevPageBtn").addEventListener("click", () => {
     if (productManager.currentPage > 1) {
       productManager.currentPage--;
@@ -2334,7 +2187,6 @@ function showListProducts() {
     }
   });
 
-  // Next page button
   document.getElementById("nextPageBtn").addEventListener("click", () => {
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     const filteredProducts = getFilteredProducts(searchText);
@@ -2345,7 +2197,7 @@ function showListProducts() {
     }
   });
 
-  // Export (uses filtered + searched list)
+  // Export
   document.getElementById("exportBtn").addEventListener("click", () => {
     const searchText = document.getElementById("searchProduct").value.toLowerCase();
     exportProductsCSV(searchText);
