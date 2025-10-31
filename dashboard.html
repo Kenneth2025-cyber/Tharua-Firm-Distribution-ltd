@@ -4248,7 +4248,6 @@ document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
   // rows are re-rendered to apply visibility
   renderUnits();
 }
-
 // ---------- Render ----------
 function renderUnits() {
   const tbody = document.getElementById("unitsTbody");
@@ -4272,33 +4271,33 @@ function renderUnits() {
 
   const slice = unitsState.filtered.slice(start, end);
   if (!slice.length) {
-    tbody.innerHTML = \`<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>\`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>`;
   } else {
-    tbody.innerHTML = slice.map(r => \`
+    tbody.innerHTML = slice.map(r => `
       <tr>
-        <td style="\${!unitsState.visibleCols.name ? 'display:none':''}" data-col="name">\${escapeHTML(r.name || "")}</td>
-        <td style="\${!unitsState.visibleCols.shortName ? 'display:none':''}" data-col="shortName">\${escapeHTML(r.shortName || "")}</td>
-        <td style="\${!unitsState.visibleCols.allowDecimal ? 'display:none':''}" data-col="allowDecimal">
-          <span class="badge \${r.allowDecimal ? 'badge-yes':'badge-no'}">\${r.allowDecimal ? 'Yes':'No'}</span>
+        <td style="${!unitsState.visibleCols.name ? 'display:none':''}" data-col="name">${escapeHTML(r.name || "")}</td>
+        <td style="${!unitsState.visibleCols.shortName ? 'display:none':''}" data-col="shortName">${escapeHTML(r.shortName || "")}</td>
+        <td style="${!unitsState.visibleCols.allowDecimal ? 'display:none':''}" data-col="allowDecimal">
+          <span class="badge ${r.allowDecimal ? 'badge-yes':'badge-no'}">${r.allowDecimal ? 'Yes':'No'}</span>
         </td>
-        <td class="actions" style="\${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
-          <button class="icon-btn icon-edit"   title="Edit"   onclick="openUnitModal('\${r.id}')">
+        <td class="actions" style="${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
+          <button class="icon-btn icon-edit" title="Edit" onclick="openUnitModal('${r.id}')">
             <i class="fas fa-pen"></i>
           </button>
-          <button class="icon-btn icon-delete" title="Delete" onclick="openDeleteUnit('\${r.id}', '\${escapeHTML(r.name || '')}')">
+          <button class="icon-btn icon-delete" title="Delete" onclick="openDeleteUnit('${r.id}', '${escapeHTML(r.name || '')}')">
             <i class="fas fa-trash"></i>
           </button>
         </td>
       </tr>
-    \`).join("");
+    `).join("");
   }
 
-  const showing = total ? \`\${start + 1} to \${end} of \${total}\` : \`0 of 0\`;
-  info.textContent = \`Showing \${showing} entries\`;
+  const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
+  info.textContent = `Showing ${showing} entries`;
 
   // ensure header visibility matches toggles
   ["name","shortName","allowDecimal","actions"].forEach(k => {
-    const th = document.querySelector(\`#unitsTable thead [data-col="\${k}"]\`);
+    const th = document.querySelector(`#unitsTable thead [data-col="${k}"]`);
     if (th) th.style.display = unitsState.visibleCols[k] ? "" : "none";
   });
 }
@@ -4329,12 +4328,14 @@ function openUnitModal(id = null) {
   }
   document.getElementById("unitModal").style.display = "block";
 }
+
 function openDeleteUnit(id, name) {
   document.getElementById("unitDeleteModal").dataset.id = id;
   document.getElementById("unitDeleteText").textContent =
-    \`Delete unit "\${name}"? This cannot be undone.\`;
+    `Delete unit "${name}"? This cannot be undone.`;
   document.getElementById("unitDeleteModal").style.display = "block";
 }
+
 async function confirmDeleteUnit() {
   const id = document.getElementById("unitDeleteModal").dataset.id;
   try {
@@ -4347,6 +4348,7 @@ async function confirmDeleteUnit() {
     alert(e.message || "Delete failed");
   }
 }
+
 function closeModal(id) {
   const m = document.getElementById(id);
   if (m) m.style.display = "none";
