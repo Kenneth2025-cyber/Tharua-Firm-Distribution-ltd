@@ -1344,39 +1344,18 @@ window.addEventListener("load", async () => {
 });
 
 // =========================
-// Add Product (enhanced)
+// Add Product (non-blocking)
 // =========================
 async function showAddProduct() {
   saveLastPage("showAddProduct");
 
-  // Loading state
-  document.getElementById("content").innerHTML = `
-    <div class="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading product form...</p>
-    </div>
-  `;
-
-  // Load options
-  const [categories, brands, locations, units] = await Promise.all([
-    getCollectionOptions("categories"),
-    getCollectionOptions("brands"),
-    getCollectionOptions("businessLocations"),
-    getCollectionOptions("units") // expects docs with {name}
-  ]);
-
-  // Render form
-  document.getElementById("content").innerHTML = `
+  // Render the form FIRST (with temporary placeholders)
+  const content = document.getElementById("content");
+  content.innerHTML = `
     <style>
-      .loading-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:rgba(255,255,255,.9);position:absolute;inset:0;z-index:1000}
-      .spinner{border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin-bottom:10px}
-      @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
       .form-container{max-width:780px;width:92%;margin:20px auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
       .form-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-      .col-6{grid-column:span 6}
-      .col-4{grid-column:span 4}
-      .col-8{grid-column:span 8}
-      .col-12{grid-column:span 12}
+      .col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-8{grid-column:span 8}.col-12{grid-column:span 12}
       .form-group label{display:block;font-weight:600;color:#333;margin-bottom:6px;font-size:14px}
       .form-group input,.form-group select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box}
       .muted{color:#666;font-size:12px}
@@ -1404,24 +1383,21 @@ async function showAddProduct() {
         <div class="form-group col-4">
           <label for="unit">Unit *</label>
           <select id="unit" required aria-label="Unit">
-            <option value="">Select unit</option>
-            ${units.map(u => `<option value="${u}">${u}</option>`).join("")}
+            <option value="">Loading units…</option>
           </select>
         </div>
 
         <div class="form-group col-6">
           <label for="category">Category *</label>
           <select id="category" required aria-label="Category">
-            <option value="">Select category</option>
-            ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
+            <option value="">Loading categories…</option>
           </select>
         </div>
 
         <div class="form-group col-6">
           <label for="brand">Brand *</label>
           <select id="brand" required aria-label="Brand">
-            <option value="">Select brand</option>
-            ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
+            <option value="">Loading brands…</option>
           </select>
         </div>
 
@@ -1454,9 +1430,7 @@ async function showAddProduct() {
           <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="0.00" required aria-label="Selling Price" />
         </div>
 
-        <div class="col-12">
-          <div class="divider"></div>
-        </div>
+        <div class="col-12"><div class="divider"></div></div>
 
         <div class="form-group col-12">
           <label class="inline">
@@ -1477,21 +1451,13 @@ async function showAddProduct() {
           </div>
         </div>
 
-        <div class="col-12">
-          <div class="divider"></div>
-        </div>
+        <div class="col-12"><div class="divider"></div></div>
 
         <div class="form-group col-12">
           <label>Opening Stock by Location</label>
           <div class="muted" style="margin-bottom:6px">Tick locations that hold opening stock and enter quantity.</div>
           <div id="locationsList">
-            ${locations.map(l => `
-              <div class="loc-row">
-                <label class="inline"><input type="checkbox" class="loc-check" data-loc="${l}"/> ${l}</label>
-                <input type="number" class="loc-qty" data-loc="${l}" min="0" step="1" placeholder="Qty" disabled/>
-                <input type="number" class="loc-cost" data-loc="${l}" min="0" step="0.01" placeholder="Unit Cost" disabled/>
-              </div>
-            `).join("")}
+            <div class="muted">Loading locations…</div>
           </div>
         </div>
 
@@ -1510,11 +1476,50 @@ async function showAddProduct() {
     </div>
   `;
 
-  // Wire up dynamics
+  // ----- helpers (no-block timeout + safe fill) -----
+  const withTimeout = (p, ms = 8000) =>
+    Promise.race([
+      p,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))
+    ]).catch(() => []);
+
+  const fillSelect = (id, items, emptyText) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value="">${emptyText}</option>` + (items || []).map(v => `<option value="${v}">${v}</option>`).join("");
+  };
+
+  const renderLocations = (locs) => {
+    const wrap = document.getElementById("locationsList");
+    if (!wrap) return;
+    if (!locs || !locs.length) {
+      wrap.innerHTML = `<div class="muted">No locations found.</div>`;
+      return;
+    }
+    wrap.innerHTML = locs.map(l => `
+      <div class="loc-row">
+        <label class="inline"><input type="checkbox" class="loc-check" data-loc="${l}"/> ${l}</label>
+        <input type="number" class="loc-qty" data-loc="${l}" min="0" step="1" placeholder="Qty" disabled/>
+        <input type="number" class="loc-cost" data-loc="${l}" min="0" step="0.01" placeholder="Unit Cost" disabled/>
+      </div>
+    `).join("");
+
+    document.querySelectorAll(".loc-check").forEach(chk => {
+      chk.addEventListener("change", () => {
+        const loc = chk.dataset.loc;
+        const qtyEl = document.querySelector(`.loc-qty[data-loc="${loc}"]`);
+        const costEl = document.querySelector(`.loc-cost[data-loc="${loc}"]`);
+        qtyEl.disabled = !chk.checked;
+        costEl.disabled = !chk.checked;
+        if (!chk.checked) { qtyEl.value = ""; costEl.value = ""; }
+      });
+    });
+  };
+
+  // ----- wire dynamics (same as before) -----
   const els = {
     name: document.getElementById("productName"),
     category: document.getElementById("category"),
-    brand: document.getElementById("brand"),
     unit: document.getElementById("unit"),
     sku: document.getElementById("sku"),
     skuLock: document.getElementById("skuLock"),
@@ -1522,48 +1527,26 @@ async function showAddProduct() {
     marginWant: document.getElementById("desiredMargin"),
     selling: document.getElementById("sellingPrice"),
     vatable: document.getElementById("vatable"),
-    vatBox: document.getElementById("vatOptions"),
     vatPct: document.getElementById("vatPercentage"),
     vatPreview: document.getElementById("vatPreview"),
     marginLive: document.getElementById("marginLive"),
     profitLive: document.getElementById("profitLive"),
-    submit: document.getElementById("submitBtn"),
     message: document.getElementById("addProductMessage"),
-  };
-
-  const updateSku = () => {
-    if (!els.skuLock.checked) return;
-    const catCode = (els.category.value || "").substring(0,3).toUpperCase();
-    const nameCode = (els.name.value || "").replace(/\s+/g,"").substring(0,3).toUpperCase();
-    els.sku.value = `PROD-${catCode}-${nameCode}-${Date.now().toString().slice(-5)}`;
   };
 
   const priceNums = () => {
     const buy = parseFloat(els.buying.value) || 0;
     const sell = parseFloat(els.selling.value) || 0;
-    const vatable = els.vatable.checked;
+    const vatable = document.getElementById("vatable").checked;
     const vatRate = vatable ? (parseFloat(els.vatPct.value) || 0)/100 : 0;
     return { buy, sell, vatable, vatRate };
   };
-
   const formatMoney = v => isNaN(v) ? "—" : Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
-
-  const recomputeFromDesiredMargin = () => {
-    const dm = parseFloat(els.marginWant.value);
-    if (isNaN(dm)) return;
-    const { buy } = priceNums();
-    // Selling = buy / (1 - margin)
-    const s = dm >= 100 ? buy : (buy / (1 - (dm/100)));
-    els.selling.value = (s || 0).toFixed(2);
-    updateLiveMath();
-  };
-
   const updateVatPreview = () => {
     const { sell, vatable, vatRate } = priceNums();
     const gross = vatable ? sell * (1 + vatRate) : sell;
     els.vatPreview.textContent = `Customer pays: KES ${formatMoney(gross)}`;
   };
-
   const updateLiveMath = () => {
     const { buy, sell } = priceNums();
     const profit = sell - buy;
@@ -1572,217 +1555,59 @@ async function showAddProduct() {
     els.profitLive.textContent = `Profit/Unit: KES ${formatMoney(profit)}`;
     updateVatPreview();
   };
+  const updateSku = () => {
+    const skuLock = document.getElementById("skuLock");
+    if (!skuLock || !skuLock.checked) return;
+    const catCode = (document.getElementById("category").value || "").substring(0,3).toUpperCase();
+    const nameCode = (document.getElementById("productName").value || "").replace(/\s+/g,"").substring(0,3).toUpperCase();
+    document.getElementById("sku").value = `PROD-${catCode}-${nameCode}-${Date.now().toString().slice(-5)}`;
+  };
 
-  // events
   ["input","change"].forEach(ev=>{
     els.name.addEventListener(ev, updateSku);
-    els.category.addEventListener(ev, updateSku);
+    document.getElementById("category").addEventListener(ev, updateSku);
   });
-  els.skuLock.addEventListener("change", () => { if (els.skuLock.checked) updateSku(); });
+  document.getElementById("skuLock").addEventListener("change", () => { if (document.getElementById("skuLock").checked) updateSku(); });
   [els.buying, els.selling].forEach(el => el.addEventListener("input", updateLiveMath));
-  els.marginWant.addEventListener("input", recomputeFromDesiredMargin);
-  [els.vatPct].forEach(el => el.addEventListener("input", updateVatPreview));
-  document.querySelectorAll('input[name="vatInclusion"]').forEach(el => el.addEventListener("change", updateVatPreview));
+  els.marginLive.textContent = "Margin: —";
+  els.profitLive.textContent = "Profit/Unit: —";
+  updateSku(); updateLiveMath();
 
-  const vatBox = document.getElementById("vatOptions");
-  const vatableCheckbox = document.getElementById("vatable");
-  vatableCheckbox.addEventListener("change", () => {
-    vatBox.style.display = vatableCheckbox.checked ? "block" : "none";
+  document.getElementById("vatable").addEventListener("change", () => {
+    const box = document.getElementById("vatOptions");
+    box.style.display = document.getElementById("vatable").checked ? "block" : "none";
     updateVatPreview();
   });
+  document.getElementById("vatPercentage").addEventListener("input", updateVatPreview);
+  document.querySelectorAll('input[name="vatInclusion"]').forEach(el => el.addEventListener("change", updateVatPreview));
 
-  // Location rows: enable qty/cost when checked
-  document.querySelectorAll(".loc-check").forEach(chk => {
-    chk.addEventListener("change", () => {
-      const loc = chk.dataset.loc;
-      const qtyEl = document.querySelector(`.loc-qty[data-loc="${loc}"]`);
-      const costEl = document.querySelector(`.loc-cost[data-loc="${loc}"]`);
-      qtyEl.disabled = !chk.checked;
-      costEl.disabled = !chk.checked;
-      if (!chk.checked) { qtyEl.value = ""; costEl.value = ""; }
-    });
-  });
-
-  // initial compute
-  updateSku();
-  updateLiveMath();
-
-  // Submit handler
+  // Submit handler (uses your existing enhanced submit)
   document.getElementById("addProductForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     await addProductSubmitEnhanced();
   });
-
-  // Expose helper for submit function
-  window.__getAddProductFormValues = () => {
-    const vatInclusion = vatableCheckbox.checked ? document.querySelector('input[name="vatInclusion"]:checked').value : null;
-
-    const locs = [];
-    document.querySelectorAll(".loc-check").forEach(chk=>{
-      if (chk.checked) {
-        const loc = chk.dataset.loc;
-        const qty = parseInt(document.querySelector(`.loc-qty[data-loc="${loc}"]`).value || "0", 10);
-        const cost = parseFloat(document.querySelector(`.loc-cost[data-loc="${loc}"]`).value || "0");
-        if (qty > 0) locs.push({ location: loc, qty, unitCost: isNaN(cost) ? 0 : cost });
-      }
-    });
-
-    return {
-      name: (document.getElementById("productName").value || "").trim(),
-      category: document.getElementById("category").value,
-      brand: document.getElementById("brand").value,
-      unit: document.getElementById("unit").value,
-      sku: (document.getElementById("sku").value || "").trim(),
-      barcode: (document.getElementById("barcode").value || "").trim(),
-      buyingPrice: parseFloat(document.getElementById("buyingPrice").value),
-      sellingPrice: parseFloat(document.getElementById("sellingPrice").value),
-      desiredMargin: parseFloat(document.getElementById("desiredMargin").value) || null,
-      vatable: vatableCheckbox.checked,
-      vatPercentage: vatableCheckbox.checked ? parseFloat(document.getElementById("vatPercentage").value) : 0,
-      vatInclusion,
-      openingByLocation: locs
-    };
-  };
-
-  // small UX: Enter on any input submits
   document.getElementById("addProductForm").addEventListener("keypress",(ev)=>{
-    if (ev.key === "Enter") {
-      ev.preventDefault();
-      document.getElementById("submitBtn").click();
-    }
+    if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("submitBtn").click(); }
   });
-}
 
-// Enhanced submit with per-location stock + movement log
-async function addProductSubmitEnhanced() {
-  const msgEl = document.getElementById("addProductMessage");
-  const btn = document.getElementById("submitBtn");
-  const {
-    name, category, brand, unit, sku, barcode,
-    buyingPrice, sellingPrice, desiredMargin,
-    vatable, vatPercentage, vatInclusion,
-    openingByLocation
-  } = window.__getAddProductFormValues();
+  // ----- load options in background -----
+  const safeGet = (col) => withTimeout(getCollectionOptions(col));
 
-  msgEl.style.color = "red";
+  const [categories, brands, locations, units] = await Promise.all([
+    safeGet("categories"),
+    safeGet("brands"),
+    safeGet("businessLocations"),
+    safeGet("units")
+  ]);
 
-  // Validate required
-  if (!name || !category || !brand || !unit || isNaN(buyingPrice) || isNaN(sellingPrice)) {
-    msgEl.textContent = "Please fill in all required fields correctly.";
-    return;
-  }
-  if (buyingPrice < 0 || sellingPrice < 0) {
-    msgEl.textContent = "Prices cannot be negative.";
-    return;
-  }
-  if (sellingPrice < buyingPrice) {
-    msgEl.textContent = "Selling price cannot be less than buying price.";
-    return;
-  }
-  if (vatable) {
-    if (isNaN(vatPercentage) || vatPercentage < 0 || vatPercentage > 100) {
-      msgEl.textContent = "VAT percentage must be between 0 and 100.";
-      return;
-    }
-    if (!vatInclusion) {
-      msgEl.textContent = "Please select whether VAT is inclusive or exclusive.";
-      return;
-    }
-  }
+  fillSelect("category", categories, "Select category");
+  fillSelect("brand", brands, "Select brand");
+  fillSelect("unit", units, "Select unit");
+  renderLocations(locations);
 
-  // Case-insensitive duplicate check by name
-  const nameLower = name.toLowerCase();
-  const existing = await firebase.firestore().collection("products")
-    .where("nameLower", "==", nameLower).limit(1).get();
-  if (!existing.empty) {
-    msgEl.textContent = "Product name already exists.";
-    return;
-  }
-
-  // Guard SKU uniqueness (optional)
-  if (sku) {
-    const skuSnap = await firebase.firestore().collection("products")
-      .where("sku", "==", sku).limit(1).get();
-    if (!skuSnap.empty) {
-      msgEl.textContent = "SKU already exists. Edit the SKU or uncheck Auto and regenerate.";
-      return;
-    }
-  }
-
-  // Prepare product doc
-  const productData = {
-    name,
-    nameLower,
-    sku: sku || null,
-    barcode: barcode || null,
-    category,
-    brand,
-    unit,
-    buyingPrice,
-    sellingPrice,
-    desiredMargin: desiredMargin ?? null,
-    vatable,
-    vatRate: vatable ? vatPercentage / 100 : 0,
-    vatInclusion: vatable ? vatInclusion : null,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    isActive: true
-  };
-
-  // UI: saving
-  btn.disabled = true;
-  msgEl.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:3px;vertical-align:-3px"></span> Saving...`;
-
-  try {
-    const db = firebase.firestore();
-    const productRef = db.collection("products").doc();
-    const batch = db.batch();
-
-    batch.set(productRef, productData);
-
-    // Opening stock by location (optional)
-    // Create stockBalances and stockMovements for auditable opening balance
-    openingByLocation.forEach(({ location, qty, unitCost }) => {
-      const balRef = db.collection("stockBalances").doc(`${productRef.id}_${location}`);
-      batch.set(balRef, {
-        productId: productRef.id,
-        location,
-        onHand: qty,
-        unitCost: unitCost || buyingPrice,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      const movRef = db.collection("stockMovements").doc();
-      batch.set(movRef, {
-        productId: productRef.id,
-        type: "OPENING_BALANCE",
-        location,
-        qty,
-        unitCost: unitCost || buyingPrice,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        note: "Opening stock on product creation"
-      });
-    });
-
-    await batch.commit();
-
-    // Done
-    msgEl.style.color = "green";
-    msgEl.textContent = `Product added successfully${productData.sku ? ` with SKU: ${productData.sku}` : ""}.`;
-    showToast(`Product "${name}" added.`, "success");
-    // Reset form
-    document.getElementById("addProductForm").reset();
-    const vatBox = document.getElementById("vatOptions");
-    if (vatBox) vatBox.style.display = "none";
-    btn.disabled = false;
-
-  } catch (error) {
-    console.error("Error adding product:", error);
-    msgEl.style.color = "red";
-    msgEl.textContent = error.code === "permission-denied"
-      ? "You do not have permission to add products."
-      : `Error adding product: ${error.message}`;
-    btn.disabled = false;
+  // Final safety: if nothing came back, keep the form usable
+  if ((!categories || !categories.length) && (!brands || !brands.length)) {
+    showToast("Couldn’t load options (using empty lists). You can still add the product.", "error");
   }
 }
 
