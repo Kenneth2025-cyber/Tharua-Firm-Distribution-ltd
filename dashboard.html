@@ -9487,7 +9487,9 @@ async function showInventoryReport() {
   });
 
   await loadInventoryProducts(); // products only
-  renderInventory();
+  await loadInventoryFilters();  // ← populate filter dropdowns
+  wireInventoryFilterEvents();   // ← listen for changes
+  applyInventoryFilters();       // ← compute filtered + render
 }
 
 // ---------- Firestore I/O (products only) ----------
@@ -9515,6 +9517,62 @@ async function loadInventoryProducts() {
   inventoryState.currentPage = 1;
 }
 
+// ---------- Filters (functional) ----------
+async function loadInventoryFilters(){
+  try{
+    const [locSnap, catSnap, brandSnap] = await Promise.all([
+      firebase.firestore().collection("businessLocations").get(),
+      firebase.firestore().collection("categories").get(),
+      firebase.firestore().collection("brands").get(),
+    ]);
+    const locSel = document.getElementById("filterLocation");
+    const catSel = document.getElementById("filterCategory");
+    const brSel  = document.getElementById("filterBrand");
+    if(!locSel || !catSel || !brSel) return;
+
+    const addOpts = (sel, snap, key="name") => {
+      const seen = new Set();
+      snap.forEach(doc=>{
+        const v = (doc.data()?.[key] || "").trim();
+        if(!v || seen.has(v)) return;
+        seen.add(v);
+        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`);
+      });
+    };
+    addOpts(locSel, locSnap, "name");
+    addOpts(catSel, catSnap, "name");
+    addOpts(brSel,  brandSnap, "name");
+  }catch(e){ /* silent */ }
+}
+
+function wireInventoryFilterEvents(){
+  const locSel = document.getElementById("filterLocation");
+  const catSel = document.getElementById("filterCategory");
+  const brSel  = document.getElementById("filterBrand");
+  if (locSel) locSel.addEventListener("change", applyInventoryFilters);
+  if (catSel) catSel.addEventListener("change", applyInventoryFilters);
+  if (brSel)  brSel.addEventListener("change", applyInventoryFilters);
+}
+
+function applyInventoryFilters(){
+  const locSel = document.getElementById("filterLocation");
+  const catSel = document.getElementById("filterCategory");
+  const brSel  = document.getElementById("filterBrand");
+  const loc = locSel ? locSel.value : "";
+  const cat = catSel ? catSel.value : "";
+  const br  = brSel  ? brSel.value  : "";
+  const t = (inventoryState.searchTerm || "").toLowerCase();
+
+  inventoryState.filtered = inventoryState.rows
+    .filter(r => !loc || r.location === loc)
+    .filter(r => !cat || r.category === cat)
+    .filter(r => !br  || r.brand === br)
+    .filter(r => !t || inventoryColumns.some(c => String(r[c.key] ?? "").toLowerCase().includes(t)));
+
+  inventoryState.currentPage = 1;
+  renderInventory();
+}
+
 // ---------- UI Handlers ----------
 function changeInventoryPerPage(v) {
   inventoryState.itemsPerPage = (v === "all") ? "all" : parseInt(v, 10);
@@ -9523,13 +9581,9 @@ function changeInventoryPerPage(v) {
 }
 
 function searchInventory(term) {
-  const t = term.trim().toLowerCase();
+  const t = term.trim();
   inventoryState.searchTerm = t;
-  inventoryState.filtered = inventoryState.rows.filter(r =>
-    inventoryColumns.some(c => String(r[c.key] ?? "").toLowerCase().includes(t))
-  );
-  inventoryState.currentPage = 1;
-  renderInventory();
+  applyInventoryFilters(); // ← combine search with selected filters
 }
 
 function inventoryPrevPage() {
@@ -9573,7 +9627,7 @@ function renderInventory() {
     end = Math.min(start + ipp, total);
     btnPrev.disabled = inventoryState.currentPage <= 1;
     btnNext.disabled = inventoryState.currentPage >= pages;
-  } else { btnPrev.disabled = true; btnNext.disabled = true; }
+  } else { btnPrev.disabled = true; btnNext disabled = true; }
 
   const slice = inventoryState.filtered.slice(start, end);
 
