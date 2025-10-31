@@ -768,8 +768,10 @@ button {
     <a onclick="showBrand()"><span>Brand</span></a>
     <a onclick="showPriceList()"><span>Price List</span></a>
     <a onclick="showPriceGroups()"><span>Price Groups</span></a>
+    <a onclick="showUnits()"><span>Units</span></a>
   </div>
 </div>
+
 
     <a onclick="clearContent()"><i class="fas fa-industry"></i> <span>Manufacturing</span></a>
     <div class="dropdown">
@@ -3973,6 +3975,468 @@ async function togglePriceGroup(id, active) {
   showSuccessNotification(`Price Group ${active ? "deactivated" : "activated"}.`);
   showPriceGroups();
 }
+
+
+// ---------- Units Page State ----------
+const unitsState = {
+  rows: [],
+  filtered: [],
+  currentPage: 1,
+  itemsPerPage: 25,
+  searchTerm: "",
+  visibleCols: { name:true, shortName:true, allowDecimal:true, actions:true },
+};
+
+// ---------- Page Entrypoint ----------
+async function showUnits() {
+  saveLastPage("showUnits");
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <style>
+      .units-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
+      .units-header h2 { margin:0; }
+      .units-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+      .units-toolbar .btn { border:none; padding:8px 12px; border-radius:6px; cursor:pointer; }
+      .btn-primary { background:#5b6ee1; color:#fff; }
+      .btn-outline { background:#fff; border:1px solid #ddd; }
+      .btn-danger { background:#dc3545; color:#fff; }
+      .units-table-wrap { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.06); padding:14px; }
+      .units-flex { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
+      .units-flex .input { padding:8px 10px; border:1px solid #ccc; border-radius:6px; }
+      .units-flex select { min-width:90px; }
+      .col-visibility { position:relative; }
+      .col-panel { position:absolute; top:40px; left:0; background:#fff; border:1px solid #ddd; border-radius:8px; padding:8px 10px; display:none; z-index:10; }
+      .col-panel label { display:flex; gap:8px; align-items:center; padding:4px 2px; }
+      .units-table { width:100%; border-collapse:collapse; }
+      .units-table th, .units-table td { border:1px solid #eee; padding:10px; font-size:14px; }
+      .units-table th { background:#f7f7f7; text-align:left; }
+      .badge { padding:2px 8px; border-radius:14px; font-size:12px; }
+      .badge-yes { background:#e6f4ea; color:#2e7d32; }
+      .badge-no { background:#fde7e9; color:#c62828; }
+      .actions button { margin-right:6px; padding:6px 10px; font-size:12px; border-radius:6px; border:none; cursor:pointer; }
+      .actions .edit { background:#6f42c1; color:#fff; }
+      .actions .delete { background:#ff6b6b; color:#fff; }
+      .pagination-section { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
+      .pagination-section .pager button { padding:8px 12px; border:none; background:#007bff; color:#fff; border-radius:6px; cursor:pointer; }
+      .pagination-section .pager button:disabled { background:#aaa; cursor:not-allowed; }
+      @media (max-width:600px){
+        .units-header { flex-direction:column; align-items:flex-start; gap:8px; }
+        .units-toolbar { width:100%; }
+      }
+      /* Reuse your modal styles already in the file */
+    </style>
+
+    <div class="units-header">
+      <h2>Units <small style="color:#6b7280; font-weight:400;">Manage your units</small></h2>
+      <button class="btn btn-primary" onclick="openUnitModal()">+ Add</button>
+    </div>
+
+    <div class="units-table-wrap">
+      <div class="units-flex">
+        <div>
+          Show
+          <select id="unitsPerPage" class="input" onchange="changeUnitsPerPage(this.value)">
+            <option>10</option><option selected>25</option><option>50</option><option>100</option><option>1000</option><option value="all">All</option>
+          </select>
+          entries
+        </div>
+
+        <div class="units-toolbar">
+          <button class="btn btn-outline" onclick="exportUnitsCSV()">Export CSV</button>
+          <button class="btn btn-outline" onclick="exportUnitsExcel()">Export Excel</button>
+          <button class="btn btn-outline" onclick="printUnits()">Print</button>
+          <div class="col-visibility">
+            <button class="btn btn-outline" onclick="toggleUnitsColPanel()">Column visibility</button>
+            <div id="unitsColPanel" class="col-panel">
+              <label><input type="checkbox" checked onchange="setUnitsCol('name', this.checked)"> Name</label>
+              <label><input type="checkbox" checked onchange="setUnitsCol('shortName', this.checked)"> Short name</label>
+              <label><input type="checkbox" checked onchange="setUnitsCol('allowDecimal', this.checked)"> Allow decimal</label>
+              <label><input type="checkbox" checked onchange="setUnitsCol('actions', this.checked)"> Action</label>
+            </div>
+          </div>
+          <button class="btn btn-outline" onclick="exportUnitsPDF()">Export PDF</button>
+        </div>
+
+        <div style="margin-left:auto">
+          <input id="unitsSearch" class="input" placeholder="Search ..." oninput="searchUnits(this.value)">
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="units-table" id="unitsTable">
+          <thead>
+            <tr>
+              <th data-col="name">Name</th>
+              <th data-col="shortName">Short name</th>
+              <th data-col="allowDecimal">Allow decimal</th>
+              <th data-col="actions" style="width:170px;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="unitsTbody">
+            <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination-section">
+        <div id="unitsInfo"></div>
+        <div class="pager">
+          <button id="unitsPrev" onclick="unitsPrevPage()" disabled>Previous</button>
+          <button id="unitsNext" onclick="unitsNextPage()" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="unitModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('unitModal')">&times;</span>
+        <h2 id="unitModalTitle">Add Unit</h2>
+        <form id="unitForm" onsubmit="submitUnitForm(event)">
+          <input type="hidden" id="unitId">
+          <label>Name</label>
+          <input id="unitName" required>
+          <label>Short name</label>
+          <input id="unitShort" required>
+          <label style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+            <input type="checkbox" id="unitDecimal"> Allow decimal (e.g., 1.5 kg)
+          </label>
+          <div class="modal-buttons" style="margin-top:18px;">
+            <button type="button" class="btn-secondary" onclick="closeModal('unitModal')">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+          <div id="unitFormError" class="error-text" style="display:none;"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirm -->
+    <div id="unitDeleteModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeModal('unitDeleteModal')">&times;</span>
+        <h2>Delete Unit</h2>
+        <p id="unitDeleteText">Are you sure?</p>
+        <div class="modal-buttons">
+          <button class="btn-secondary" onclick="closeModal('unitDeleteModal')">Cancel</button>
+          <button class="btn-danger" onclick="confirmDeleteUnit()">Delete</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // close column panel when clicking outside
+  document.addEventListener("click", (e)=> {
+    const panel = document.getElementById("unitsColPanel");
+    if (!panel) return;
+    const trigger = e.target.closest(".col-visibility");
+    if (!trigger) panel.style.display = "none";
+  });
+
+  await loadUnits();
+  renderUnits();
+}
+
+// ---------- Firestore I/O ----------
+async function loadUnits() {
+  const snap = await firebase.firestore().collection("units").orderBy("name").get();
+  unitsState.rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  unitsState.filtered = [...unitsState.rows];
+  unitsState.currentPage = 1;
+}
+
+async function addUnit(data) {
+  // prevent duplicate name or shortName (case-insensitive)
+  const q = await firebase.firestore().collection("units")
+    .where("nameLower", "==", data.name.toLowerCase()).get();
+  const q2 = await firebase.firestore().collection("units")
+    .where("shortLower", "==", data.shortName.toLowerCase()).get();
+  if (!q.empty || !q2.empty) throw new Error("Unit name or short name already exists.");
+
+  await firebase.firestore().collection("units").add({
+    name: data.name,
+    shortName: data.shortName,
+    allowDecimal: !!data.allowDecimal,
+    nameLower: data.name.toLowerCase(),
+    shortLower: data.shortName.toLowerCase(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function updateUnit(id, data) {
+  await firebase.firestore().collection("units").doc(id).update({
+    name: data.name,
+    shortName: data.shortName,
+    allowDecimal: !!data.allowDecimal,
+    nameLower: data.name.toLowerCase(),
+    shortLower: data.shortName.toLowerCase(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function deleteUnit(id) {
+  await firebase.firestore().collection("units").doc(id).delete();
+}
+
+// ---------- UI Handlers ----------
+function changeUnitsPerPage(v) {
+  unitsState.itemsPerPage = (v === "all") ? "all" : parseInt(v,10);
+  unitsState.currentPage = 1;
+  renderUnits();
+}
+
+function searchUnits(term) {
+  unitsState.searchTerm = term.trim().toLowerCase();
+  const t = unitsState.searchTerm;
+  unitsState.filtered = unitsState.rows.filter(r =>
+    (r.name || "").toLowerCase().includes(t) ||
+    (r.shortName || "").toLowerCase().includes(t) ||
+    (r.allowDecimal ? "yes" : "no").includes(t)
+  );
+  unitsState.currentPage = 1;
+  renderUnits();
+}
+
+function unitsPrevPage() {
+  if (unitsState.currentPage > 1) { unitsState.currentPage--; renderUnits(); }
+}
+function unitsNextPage() {
+  const total = unitsState.filtered.length;
+  const ipp = unitsState.itemsPerPage === "all" ? total : unitsState.itemsPerPage;
+  const pages = Math.max(1, Math.ceil(total / ipp));
+  if (unitsState.currentPage < pages) { unitsState.currentPage++; renderUnits(); }
+}
+
+function toggleUnitsColPanel() {
+  const p = document.getElementById("unitsColPanel");
+  p.style.display = (p.style.display === "block" ? "none" : "block");
+}
+function setUnitsCol(key, val) {
+  unitsState.visibleCols[key] = !!val;
+  // hide/show headers
+  document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
+    th.style.display = val ? "" : "none";
+  });
+  // rows are re-rendered to apply visibility
+  renderUnits();
+}
+
+// ---------- Render ----------
+function renderUnits() {
+  const tbody = document.getElementById("unitsTbody");
+  const info = document.getElementById("unitsInfo");
+  const btnPrev = document.getElementById("unitsPrev");
+  const btnNext = document.getElementById("unitsNext");
+
+  const total = unitsState.filtered.length;
+  let start = 0, end = total;
+  if (unitsState.itemsPerPage !== "all") {
+    const ipp = unitsState.itemsPerPage;
+    const pages = Math.max(1, Math.ceil(total / ipp));
+    unitsState.currentPage = Math.min(unitsState.currentPage, pages);
+    start = (unitsState.currentPage - 1) * ipp;
+    end = Math.min(start + ipp, total);
+    btnPrev.disabled = unitsState.currentPage <= 1;
+    btnNext.disabled = unitsState.currentPage >= pages;
+  } else {
+    btnPrev.disabled = true; btnNext.disabled = true;
+  }
+
+  const slice = unitsState.filtered.slice(start, end);
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(r => `
+      <tr>
+        <td style="${!unitsState.visibleCols.name ? 'display:none':''}" data-col="name">${escapeHTML(r.name || "")}</td>
+        <td style="${!unitsState.visibleCols.shortName ? 'display:none':''}" data-col="shortName">${escapeHTML(r.shortName || "")}</td>
+        <td style="${!unitsState.visibleCols.allowDecimal ? 'display:none':''}" data-col="allowDecimal">
+          <span class="badge ${r.allowDecimal ? 'badge-yes':'badge-no'}">${r.allowDecimal ? 'Yes':'No'}</span>
+        </td>
+        <td class="actions" style="${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
+          <button class="edit" onclick="openUnitModal('${r.id}')">Edit</button>
+          <button class="delete" onclick="openDeleteUnit('${r.id}', '${escapeHTML(r.name || '')}')">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  const showing = total ? `${start+1} to ${end} of ${total}` : `0 of 0`;
+  info.textContent = `Showing ${showing} entries`;
+
+  // ensure header visibility matches toggles
+  ["name","shortName","allowDecimal","actions"].forEach(k=>{
+    const th = document.querySelector(`#unitsTable thead [data-col="${k}"]`);
+    if (th) th.style.display = unitsState.visibleCols[k] ? "" : "none";
+  });
+}
+
+// ---------- Modal Logic ----------
+function openUnitModal(id=null) {
+  const title = document.getElementById("unitModalTitle");
+  const idEl = document.getElementById("unitId");
+  const nameEl = document.getElementById("unitName");
+  const shortEl = document.getElementById("unitShort");
+  const decEl = document.getElementById("unitDecimal");
+  const err = document.getElementById("unitFormError");
+  err.style.display = "none"; err.textContent = "";
+
+  if (id) {
+    const row = unitsState.rows.find(r => r.id === id);
+    title.textContent = "Edit Unit";
+    idEl.value = id;
+    nameEl.value = row?.name || "";
+    shortEl.value = row?.shortName || "";
+    decEl.checked = !!row?.allowDecimal;
+  } else {
+    title.textContent = "Add Unit";
+    idEl.value = "";
+    nameEl.value = "";
+    shortEl.value = "";
+    decEl.checked = false;
+  }
+  document.getElementById("unitModal").style.display = "block";
+}
+function openDeleteUnit(id, name) {
+  document.getElementById("unitDeleteModal").dataset.id = id;
+  document.getElementById("unitDeleteText").textContent =
+    `Delete unit "${name}"? This cannot be undone.`;
+  document.getElementById("unitDeleteModal").style.display = "block";
+}
+async function confirmDeleteUnit() {
+  const id = document.getElementById("unitDeleteModal").dataset.id;
+  try {
+    await deleteUnit(id);
+    closeModal("unitDeleteModal");
+    showSuccessNotification("Unit deleted.");
+    await loadUnits();
+    renderUnits();
+  } catch (e) {
+    alert(e.message || "Delete failed");
+  }
+}
+function closeModal(id) {
+  const m = document.getElementById(id);
+  if (m) m.style.display = "none";
+}
+
+async function submitUnitForm(e) {
+  e.preventDefault();
+  const id = document.getElementById("unitId").value;
+  const name = document.getElementById("unitName").value.trim();
+  const shortName = document.getElementById("unitShort").value.trim();
+  const allowDecimal = document.getElementById("unitDecimal").checked;
+  const err = document.getElementById("unitFormError");
+
+  if (!name || !shortName) {
+    err.textContent = "Please provide name and short name.";
+    err.style.display = "block";
+    return;
+  }
+  if (shortName.length > 12) {
+    err.textContent = "Short name is too long.";
+    err.style.display = "block";
+    return;
+  }
+
+  try {
+    if (id) {
+      await updateUnit(id, { name, shortName, allowDecimal });
+      showSuccessNotification("Unit updated.");
+    } else {
+      await addUnit({ name, shortName, allowDecimal });
+      showSuccessNotification("Unit added.");
+    }
+    closeModal("unitModal");
+    await loadUnits();
+    searchUnits(unitsState.searchTerm); // keeps filters active
+  } catch (e) {
+    err.textContent = e.message || "Failed to save unit.";
+    err.style.display = "block";
+  }
+}
+
+// ---------- Exports & Print ----------
+function exportUnitsCSV() {
+  const cols = ["name","shortName","allowDecimal"].filter(c => unitsState.visibleCols[c]);
+  const header = cols.map(h => ({
+    name:"Name", shortName:"Short name", allowDecimal:"Allow decimal"
+  }[h])).join(",");
+  const rows = unitsState.filtered.map(r => cols.map(c => {
+    let v = (c === "allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (r[c] || "");
+    v = String(v).replace(/"/g,'""');
+    return `"${v}"`;
+  }).join(","));
+  const csv = [header, ...rows].join("\n");
+  downloadBlob(csv, "units.csv", "text/csv;charset=utf-8;");
+}
+
+function exportUnitsExcel() {
+  // Simple Excel-compatible HTML table
+  const cols = ["name","shortName","allowDecimal"].filter(c => unitsState.visibleCols[c]);
+  const head = cols.map(c=> `<th>${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>`).join("");
+  const body = unitsState.filtered.map(r=> `
+    <tr>
+      ${cols.map(c=>{
+        let v = (c==="allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (escapeHTML(r[c]||""));
+        return `<td>${v}</td>`;
+      }).join("")}
+    </tr>`).join("");
+  const html = `
+    <html><head><meta charset="UTF-8"></head>
+    <body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+  downloadBlob(html, "units.xls", "application/vnd.ms-excel");
+}
+
+function exportUnitsPDF() {
+  // Quick PDF via print-friendly window; users can "Save as PDF"
+  const w = window.open("", "_blank");
+  const cols = ["Name","Short name","Allow decimal"].filter((_,i)=>{
+    return [unitsState.visibleCols.name, unitsState.visibleCols.shortName, unitsState.visibleCols.allowDecimal][i];
+  });
+  const rows = unitsState.filtered.map(r=>[
+    unitsState.visibleCols.name ? escapeHTML(r.name||"") : null,
+    unitsState.visibleCols.shortName ? escapeHTML(r.shortName||"") : null,
+    unitsState.visibleCols.allowDecimal ? (r.allowDecimal?"Yes":"No") : null
+  ].filter(x=>x!==null));
+
+  w.document.write(`
+    <html><head><title>Units</title>
+    <style>
+      body{font-family:Arial, sans-serif; padding:16px;}
+      table{width:100%; border-collapse:collapse;}
+      th,td{border:1px solid #333; padding:8px; font-size:12px;}
+      th{background:#eee;}
+      h2{margin:0 0 10px;}
+    </style>
+    </head><body>
+      <h2>Units</h2>
+      <table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}
+      </tbody></table>
+      <script>window.onload = () => window.print();<\/script>
+    </body></html>
+  `);
+  w.document.close();
+}
+
+function printUnits() {
+  exportUnitsPDF(); // same flow; opens print dialog
+}
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+}
+
+// ---------- Utility ----------
+function escapeHTML(str) {
+  return (str||"").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+
 
 
 function togglePurchases() {
