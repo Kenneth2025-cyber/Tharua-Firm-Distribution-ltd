@@ -1344,12 +1344,12 @@ window.addEventListener("load", async () => {
 });
 
 // =========================
-// Add Product (non-blocking)
+// ADD PRODUCT PAGE (integrated + simplified)
 // =========================
 async function showAddProduct() {
   saveLastPage("showAddProduct");
 
-  // Render the form FIRST (with temporary placeholders)
+  // Render form immediately
   const content = document.getElementById("content");
   content.innerHTML = `
     <style>
@@ -1358,16 +1358,13 @@ async function showAddProduct() {
       .col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-8{grid-column:span 8}.col-12{grid-column:span 12}
       .form-group label{display:block;font-weight:600;color:#333;margin-bottom:6px;font-size:14px}
       .form-group input,.form-group select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box}
+      .form-group select[multiple]{height:120px;padding:6px}
       .muted{color:#666;font-size:12px}
       .inline{display:flex;gap:8px;align-items:center}
       .pill{display:inline-block;padding:6px 10px;border:1px solid #e5e7eb;border-radius:999px;font-size:12px}
       .divider{height:1px;background:#eee;margin:8px 0 4px}
-      .loc-row{display:grid;grid-template-columns:1.2fr .8fr .8fr;gap:8px;align-items:center;margin-bottom:8px}
-      .loc-row input[type="number"]{text-align:right}
-      .submit-btn{background:#3498db;color:#fff;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:16px;width:100%;transition:background .2s}
+      .submit-btn{background:#3498db;color:#fff;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:16px;width:100%}
       .submit-btn[disabled]{opacity:.6;cursor:not-allowed}
-      .submit-btn:hover{background:#2980b9}
-      #addProductMessage{margin-top:12px;text-align:center;font-size:14px}
       @media(max-width:720px){.form-grid{grid-template-columns:repeat(6,1fr)}.col-6{grid-column:span 6}.col-4{grid-column:span 6}.col-8{grid-column:span 6}}
     </style>
 
@@ -1377,26 +1374,26 @@ async function showAddProduct() {
       <form id="addProductForm" class="form-grid">
         <div class="form-group col-8">
           <label for="productName">Product Name *</label>
-          <input type="text" id="productName" placeholder="Enter product name" required aria-label="Product Name" />
+          <input type="text" id="productName" placeholder="Enter product name" required/>
         </div>
 
         <div class="form-group col-4">
           <label for="unit">Unit *</label>
-          <select id="unit" required aria-label="Unit">
+          <select id="unit" required>
             <option value="">Loading units…</option>
           </select>
         </div>
 
         <div class="form-group col-6">
           <label for="category">Category *</label>
-          <select id="category" required aria-label="Category">
+          <select id="category" required>
             <option value="">Loading categories…</option>
           </select>
         </div>
 
         <div class="form-group col-6">
           <label for="brand">Brand *</label>
-          <select id="brand" required aria-label="Brand">
+          <select id="brand" required>
             <option value="">Loading brands…</option>
           </select>
         </div>
@@ -1404,7 +1401,7 @@ async function showAddProduct() {
         <div class="form-group col-6">
           <label for="sku">SKU</label>
           <div class="inline">
-            <input type="text" id="sku" placeholder="Auto-generated" aria-label="SKU" />
+            <input type="text" id="sku" placeholder="Auto-generated"/>
             <label class="muted inline"><input type="checkbox" id="skuLock" checked/> Auto</label>
           </div>
           <div class="muted">Auto builds from Category + Name. Uncheck to edit.</div>
@@ -1412,35 +1409,49 @@ async function showAddProduct() {
 
         <div class="form-group col-6">
           <label for="barcode">Barcode (optional)</label>
-          <input type="text" id="barcode" placeholder="EAN/UPC/Custom" aria-label="Barcode" />
+          <input type="text" id="barcode" placeholder="EAN/UPC/Custom"/>
         </div>
 
         <div class="form-group col-4">
           <label for="buyingPrice">Buying Price (KES) *</label>
-          <input type="number" id="buyingPrice" min="0" step="0.01" placeholder="0.00" required aria-label="Buying Price" />
+          <input type="number" id="buyingPrice" min="0" step="0.01" placeholder="0.00" required/>
         </div>
 
         <div class="form-group col-4">
           <label for="desiredMargin">Desired Margin %</label>
-          <input type="number" id="desiredMargin" min="0" max="99.999" step="0.01" placeholder="e.g. 20" aria-label="Desired Margin Percent" />
+          <input type="number" id="desiredMargin" min="0" max="99.999" step="0.01" placeholder="e.g. 20"/>
         </div>
 
         <div class="form-group col-4">
           <label for="sellingPrice">Selling Price (KES) *</label>
-          <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="0.00" required aria-label="Selling Price" />
+          <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="0.00" required/>
+        </div>
+
+        <div class="col-12"><div class="divider"></div></div>
+
+        <div class="form-group col-6">
+          <label for="openingStock">Opening Stock</label>
+          <input type="number" id="openingStock" min="0" step="1" placeholder="Enter opening stock"/>
+        </div>
+
+        <div class="form-group col-6">
+          <label for="businessLocations">Business Locations *</label>
+          <select id="businessLocations" multiple required>
+            <option value="">Loading locations…</option>
+          </select>
+          <div class="muted" style="margin-top:6px">Hold Ctrl/Cmd to select multiple.</div>
         </div>
 
         <div class="col-12"><div class="divider"></div></div>
 
         <div class="form-group col-12">
           <label class="inline">
-            <input type="checkbox" id="vatable" aria-label="Vatable Product" /> Vatable Product
+            <input type="checkbox" id="vatable"/> Vatable Product
           </label>
-          <div id="vatOptions" style="display:none; margin-top:8px">
-            <div class="inline" style="gap:16px; flex-wrap:wrap">
-              <label class="inline">
-                VAT % 
-                <input type="number" id="vatPercentage" min="0" max="100" step="0.01" value="16" style="width:96px;margin-left:6px" aria-label="VAT Percentage"/>
+          <div id="vatOptions" style="display:none;margin-top:8px">
+            <div class="inline" style="gap:16px;flex-wrap:wrap">
+              <label class="inline">VAT % 
+                <input type="number" id="vatPercentage" min="0" max="100" step="0.01" value="16" style="width:96px;margin-left:6px"/>
               </label>
               <div class="inline" style="gap:16px">
                 <label class="inline"><input type="radio" name="vatInclusion" value="inclusive" checked/> Inclusive of Buying Price</label>
@@ -1448,16 +1459,6 @@ async function showAddProduct() {
               </div>
               <span class="pill" id="vatPreview">Customer pays: —</span>
             </div>
-          </div>
-        </div>
-
-        <div class="col-12"><div class="divider"></div></div>
-
-        <div class="form-group col-12">
-          <label>Opening Stock by Location</label>
-          <div class="muted" style="margin-bottom:6px">Tick locations that hold opening stock and enter quantity.</div>
-          <div id="locationsList">
-            <div class="muted">Loading locations…</div>
           </div>
         </div>
 
@@ -1476,138 +1477,180 @@ async function showAddProduct() {
     </div>
   `;
 
-  // ----- helpers (no-block timeout + safe fill) -----
-  const withTimeout = (p, ms = 8000) =>
-    Promise.race([
-      p,
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))
-    ]).catch(() => []);
-
-  const fillSelect = (id, items, emptyText) => {
+  // ---------- Dynamic behaviors ----------
+  const withTimeout = (p, ms=8000)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),ms))]).catch(()=>[]);
+  const fillSelect = (id, items, placeholder) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.innerHTML = `<option value="">${emptyText}</option>` + (items || []).map(v => `<option value="${v}">${v}</option>`).join("");
+    el.innerHTML = (placeholder ? `<option value="">${placeholder}</option>` : "")
+      + (items||[]).map(v=>`<option value="${v}">${v}</option>`).join("");
   };
 
-  const renderLocations = (locs) => {
-    const wrap = document.getElementById("locationsList");
-    if (!wrap) return;
-    if (!locs || !locs.length) {
-      wrap.innerHTML = `<div class="muted">No locations found.</div>`;
-      return;
-    }
-    wrap.innerHTML = locs.map(l => `
-      <div class="loc-row">
-        <label class="inline"><input type="checkbox" class="loc-check" data-loc="${l}"/> ${l}</label>
-        <input type="number" class="loc-qty" data-loc="${l}" min="0" step="1" placeholder="Qty" disabled/>
-        <input type="number" class="loc-cost" data-loc="${l}" min="0" step="0.01" placeholder="Unit Cost" disabled/>
-      </div>
-    `).join("");
-
-    document.querySelectorAll(".loc-check").forEach(chk => {
-      chk.addEventListener("change", () => {
-        const loc = chk.dataset.loc;
-        const qtyEl = document.querySelector(`.loc-qty[data-loc="${loc}"]`);
-        const costEl = document.querySelector(`.loc-cost[data-loc="${loc}"]`);
-        qtyEl.disabled = !chk.checked;
-        costEl.disabled = !chk.checked;
-        if (!chk.checked) { qtyEl.value = ""; costEl.value = ""; }
-      });
-    });
-  };
-
-  // ----- wire dynamics (same as before) -----
-  const els = {
-    name: document.getElementById("productName"),
-    category: document.getElementById("category"),
-    unit: document.getElementById("unit"),
-    sku: document.getElementById("sku"),
-    skuLock: document.getElementById("skuLock"),
-    buying: document.getElementById("buyingPrice"),
-    marginWant: document.getElementById("desiredMargin"),
-    selling: document.getElementById("sellingPrice"),
-    vatable: document.getElementById("vatable"),
-    vatPct: document.getElementById("vatPercentage"),
-    vatPreview: document.getElementById("vatPreview"),
-    marginLive: document.getElementById("marginLive"),
-    profitLive: document.getElementById("profitLive"),
-    message: document.getElementById("addProductMessage"),
-  };
-
-  const priceNums = () => {
-    const buy = parseFloat(els.buying.value) || 0;
-    const sell = parseFloat(els.selling.value) || 0;
-    const vatable = document.getElementById("vatable").checked;
-    const vatRate = vatable ? (parseFloat(els.vatPct.value) || 0)/100 : 0;
-    return { buy, sell, vatable, vatRate };
-  };
   const formatMoney = v => isNaN(v) ? "—" : Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
-  const updateVatPreview = () => {
-    const { sell, vatable, vatRate } = priceNums();
-    const gross = vatable ? sell * (1 + vatRate) : sell;
-    els.vatPreview.textContent = `Customer pays: KES ${formatMoney(gross)}`;
+  const priceNums = () => {
+    const buy = parseFloat(document.getElementById("buyingPrice").value)||0;
+    const sell = parseFloat(document.getElementById("sellingPrice").value)||0;
+    const vatable = document.getElementById("vatable").checked;
+    const vatRate = vatable ? (parseFloat(document.getElementById("vatPercentage").value)||0)/100 : 0;
+    return {buy,sell,vatable,vatRate};
   };
-  const updateLiveMath = () => {
-    const { buy, sell } = priceNums();
+  const updateVatPreview = ()=>{
+    const {sell, vatable, vatRate}=priceNums();
+    const gross = vatable ? sell*(1+vatRate) : sell;
+    document.getElementById("vatPreview").textContent = `Customer pays: KES ${formatMoney(gross)}`;
+  };
+  const updateLiveMath = ()=>{
+    const {buy,sell}=priceNums();
     const profit = sell - buy;
-    const margin = sell > 0 ? (profit / sell) * 100 : 0;
-    els.marginLive.textContent = `Margin: ${isFinite(margin) ? margin.toFixed(2) + "%" : "—"}`;
-    els.profitLive.textContent = `Profit/Unit: KES ${formatMoney(profit)}`;
+    const margin = sell>0 ? (profit/sell)*100 : 0;
+    document.getElementById("marginLive").textContent = `Margin: ${isFinite(margin)?margin.toFixed(2)+"%":"—"}`;
+    document.getElementById("profitLive").textContent = `Profit/Unit: KES ${formatMoney(profit)}`;
     updateVatPreview();
   };
-  const updateSku = () => {
-    const skuLock = document.getElementById("skuLock");
-    if (!skuLock || !skuLock.checked) return;
-    const catCode = (document.getElementById("category").value || "").substring(0,3).toUpperCase();
-    const nameCode = (document.getElementById("productName").value || "").replace(/\s+/g,"").substring(0,3).toUpperCase();
+  const updateSku = ()=>{
+    const lock = document.getElementById("skuLock");
+    if (!lock || !lock.checked) return;
+    const catCode = (document.getElementById("category").value||"").substring(0,3).toUpperCase();
+    const nameCode = (document.getElementById("productName").value||"").replace(/\s+/g,"").substring(0,3).toUpperCase();
     document.getElementById("sku").value = `PROD-${catCode}-${nameCode}-${Date.now().toString().slice(-5)}`;
   };
 
   ["input","change"].forEach(ev=>{
-    els.name.addEventListener(ev, updateSku);
+    document.getElementById("productName").addEventListener(ev, updateSku);
     document.getElementById("category").addEventListener(ev, updateSku);
   });
-  document.getElementById("skuLock").addEventListener("change", () => { if (document.getElementById("skuLock").checked) updateSku(); });
-  [els.buying, els.selling].forEach(el => el.addEventListener("input", updateLiveMath));
-  els.marginLive.textContent = "Margin: —";
-  els.profitLive.textContent = "Profit/Unit: —";
-  updateSku(); updateLiveMath();
-
-  document.getElementById("vatable").addEventListener("change", () => {
-    const box = document.getElementById("vatOptions");
-    box.style.display = document.getElementById("vatable").checked ? "block" : "none";
+  document.getElementById("skuLock").addEventListener("change", ()=>{ if (document.getElementById("skuLock").checked) updateSku(); });
+  ["buyingPrice","sellingPrice"].forEach(id=>document.getElementById(id).addEventListener("input", updateLiveMath));
+  document.getElementById("vatable").addEventListener("change", ()=>{
+    document.getElementById("vatOptions").style.display = document.getElementById("vatable").checked ? "block" : "none";
     updateVatPreview();
   });
   document.getElementById("vatPercentage").addEventListener("input", updateVatPreview);
-  document.querySelectorAll('input[name="vatInclusion"]').forEach(el => el.addEventListener("change", updateVatPreview));
+  document.querySelectorAll('input[name="vatInclusion"]').forEach(el=>el.addEventListener("change", updateVatPreview));
+  updateSku(); updateLiveMath();
 
-  // Submit handler (uses your existing enhanced submit)
-  document.getElementById("addProductForm").addEventListener("submit", async (e) => {
+  // ---------- Form submit ----------
+  document.getElementById("addProductForm").addEventListener("submit", async (e)=>{
     e.preventDefault();
-    await addProductSubmitEnhanced();
-  });
-  document.getElementById("addProductForm").addEventListener("keypress",(ev)=>{
-    if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("submitBtn").click(); }
+    await addProductSubmitIntegrated();
   });
 
-  // ----- load options in background -----
-  const safeGet = (col) => withTimeout(getCollectionOptions(col));
-
-  const [categories, brands, locations, units] = await Promise.all([
-    safeGet("categories"),
-    safeGet("brands"),
-    safeGet("businessLocations"),
-    safeGet("units")
+  // ---------- Load dropdown options ----------
+  const [cats, brands, locs, units] = await Promise.all([
+    withTimeout(getCollectionOptions("categories")),
+    withTimeout(getCollectionOptions("brands")),
+    withTimeout(getCollectionOptions("businessLocations")),
+    withTimeout(getCollectionOptions("units")),
   ]);
-
-  fillSelect("category", categories, "Select category");
+  fillSelect("category", cats, "Select category");
   fillSelect("brand", brands, "Select brand");
   fillSelect("unit", units, "Select unit");
-  renderLocations(locations);
+  document.getElementById("businessLocations").innerHTML = (locs||[]).map(l=>`<option value="${l}">${l}</option>`).join("");
+}
 
-  // Final safety: if nothing came back, keep the form usable
-  if ((!categories || !categories.length) && (!brands || !brands.length)) {
-    showToast("Couldn’t load options (using empty lists). You can still add the product.", "error");
+// =========================
+// ADD PRODUCT SUBMIT
+// =========================
+async function addProductSubmitIntegrated() {
+  const msgEl = document.getElementById("addProductMessage");
+  const btn = document.getElementById("submitBtn");
+  msgEl.style.color = "red";
+
+  const vatable = document.getElementById("vatable").checked;
+  const vatInclusion = vatable ? document.querySelector('input[name="vatInclusion"]:checked').value : null;
+  const locSel = document.getElementById("businessLocations");
+  const locations = Array.from(locSel.selectedOptions).map(o=>o.value);
+
+  const name = (document.getElementById("productName").value||"").trim();
+  const category = document.getElementById("category").value;
+  const brand = document.getElementById("brand").value;
+  const unit = document.getElementById("unit").value;
+  const sku = (document.getElementById("sku").value||"").trim();
+  const barcode = (document.getElementById("barcode").value||"").trim();
+  const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
+  const sellingPrice = parseFloat(document.getElementById("sellingPrice").value);
+  const desiredMargin = parseFloat(document.getElementById("desiredMargin").value) || null;
+  const openingStock = parseInt(document.getElementById("openingStock").value) || 0;
+  const vatPercentage = vatable ? parseFloat(document.getElementById("vatPercentage").value) : 0;
+
+  if (!name || !category || !brand || !unit || isNaN(buyingPrice) || isNaN(sellingPrice) || !locations.length) {
+    msgEl.textContent = "Please fill in all required fields correctly.";
+    return;
+  }
+  if (buyingPrice < 0 || sellingPrice < 0 || openingStock < 0) {
+    msgEl.textContent = "Prices and stock cannot be negative.";
+    return;
+  }
+  if (sellingPrice < buyingPrice) {
+    msgEl.textContent = "Selling price cannot be less than buying price.";
+    return;
+  }
+  if (vatable && (isNaN(vatPercentage) || vatPercentage < 0 || vatPercentage > 100)) {
+    msgEl.textContent = "VAT percentage must be between 0 and 100.";
+    return;
+  }
+
+  // Check for duplicate name
+  const nameLower = name.toLowerCase();
+  const existing = await firebase.firestore().collection("products").where("nameLower","==",nameLower).limit(1).get();
+  if (!existing.empty) {
+    msgEl.textContent = "Product name already exists.";
+    return;
+  }
+
+  const productData = {
+    name,
+    nameLower,
+    sku: sku || null,
+    barcode: barcode || null,
+    category,
+    brand,
+    unit,
+    buyingPrice,
+    sellingPrice,
+    desiredMargin,
+    openingStock,
+    locations,
+    vatable,
+    vatRate: vatable ? vatPercentage / 100 : 0,
+    vatInclusion: vatable ? vatInclusion : null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    isActive: true
+  };
+
+  // Save
+  btn.disabled = true;
+  msgEl.innerHTML = '<span class="spinner" style="width:18px;height:18px;border-width:3px;vertical-align:-3px"></span> Saving...';
+
+  try {
+    await firebase.firestore().collection("products").add(productData);
+    msgEl.style.color = "green";
+    msgEl.textContent = `Product added successfully${productData.sku ? ` with SKU: ${productData.sku}` : ""}.`;
+    showToast(`Product "${name}" added.`, "success");
+    document.getElementById("addProductForm").reset();
+    document.getElementById("vatOptions").style.display = "none";
+  } catch (error) {
+    console.error("Error adding product:", error);
+    msgEl.style.color = "red";
+    msgEl.textContent = error.code === "permission-denied"
+      ? "You do not have permission to add products."
+      : `Error adding product: ${error.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// =========================
+// Helper to fetch collection names
+// =========================
+async function getCollectionOptions(collectionName) {
+  try {
+    const snapshot = await firebase.firestore().collection(collectionName).get();
+    return snapshot.docs.map(doc => doc.data().name || doc.id);
+  } catch (error) {
+    console.error(`Error loading ${collectionName}:`, error);
+    return [];
   }
 }
 
