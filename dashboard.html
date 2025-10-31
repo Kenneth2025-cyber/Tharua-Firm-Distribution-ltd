@@ -2424,9 +2424,74 @@ async function viewProduct(id) {
 
 
 
-function editProduct(id) {
-  document.getElementById("editModal").style.display = "flex";
+async function editProduct(id) {
+  const db = firebase.firestore();
+  const snap = await db.collection("products").doc(id).get();
+  if (!snap.exists) { showToast("Product not found"); return; }
+  const p = snap.data();
+
+  // open the Add Product page UI
+  await showAddProduct();
+
+  // mark edit mode
+  window.editProductId = id;
+  document.getElementById("btnSaveOnly").textContent = "Update Product";
+  document.getElementById("btnSaveAndStock").style.display = "none"; // hide opening stock on edit
+
+  // fill fields
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v ?? ""; };
+  set("productName", p.name);
+  set("sku", p.sku || "");
+  set("barcode", p.barcode || "");
+  set("buyingPrice", p.buyingPrice);
+  set("desiredMargin", p.desiredMargin ?? "");
+  set("sellingPrice", p.sellingPrice);
+
+  // selects (unit/category/brand) — ensure options are loaded
+  document.getElementById("unit").value = p.unit || "";
+  document.getElementById("category").value = p.category || "";
+  document.getElementById("brand").value = p.brand || "";
+
+  // VAT
+  const vatable = !!p.vatable;
+  document.getElementById("vatable").checked = vatable;
+  document.getElementById("vatOptions").style.display = vatable ? "block" : "none";
+  if (vatable) {
+    document.getElementById("vatPercentage").value = (p.vatRate ?? 0) * 100;
+    const incl = p.vatInclusion || "inclusive";
+    const r = document.querySelector(`input[name="vatInclusion"][value="${incl}"]`);
+    if (r) r.checked = true;
+  }
+
+  // locations (multi)
+  const locSel = document.getElementById("businessLocations");
+  if (locSel && Array.isArray(p.locations)) {
+    Array.from(locSel.options).forEach(o => o.selected = p.locations.includes(o.value));
+  }
+
+  // live math refresh
+  const evt = new Event("input"); document.getElementById("sellingPrice").dispatchEvent(evt);
+
+  // rewire Save to UPDATE instead of ADD
+  document.getElementById("btnSaveOnly").onclick = async () => {
+    const base = getProductFormValues();
+    if (base.error) { document.getElementById("addProductMessage").textContent = base.error; return; }
+
+    try {
+      await db.collection("products").doc(window.editProductId).update({
+        ...base.data,
+        nameLower: base.data.name.toLowerCase(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showSweetSuccess(`✅ Product “${base.data.name}” updated.`);
+      // go back to list
+      if (typeof showListProducts === "function") showListProducts();
+    } catch (e) {
+      document.getElementById("addProductMessage").textContent = `Error updating: ${e.message}`;
+    }
+  };
 }
+
 
 function confirmDeleteProduct(id, name) {
   document.getElementById("deleteModal").style.display = "flex";
