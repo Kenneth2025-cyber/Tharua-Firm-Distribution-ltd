@@ -1344,12 +1344,11 @@ window.addEventListener("load", async () => {
 });
 
 // =========================
-// ADD PRODUCT PAGE (integrated + simplified)
+// ADD PRODUCT PAGE (integrated, no opening stock in form)
 // =========================
 async function showAddProduct() {
   saveLastPage("showAddProduct");
 
-  // Render form immediately
   const content = document.getElementById("content");
   content.innerHTML = `
     <style>
@@ -1363,8 +1362,10 @@ async function showAddProduct() {
       .inline{display:flex;gap:8px;align-items:center}
       .pill{display:inline-block;padding:6px 10px;border:1px solid #e5e7eb;border-radius:999px;font-size:12px}
       .divider{height:1px;background:#eee;margin:8px 0 4px}
-      .submit-btn{background:#3498db;color:#fff;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:16px;width:100%}
-      .submit-btn[disabled]{opacity:.6;cursor:not-allowed}
+      .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+      .btn{background:#3498db;color:#fff;padding:12px 16px;border:none;border-radius:8px;cursor:pointer;font-size:16px}
+      .btn.secondary{background:#2c3e50}
+      .btn[disabled]{opacity:.6;cursor:not-allowed}
       @media(max-width:720px){.form-grid{grid-template-columns:repeat(6,1fr)}.col-6{grid-column:span 6}.col-4{grid-column:span 6}.col-8{grid-column:span 6}}
     </style>
 
@@ -1427,23 +1428,6 @@ async function showAddProduct() {
           <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="0.00" required/>
         </div>
 
-        <div class="col-12"><div class="divider"></div></div>
-
-        <div class="form-group col-6">
-          <label for="openingStock">Opening Stock</label>
-          <input type="number" id="openingStock" min="0" step="1" placeholder="Enter opening stock"/>
-        </div>
-
-        <div class="form-group col-6">
-          <label for="businessLocations">Business Locations *</label>
-          <select id="businessLocations" multiple required>
-            <option value="">Loading locations…</option>
-          </select>
-          <div class="muted" style="margin-top:6px">Hold Ctrl/Cmd to select multiple.</div>
-        </div>
-
-        <div class="col-12"><div class="divider"></div></div>
-
         <div class="form-group col-12">
           <label class="inline">
             <input type="checkbox" id="vatable"/> Vatable Product
@@ -1470,8 +1454,11 @@ async function showAddProduct() {
         </div>
 
         <div class="col-12">
-          <button type="submit" class="submit-btn" id="submitBtn">Add Product</button>
-          <div id="addProductMessage" style="color:red;"></div>
+          <div class="btn-row">
+            <button type="button" class="btn" id="btnSaveOnly">Save Product</button>
+            <button type="button" class="btn secondary" id="btnSaveAndStock">Save & Add Opening Stock</button>
+          </div>
+          <div id="addProductMessage" style="color:red;margin-top:8px;"></div>
         </div>
       </form>
     </div>
@@ -1529,11 +1516,9 @@ async function showAddProduct() {
   document.querySelectorAll('input[name="vatInclusion"]').forEach(el=>el.addEventListener("change", updateVatPreview));
   updateSku(); updateLiveMath();
 
-  // ---------- Form submit ----------
-  document.getElementById("addProductForm").addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    await addProductSubmitIntegrated();
-  });
+  // ---------- Button handlers ----------
+  document.getElementById("btnSaveOnly").addEventListener("click", () => addProductSubmitIntegrated("save"));
+  document.getElementById("btnSaveAndStock").addEventListener("click", () => addProductSubmitIntegrated("stock"));
 
   // ---------- Load dropdown options ----------
   const [cats, brands, locs, units] = await Promise.all([
@@ -1545,15 +1530,26 @@ async function showAddProduct() {
   fillSelect("category", cats, "Select category");
   fillSelect("brand", brands, "Select brand");
   fillSelect("unit", units, "Select unit");
-  document.getElementById("businessLocations").innerHTML = (locs||[]).map(l=>`<option value="${l}">${l}</option>`).join("");
+
+  // Multi-select for locations (like before)
+  // NOTE: you said remove opening stock fields, not locations; we keep locations here.
+  const locSelect = document.createElement("select");
+  locSelect.id = "businessLocations";
+  locSelect.multiple = true;
+  locSelect.required = true;
+  locSelect.innerHTML = (locs||[]).map(l=>`<option value="${l}">${l}</option>`).join("");
+  // Replace the placeholder select if present
+  const placeholderLoc = document.querySelector("select#businessLocations");
+  if (placeholderLoc) placeholderLoc.replaceWith(locSelect);
 }
 
 // =========================
-// ADD PRODUCT SUBMIT
+// ADD PRODUCT SUBMIT (mode: "save" | "stock")
 // =========================
-async function addProductSubmitIntegrated() {
+async function addProductSubmitIntegrated(mode = "save") {
   const msgEl = document.getElementById("addProductMessage");
-  const btn = document.getElementById("submitBtn");
+  const btnSave = document.getElementById("btnSaveOnly");
+  const btnStock = document.getElementById("btnSaveAndStock");
   msgEl.style.color = "red";
 
   const vatable = document.getElementById("vatable").checked;
@@ -1570,15 +1566,14 @@ async function addProductSubmitIntegrated() {
   const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
   const sellingPrice = parseFloat(document.getElementById("sellingPrice").value);
   const desiredMargin = parseFloat(document.getElementById("desiredMargin").value) || null;
-  const openingStock = parseInt(document.getElementById("openingStock").value) || 0;
   const vatPercentage = vatable ? parseFloat(document.getElementById("vatPercentage").value) : 0;
 
   if (!name || !category || !brand || !unit || isNaN(buyingPrice) || isNaN(sellingPrice) || !locations.length) {
     msgEl.textContent = "Please fill in all required fields correctly.";
     return;
   }
-  if (buyingPrice < 0 || sellingPrice < 0 || openingStock < 0) {
-    msgEl.textContent = "Prices and stock cannot be negative.";
+  if (buyingPrice < 0 || sellingPrice < 0) {
+    msgEl.textContent = "Prices cannot be negative.";
     return;
   }
   if (sellingPrice < buyingPrice) {
@@ -1590,7 +1585,7 @@ async function addProductSubmitIntegrated() {
     return;
   }
 
-  // Check for duplicate name
+  // Duplicate by name (case-insensitive)
   const nameLower = name.toLowerCase();
   const existing = await firebase.firestore().collection("products").where("nameLower","==",nameLower).limit(1).get();
   if (!existing.empty) {
@@ -1609,8 +1604,7 @@ async function addProductSubmitIntegrated() {
     buyingPrice,
     sellingPrice,
     desiredMargin,
-    openingStock,
-    locations,
+    locations,                  // multi-select
     vatable,
     vatRate: vatable ? vatPercentage / 100 : 0,
     vatInclusion: vatable ? vatInclusion : null,
@@ -1619,17 +1613,28 @@ async function addProductSubmitIntegrated() {
     isActive: true
   };
 
-  // Save
-  btn.disabled = true;
-  msgEl.innerHTML = '<span class="spinner" style="width:18px;height:18px;border-width:3px;vertical-align:-3px"></span> Saving...';
+  // UI: disable only the clicked button and show inline spinner
+  const targetBtn = mode === "stock" ? btnStock : btnSave;
+  const originalText = targetBtn.textContent;
+  targetBtn.disabled = true;
+  targetBtn.textContent = originalText + " …";
 
   try {
-    await firebase.firestore().collection("products").add(productData);
-    msgEl.style.color = "green";
-    msgEl.textContent = `Product added successfully${productData.sku ? ` with SKU: ${productData.sku}` : ""}.`;
-    showToast(`Product "${name}" added.`, "success");
+    const ref = await firebase.firestore().collection("products").add(productData);
+
+    // SWEET success toast + louder sound
+    showSweetSuccess(`✅ Product “${name}” saved${productData.sku ? ` (SKU: ${productData.sku})` : ""}.`);
+
+    // Clear form & hide VAT box
     document.getElementById("addProductForm").reset();
-    document.getElementById("vatOptions").style.display = "none";
+    const vatBox = document.getElementById("vatOptions");
+    if (vatBox) vatBox.style.display = "none";
+
+    // Route if user chose stock path
+    if (mode === "stock") {
+      showOpeningStockForProduct(ref.id, name, locations);
+    }
+
   } catch (error) {
     console.error("Error adding product:", error);
     msgEl.style.color = "red";
@@ -1637,8 +1642,79 @@ async function addProductSubmitIntegrated() {
       ? "You do not have permission to add products."
       : `Error adding product: ${error.message}`;
   } finally {
-    btn.disabled = false;
+    targetBtn.disabled = false;
+    targetBtn.textContent = originalText;
   }
+}
+
+// =========================
+// Sweet success toast + louder sound (non-intrusive to your existing showToast)
+// =========================
+function playSuccessSoundLoud() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    const now = ctx.currentTime;
+
+    o.type = 'triangle';             // a bit brighter than sine
+    o.frequency.setValueAtTime(520, now);
+    o.frequency.linearRampToValueAtTime(780, now + 0.28); // tiny sweep
+    g.gain.setValueAtTime(0.001, now);
+    g.gain.exponentialRampToValueAtTime(0.9, now + 0.04); // louder attack
+    g.gain.exponentialRampToValueAtTime(0.00001, now + 0.55);
+
+    o.connect(g); g.connect(ctx.destination);
+    o.start(now);
+    o.stop(now + 0.56);
+    setTimeout(() => { try { ctx.close(); } catch (e) {} }, 700);
+  } catch (e) {
+    console.warn("playSuccessSoundLoud error:", e);
+  }
+}
+
+function showSweetSuccess(message) {
+  // minimal custom toast so we don't touch your global showToast styling
+  const prev = document.getElementById("sweetToast");
+  if (prev) prev.remove();
+
+  const toast = document.createElement("div");
+  toast.id = "sweetToast";
+  toast.textContent = message;
+  Object.assign(toast.style, {
+    position: "fixed",
+    top: "20px",
+    right: "20px",
+    background: "#22c55e",
+    color: "#fff",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    boxShadow: "0 10px 22px rgba(0,0,0,0.18)",
+    zIndex: 99999,
+    opacity: "0",
+    transform: "translateY(-10px)",
+    transition: "opacity 220ms ease, transform 220ms ease",
+    fontFamily: "Inter, system-ui, -apple-system, Segoe UI, Arial, sans-serif",
+    fontSize: "14px",
+    fontWeight: "600",
+    letterSpacing: ".2px"
+  });
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  });
+
+  // loud success ding
+  playSuccessSoundLoud();
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-10px)";
+    setTimeout(() => { try { toast.remove(); } catch (e) {} }, 250);
+  }, 2600);
 }
 
 // =========================
@@ -1652,6 +1728,25 @@ async function getCollectionOptions(collectionName) {
     console.error(`Error loading ${collectionName}:`, error);
     return [];
   }
+}
+
+// =========================
+// Placeholder route (we’ll build it next)
+// =========================
+function showOpeningStockForProduct(productId, productName, locations) {
+  // very light stub — no writes here
+  const content = document.getElementById("content");
+  content.innerHTML = `
+    <div style="max-width:780px;width:92%;margin:20px auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)">
+      <h2 style="margin-top:0">Opening Stock • ${productName}</h2>
+      <p class="muted">Product ID: ${productId}</p>
+      <p style="margin-top:12px">We’ll add per-location opening stock here next. Selected locations:</p>
+      <ul style="margin:8px 0 16px; padding-left:18px;">
+        ${(locations||[]).map(l=>`<li>${l}</li>`).join("") || "<li><em>None</em></li>"}
+      </ul>
+      <button onclick="showProductsHome()" class="btn">← Back to Products</button>
+    </div>
+  `;
 }
 
 
