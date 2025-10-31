@@ -9353,29 +9353,53 @@ const inventoryState = {
   },
 };
 
+// Column defs (order + labels like screenshot)
+const inventoryColumns = [
+  { key: "product",            label: "Product" },
+  { key: "category",           label: "Category" },
+  { key: "brand",              label: "Brand" },
+  { key: "location",           label: "Location" },
+  { key: "openingStock",       label: "Opening Stock" },
+  { key: "openingStockToday",  label: "Opening Stock Today" },
+  { key: "purchasedToday",     label: "Purchased Today" },
+  { key: "purchasedTotal",     label: "Purchased Total" },
+  { key: "soldToday",          label: "Sold Today" },
+  { key: "soldTotal",          label: "Sold Total" },
+  { key: "adjusted",           label: "Adjusted" },
+  { key: "currentStock",       label: "Current Stocks Available" },
+];
+
 // ---------- Page Entrypoint ----------
 async function showInventoryReport() {
   saveLastPage("showInventoryReport");
   const el = document.getElementById("content");
   el.innerHTML = `
-    <style>
-      ${document.querySelector("style[data-units-style]")?.innerHTML || `
+    <style data-inventory-style>
       .units-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;}
+      .units-header h2{margin:0;}
+      .units-table-wrap{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:14px;}
+      .units-flex{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+      .units-flex .input{padding:8px 10px;border:1px solid #ccc;border-radius:6px;}
+      .units-flex select{min-width:90px;}
       .units-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+      .export-group{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;white-space:nowrap;}
       .btn{border:none;padding:8px 12px;border-radius:6px;cursor:pointer;}
-      .btn-primary{background:#5b6ee1;color:#fff;}
-      .btn-gray{background:#6b7280;color:#fff;border:1px solid #6b7280;}
+      .btn-sm{padding:4px 8px;font-size:12px;line-height:1.2;}
       .btn-csv{background:#0d6efd;color:#fff;}
       .btn-excel{background:#198754;color:#fff;}
       .btn-print{background:#dc3545;color:#fff;}
-      .btn-sm{padding:4px 8px;font-size:12px;}
-      .units-table-wrap{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:14px;}
+      .btn-gray{background:#6b7280;color:#fff;border:1px solid #6b7280;}
+      .btn-csv:hover,.btn-excel:hover,.btn-print:hover,.btn-gray:hover{filter:brightness(0.95);}
+      .col-visibility{position:relative;}
+      .col-panel{position:absolute;top:40px;left:0;background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px 10px;display:none;z-index:10;}
+      .col-panel label{display:flex;gap:8px;align-items:center;padding:4px 2px;}
       .table-container{overflow-x:auto;}
-      .units-table{width:100%;border-collapse:separate;border-spacing:0;}
+      .units-table{width:100%;min-width:1200px;border-collapse:separate;border-spacing:0;}
       .units-table th,.units-table td{border:0;border-bottom:1px solid #e9ecef;padding:10px;font-size:14px;white-space:nowrap;}
       .units-table thead th{background:#f8f9fa;border-bottom:1px solid #dde1e6;text-align:left;}
       .pagination-section{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
-      `}
+      .pagination-section .pager button{padding:8px 12px;border:none;background:#007bff;color:#fff;border-radius:6px;cursor:pointer;}
+      .pagination-section .pager button:disabled{background:#aaa;cursor:not-allowed;}
     </style>
 
     <div class="units-header">
@@ -9399,9 +9423,9 @@ async function showInventoryReport() {
           <div class="col-visibility">
             <button class="btn btn-gray btn-sm" onclick="toggleInventoryColPanel()">Columns</button>
             <div id="inventoryColPanel" class="col-panel">
-              ${Object.keys(inventoryState.visibleCols).map(c =>
-                `<label><input type="checkbox" checked onchange="setInventoryCol('${c}', this.checked)"> ${c.replace(/([A-Z])/g, ' $1')}</label>`
-              ).join("")}
+              ${inventoryColumns.map(c => `
+                <label><input type="checkbox" ${inventoryState.visibleCols[c.key] ? "checked":""}
+                  onchange="setInventoryCol('${c.key}', this.checked)"> ${c.label}</label>`).join("")}
             </div>
           </div>
           <button class="btn btn-gray btn-sm" onclick="exportInventoryPDF()">PDF</button>
@@ -9416,22 +9440,11 @@ async function showInventoryReport() {
         <table class="units-table" id="inventoryTable">
           <thead>
             <tr>
-              <th data-col="product">Product</th>
-              <th data-col="category">Category</th>
-              <th data-col="brand">Brand</th>
-              <th data-col="location">Location</th>
-              <th data-col="openingStock">Opening Stock</th>
-              <th data-col="openingStockToday">Opening Stock Today</th>
-              <th data-col="purchasedToday">Purchased Today</th>
-              <th data-col="purchasedTotal">Purchased Total</th>
-              <th data-col="soldToday">Sold Today</th>
-              <th data-col="soldTotal">Sold Total</th>
-              <th data-col="adjusted">Adjusted</th>
-              <th data-col="currentStock">Current Stocks Available</th>
+              ${inventoryColumns.map(c => `<th data-col="${c.key}">${c.label}</th>`).join("")}
             </tr>
           </thead>
           <tbody id="inventoryTbody">
-            <tr><td colspan="12" style="text-align:center;">Loading...</td></tr>
+            <tr><td colspan="${inventoryColumns.length}" style="text-align:center;">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -9446,6 +9459,7 @@ async function showInventoryReport() {
     </div>
   `;
 
+  // close column panel when clicking outside
   document.addEventListener("click", (e) => {
     const panel = document.getElementById("inventoryColPanel");
     if (!panel) return;
@@ -9453,28 +9467,31 @@ async function showInventoryReport() {
     if (!trigger) panel.style.display = "none";
   });
 
-  await loadInventoryProducts();
+  await loadInventoryProducts(); // fetch products only
   renderInventory();
 }
 
-// ---------- Firestore I/O ----------
+// ---------- Firestore I/O (products only) ----------
 async function loadInventoryProducts() {
   const snap = await firebase.firestore().collection("products").get();
-  inventoryState.rows = snap.docs.map(d => ({
-    id: d.id,
-    product: d.data().name || "",
-    category: d.data().category || "",
-    brand: d.data().brand || "",
-    location: (d.data().locations && d.data().locations[0]) || "",
-    openingStock: d.data().openingStock || 0,
-    openingStockToday: 0,
-    purchasedToday: 0,
-    purchasedTotal: 0,
-    soldToday: 0,
-    soldTotal: 0,
-    adjusted: 0,
-    currentStock: 0
-  }));
+  inventoryState.rows = snap.docs.map(d => {
+    const data = d.data() || {};
+    return {
+      id: d.id,
+      product: data.name || "",
+      category: data.category || "",
+      brand: data.brand || "",
+      location: (Array.isArray(data.locations) && data.locations[0]) || "",
+      openingStock: data.openingStock || 0,
+      openingStockToday: 0,
+      purchasedToday: 0,
+      purchasedTotal: 0,
+      soldToday: 0,
+      soldTotal: 0,
+      adjusted: 0,
+      currentStock: 0
+    };
+  });
   inventoryState.filtered = [...inventoryState.rows];
   inventoryState.currentPage = 1;
 }
@@ -9490,7 +9507,7 @@ function searchInventory(term) {
   const t = term.trim().toLowerCase();
   inventoryState.searchTerm = t;
   inventoryState.filtered = inventoryState.rows.filter(r =>
-    Object.values(r).some(val => String(val).toLowerCase().includes(t))
+    inventoryColumns.some(c => String(r[c.key] ?? "").toLowerCase().includes(t))
   );
   inventoryState.currentPage = 1;
   renderInventory();
@@ -9512,6 +9529,7 @@ function toggleInventoryColPanel() {
 }
 function setInventoryCol(key, val) {
   inventoryState.visibleCols[key] = !!val;
+  // hide/show headers
   document.querySelectorAll(`#inventoryTable [data-col="${key}"]`).forEach(th => {
     th.style.display = val ? "" : "none";
   });
@@ -9535,19 +9553,19 @@ function renderInventory() {
     end = Math.min(start + ipp, total);
     btnPrev.disabled = inventoryState.currentPage <= 1;
     btnNext.disabled = inventoryState.currentPage >= pages;
-  } else {
-    btnPrev.disabled = true; btnNext.disabled = true;
-  }
+  } else { btnPrev.disabled = true; btnNext.disabled = true; }
 
   const slice = inventoryState.filtered.slice(start, end);
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;">No inventory records found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;">No inventory records found.</td></tr>`;
   } else {
     tbody.innerHTML = slice.map(r => `
       <tr>
-        ${Object.keys(inventoryState.visibleCols).map(k =>
-          `<td style="${!inventoryState.visibleCols[k] ? 'display:none':''}" data-col="${k}">${escapeHTML(r[k] ?? "")}</td>`
-        ).join("")}
+        ${inventoryColumns.map(c => {
+          const show = inventoryState.visibleCols[c.key];
+          const val = r[c.key] ?? "";
+          return `<td style="${!show ? 'display:none':''}" data-col="${c.key}">${escapeHTML(val)}</td>`;
+        }).join("")}
       </tr>
     `).join("");
   }
@@ -9555,66 +9573,73 @@ function renderInventory() {
   const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
   info.textContent = `Showing ${showing} entries`;
 
-  Object.keys(inventoryState.visibleCols).forEach(k => {
-    const th = document.querySelector(`#inventoryTable thead [data-col="${k}"]`);
-    if (th) th.style.display = inventoryState.visibleCols[k] ? "" : "none";
+  // sync header visibility with toggles
+  inventoryColumns.forEach(c => {
+    const th = document.querySelector(`#inventoryTable thead [data-col="${c.key}"]`);
+    if (th) th.style.display = inventoryState.visibleCols[c.key] ? "" : "none";
   });
 }
 
-// ---------- Exports & Print ----------
+// ---------- Exports & Print (exact Units logic) ----------
 function exportInventoryCSV() {
-  const cols = Object.keys(inventoryState.visibleCols).filter(c => inventoryState.visibleCols[c]);
-  const header = cols.map(h => h.replace(/([A-Z])/g, ' $1')).join(",");
+  const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
+  const header = cols.map(c => c.label).join(",");
   const rows = inventoryState.filtered.map(r =>
-    cols.map(c => `"${String(r[c] ?? "").replace(/"/g, '""')}"`).join(",")
+    cols.map(c => `"${String(r[c.key] ?? "").replace(/"/g,'""')}"`).join(",")
   );
   downloadBlob([header, ...rows].join("\n"), "inventory.csv", "text/csv;charset=utf-8;");
 }
 
 function exportInventoryExcel() {
-  const cols = Object.keys(inventoryState.visibleCols).filter(c => inventoryState.visibleCols[c]);
-  const head = cols.map(c => `<th>${c.replace(/([A-Z])/g, ' $1')}</th>`).join("");
-  const body = inventoryState.filtered.map(r =>
-    `<tr>${cols.map(c => `<td>${escapeHTML(r[c] ?? "")}</td>`).join("")}</tr>`
-  ).join("");
-  const html = `<html><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+  const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
+  const head = cols.map(c => `<th>${c.label}</th>`).join("");
+  const body = inventoryState.filtered.map(r => `
+    <tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>
+  `).join("");
+  const html = `
+    <html><head><meta charset="UTF-8"></head>
+    <body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
   downloadBlob(html, "inventory.xls", "application/vnd.ms-excel");
 }
 
 function exportInventoryPDF() {
   const w = window.open("", "_blank");
-  const cols = Object.keys(inventoryState.visibleCols).filter(c => inventoryState.visibleCols[c]);
-  const rows = inventoryState.filtered.map(r => cols.map(c => escapeHTML(r[c] ?? "")));
+  const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
+  const rows = inventoryState.filtered.map(r => cols.map(c => escapeHTML(r[c.key] ?? "")));
+
   w.document.write(`
     <html><head><title>Inventory</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:16px;}
-      table{width:100%;border-collapse:collapse;}
-      th,td{border:1px solid #333;padding:8px;font-size:12px;}
+      body{font-family:Arial, sans-serif; padding:16px;}
+      table{width:100%; border-collapse:collapse;}
+      th,td{border:1px solid #333; padding:8px; font-size:12px;}
       th{background:#eee;}
-    </style></head><body>
+      h2{margin:0 0 10px;}
+    </style>
+    </head><body>
       <h2>Inventory Report</h2>
-      <table><thead><tr>${cols.map(c=>`<th>${c.replace(/([A-Z])/g,' $1')}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>
-      <script>window.onload=()=>window.print();<\/script>
-    </body></html>`);
+      <table><thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}
+      </tbody></table>
+      <script>window.onload = () => window.print();<\/script>
+    </body></html>
+  `);
   w.document.close();
 }
 
-function printInventory() { exportInventoryPDF(); }
+function printInventory(){ exportInventoryPDF(); }
 
+// ---------- Utils ----------
 function downloadBlob(content, filename, type) {
-  const blob = new Blob([content], { type });
+  const blob = new Blob([content], {type});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
+  a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-
-function escapeHTML(str) {
-  return (str || "").replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+function escapeHTML(str){
+  return (str||"").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 }
 
 
