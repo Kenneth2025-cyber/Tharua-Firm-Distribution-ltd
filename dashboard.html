@@ -4240,10 +4240,11 @@ function toggleUnitsColPanel() {
 }
 function setUnitsCol(key, val) {
   unitsState.visibleCols[key] = !!val;
-  // hide/show headers
-  document.querySelectorAll(\`#unitsTable [data-col="\${key}"]\`).forEach(th => {
-    th.style.display = val ? "" : "none";
-  });
+// hide/show headers
+document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
+  th.style.display = val ? "" : "none";
+});
+
   // rows are re-rendered to apply visibility
   renderUnits();
 }
