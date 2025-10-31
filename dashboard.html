@@ -3995,15 +3995,22 @@ async function showUnits() {
       .units-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
       .units-header h2 { margin:0; }
       .units-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+
+      /* buttons */
       .units-toolbar .btn { border:none; padding:8px 12px; border-radius:6px; cursor:pointer; }
       .btn-primary { background:#5b6ee1; color:#fff; }
       .btn-outline { background:#fff; border:1px solid #ddd; }
       .btn-danger { background:#dc3545; color:#fff; }
-      /* colored export buttons */
+
+      /* colored export buttons + compact size */
+      .export-group{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; white-space:nowrap; }
+      .btn-sm{ padding:4px 8px; font-size:12px; line-height:1.2; }
+
       .btn-csv   { background:#0d6efd; color:#fff; }
       .btn-excel { background:#198754; color:#fff; }
       .btn-print { background:#dc3545; color:#fff; }
-      .btn-csv:hover, .btn-excel:hover, .btn-print:hover { filter:brightness(0.95); }
+      .btn-csv:hover, .btn-excel:hover, .btn-print:hover,
+      .icon-btn:hover { filter:brightness(0.95); }
 
       .units-table-wrap { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.06); padding:14px; }
       .units-flex { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
@@ -4021,9 +4028,17 @@ async function showUnits() {
       .badge { padding:2px 8px; border-radius:14px; font-size:12px; }
       .badge-yes { background:#e6f4ea; color:#2e7d32; }
       .badge-no { background:#fde7e9; color:#c62828; }
-      .actions button { margin-right:6px; padding:6px 10px; font-size:12px; border-radius:6px; border:none; cursor:pointer; }
-      .actions .edit { background:#6f42c1; color:#fff; }
-      .actions .delete { background:#ff6b6b; color:#fff; }
+
+      /* tiny icon action buttons */
+      .actions { white-space:nowrap; }
+      .icon-btn{
+        width:28px; height:28px;
+        display:inline-flex; align-items:center; justify-content:center;
+        border:none; border-radius:6px; cursor:pointer;
+        margin-right:6px;
+      }
+      .icon-edit{  background:#6f42c1; color:#fff; }
+      .icon-delete{background:#ff6b6b; color:#fff; }
 
       .pagination-section { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
       .pagination-section .pager button { padding:8px 12px; border:none; background:#007bff; color:#fff; border-radius:6px; cursor:pointer; }
@@ -4050,12 +4065,12 @@ async function showUnits() {
           entries
         </div>
 
-        <div class="units-toolbar">
-          <button class="btn btn-csv"   onclick="exportUnitsCSV()">Export CSV</button>
-          <button class="btn btn-excel" onclick="exportUnitsExcel()">Export Excel</button>
-          <button class="btn btn-print" onclick="printUnits()">Print</button>
+        <div class="units-toolbar export-group">
+          <button class="btn btn-csv btn-sm"   onclick="exportUnitsCSV()">CSV</button>
+          <button class="btn btn-excel btn-sm" onclick="exportUnitsExcel()">Excel</button>
+          <button class="btn btn-print btn-sm" onclick="printUnits()">Print</button>
           <div class="col-visibility">
-            <button class="btn btn-outline" onclick="toggleUnitsColPanel()">Column visibility</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleUnitsColPanel()">Columns</button>
             <div id="unitsColPanel" class="col-panel">
               <label><input type="checkbox" checked onchange="setUnitsCol('name', this.checked)"> Name</label>
               <label><input type="checkbox" checked onchange="setUnitsCol('shortName', this.checked)"> Short name</label>
@@ -4063,7 +4078,7 @@ async function showUnits() {
               <label><input type="checkbox" checked onchange="setUnitsCol('actions', this.checked)"> Action</label>
             </div>
           </div>
-          <button class="btn btn-outline" onclick="exportUnitsPDF()">Export PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="exportUnitsPDF()">PDF</button>
         </div>
 
         <div style="margin-left:auto">
@@ -4078,7 +4093,7 @@ async function showUnits() {
               <th data-col="name">Name</th>
               <th data-col="shortName">Short name</th>
               <th data-col="allowDecimal">Allow decimal</th>
-              <th data-col="actions" style="width:170px;">Action</th>
+              <th data-col="actions" style="width:90px;">Action</th>
             </tr>
           </thead>
           <tbody id="unitsTbody">
@@ -4262,8 +4277,12 @@ function renderUnits() {
           <span class="badge ${r.allowDecimal ? 'badge-yes':'badge-no'}">${r.allowDecimal ? 'Yes':'No'}</span>
         </td>
         <td class="actions" style="${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
-          <button class="edit" onclick="openUnitModal('${r.id}')">Edit</button>
-          <button class="delete" onclick="openDeleteUnit('${r.id}', '${escapeHTML(r.name || '')}')">Delete</button>
+          <button class="icon-btn icon-edit"   title="Edit"   onclick="openUnitModal('${r.id}')">
+            <i class="fas fa-pen"></i>
+          </button>
+          <button class="icon-btn icon-delete" title="Delete" onclick="openDeleteUnit('${r.id}', '${escapeHTML(r.name || '')}')">
+            <i class="fas fa-trash"></i>
+          </button>
         </td>
       </tr>
     `).join("");
