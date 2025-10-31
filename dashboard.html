@@ -2205,6 +2205,125 @@ function showListProducts() {
   });
 }
 
+// 2) Make sure these loaders RETURN promises and fill productManager
+function loadLocations() {
+  const sel = document.getElementById("locationFilter");
+  if (!sel) return Promise.resolve();
+  sel.innerHTML = `<option value="">All Locations</option>`;
+  sel.disabled = true;
+  return firebase.firestore().collection("businessLocations").orderBy("name").get()
+    .then(snap => {
+      productManager.locations = snap.docs.map(d => d.data().name || d.id);
+      productManager.locations.forEach(n => {
+        const o = document.createElement("option"); o.value = o.textContent = n; sel.appendChild(o);
+      });
+    })
+    .finally(() => { sel.disabled = false; });
+}
+
+function loadCategories() {
+  const sel = document.getElementById("categoryFilter");
+  if (!sel) return Promise.resolve();
+  sel.innerHTML = `<option value="">All Categories</option>`;
+  return firebase.firestore().collection("categories").orderBy("name").get().then(snap => {
+    productManager.categories = snap.docs.map(d => d.data().name || d.id);
+    productManager.categories.forEach(n => {
+      const o = document.createElement("option"); o.value = o.textContent = n; sel.appendChild(o);
+    });
+  });
+}
+
+function loadBrands() {
+  const sel = document.getElementById("brandFilter");
+  if (!sel) return Promise.resolve();
+  sel.innerHTML = `<option value="">All Brands</option>`;
+  return firebase.firestore().collection("brands").orderBy("name").get().then(snap => {
+    productManager.brands = snap.docs.map(d => d.data().name || d.id);
+    productManager.brands.forEach(n => {
+      const o = document.createElement("option"); o.value = o.textContent = n; sel.appendChild(o);
+    });
+  });
+}
+
+function loadProducts() {
+  return firebase.firestore().collection("products").orderBy("nameLower").get().then(snap => {
+    productManager.products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  });
+}
+
+// 3) Safe util used in your catch
+function escapeHTML(s=""){return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));}
+
+// 4) Filtering + pagination + render
+function getFilteredProducts(searchText="") {
+  let list = productManager.products || [];
+
+  if (productManager.selectedLocation)
+    list = list.filter(p => (p.locations||[]).includes(productManager.selectedLocation));
+
+  if (productManager.selectedCategory)
+    list = list.filter(p => (p.category||"") === productManager.selectedCategory);
+
+  if (productManager.selectedBrand)
+    list = list.filter(p => (p.brand||"") === productManager.selectedBrand);
+
+  if (searchText && searchText.length >= 3)
+    list = list.filter(p => (p.name||"").toLowerCase().includes(searchText));
+
+  return list;
+}
+
+function renderProductsTable(searchText="") {
+  const tbody = document.getElementById("productsTbody");
+  const info  = document.getElementById("paginationInfo");
+  if (!tbody) return;
+
+  const all = getFilteredProducts(searchText);
+  const per = productManager.itemsPerPage === Infinity ? all.length : productManager.itemsPerPage;
+  const maxPage = Math.max(1, Math.ceil(all.length / (per || 1)));
+  if (productManager.currentPage > maxPage) productManager.currentPage = maxPage;
+
+  const start = (productManager.currentPage - 1) * per;
+  const pageItems = all.slice(start, start + per);
+
+  if (!pageItems.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No products found.</td></tr>`;
+  } else {
+    tbody.innerHTML = pageItems.map(p => `
+      <tr>
+        <td>${escapeHTML(p.name || "")}</td>
+        <td>${escapeHTML(p.category || "")}</td>
+        <td>${escapeHTML(p.brand || "")}</td>
+        <td>${Number(p.buyingPrice||0).toLocaleString()}</td>
+        <td>${Number(p.sellingPrice||0).toLocaleString()}</td>
+        <td>${p.openingStock ?? "-"}</td>
+        <td>${escapeHTML((p.locations||[]).join(", "))}</td>
+        <td>
+          <button onclick="viewProduct('${p.id}')">View</button>
+          <button onclick="editProduct('${p.id}')">Edit</button>
+          <button onclick="confirmDeleteProduct('${p.id}', '${escapeHTML(p.name||"")}')">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  // pagination UI
+  const prev = document.getElementById("prevPageBtn");
+  const next = document.getElementById("nextPageBtn");
+  if (prev) prev.disabled = productManager.currentPage <= 1;
+  if (next) next.disabled = productManager.currentPage >= maxPage;
+  if (info) info.textContent = ` Page ${productManager.currentPage} of ${maxPage} — ${all.length} items `;
+
+  tbody.setAttribute("aria-busy","false");
+}
+
+// 5) Minimal stubs so buttons don’t crash
+function viewProduct(id){ document.getElementById("viewModal").style.display="flex"; document.getElementById("viewModalContent").textContent = id; }
+function editProduct(id){ document.getElementById("editModal").style.display="flex"; }
+function confirmDeleteProduct(id, name){ document.getElementById("deleteModal").style.display="flex"; document.getElementById("deleteModalMessage").textContent = `Delete “${name}”?`; }
+function closeModal(id){ const m=document.getElementById(id); if(m) m.style.display="none"; }
+function showToast(msg){ console.log(msg); } // replace with your real toast
+
 
 // Initialize locationManager for pagination
 const locationManager = {
