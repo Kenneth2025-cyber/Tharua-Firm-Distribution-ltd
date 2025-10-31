@@ -4281,12 +4281,8 @@ function renderUnits() {
           <span class="badge ${r.allowDecimal ? 'badge-yes':'badge-no'}">${r.allowDecimal ? 'Yes':'No'}</span>
         </td>
         <td class="actions" style="${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
-          <button class="icon-btn icon-edit"   title="Edit"   onclick="openUnitModal('${r.id}')">
-            <i class="fas fa-pen"></i>
-          </button>
-          <button class="icon-btn icon-delete" title="Delete" onclick="openDeleteUnit('${r.id}', '${escapeHTML(r.name || '')}')">
-            <i class="fas fa-trash"></i>
-          </button>
+          <button class="icon-btn icon-edit"   title="Edit"   aria-label="Edit">✏</button>
+          <button class="icon-btn icon-delete" title="Delete" aria-label="Delete">🗑</button>
         </td>
       </tr>
     `).join("");
@@ -9835,4 +9831,3 @@ document.addEventListener("click", function (e) {
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </body>
 </html>
-
