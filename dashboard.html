@@ -9487,9 +9487,18 @@ async function showInventoryReport() {
   });
 
   await loadInventoryProducts(); // products only
-  await loadInventoryFilters();  // ← populate filter dropdowns
-  wireInventoryFilterEvents();   // ← listen for changes
-  applyInventoryFilters();       // ← compute filtered + render
+
+  // 🔹 FILTERS: populate + wire + apply
+  await loadInventoryFilters();
+  const _loc = document.getElementById("filterLocation");
+  const _cat = document.getElementById("filterCategory");
+  const _br  = document.getElementById("filterBrand");
+  if (_loc) _loc.addEventListener("change", applyInventoryFilters);
+  if (_cat) _cat.addEventListener("change", applyInventoryFilters);
+  if (_br)  _br.addEventListener("change",  applyInventoryFilters);
+  applyInventoryFilters();
+
+  renderInventory();
 }
 
 // ---------- Firestore I/O (products only) ----------
@@ -9517,7 +9526,7 @@ async function loadInventoryProducts() {
   inventoryState.currentPage = 1;
 }
 
-// ---------- Filters (functional) ----------
+// ---------- FILTERS (only additions below) ----------
 async function loadInventoryFilters(){
   try{
     const [locSnap, catSnap, brandSnap] = await Promise.all([
@@ -9545,23 +9554,15 @@ async function loadInventoryFilters(){
   }catch(e){ /* silent */ }
 }
 
-function wireInventoryFilterEvents(){
-  const locSel = document.getElementById("filterLocation");
-  const catSel = document.getElementById("filterCategory");
-  const brSel  = document.getElementById("filterBrand");
-  if (locSel) locSel.addEventListener("change", applyInventoryFilters);
-  if (catSel) catSel.addEventListener("change", applyInventoryFilters);
-  if (brSel)  brSel.addEventListener("change", applyInventoryFilters);
-}
-
 function applyInventoryFilters(){
   const locSel = document.getElementById("filterLocation");
   const catSel = document.getElementById("filterCategory");
   const brSel  = document.getElementById("filterBrand");
+
   const loc = locSel ? locSel.value : "";
   const cat = catSel ? catSel.value : "";
   const br  = brSel  ? brSel.value  : "";
-  const t = (inventoryState.searchTerm || "").toLowerCase();
+  const t   = (inventoryState.searchTerm || "").toLowerCase();
 
   inventoryState.filtered = inventoryState.rows
     .filter(r => !loc || r.location === loc)
@@ -9581,9 +9582,10 @@ function changeInventoryPerPage(v) {
 }
 
 function searchInventory(term) {
+  // 🔹 keep API, but combine with filters
   const t = term.trim();
   inventoryState.searchTerm = t;
-  applyInventoryFilters(); // ← combine search with selected filters
+  applyInventoryFilters();
 }
 
 function inventoryPrevPage() {
@@ -9627,7 +9629,7 @@ function renderInventory() {
     end = Math.min(start + ipp, total);
     btnPrev.disabled = inventoryState.currentPage <= 1;
     btnNext.disabled = inventoryState.currentPage >= pages;
-  } else { btnPrev.disabled = true; btnNext disabled = true; }
+  } else { btnPrev.disabled = true; btnNext.disabled = true; }
 
   const slice = inventoryState.filtered.slice(start, end);
 
