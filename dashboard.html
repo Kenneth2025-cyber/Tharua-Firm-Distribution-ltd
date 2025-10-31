@@ -2343,77 +2343,56 @@ tbody.innerHTML = pageItems.map(p => `
   tbody.setAttribute("aria-busy","false");
 }
 
-// 5) Minimal stubs so buttons don’t crash
-// View product (sweet modal with full details)
+// 5) Button actions with functional view modal
 async function viewProduct(id) {
-  const db = firebase.firestore();
   const modal = document.getElementById("viewModal");
-  const box   = document.getElementById("viewModalContent");
-
-  // show modal + loader
+  const box = document.getElementById("viewModalContent");
   modal.style.display = "flex";
-  box.innerHTML = `
-    <div class="loading-overlay">
-      <div class="spinner"></div>
-      <div>Loading…</div>
-    </div>
-  `;
+  box.innerHTML = `<div style="text-align:center;padding:20px;">Loading...</div>`;
 
   try {
-    const snap = await db.collection("products").doc(id).get();
-    if (!snap.exists) { box.innerHTML = `<p class="error-text">Product not found.</p>`; return; }
+    const snap = await firebase.firestore().collection("products").doc(id).get();
+    if (!snap.exists) {
+      box.innerHTML = `<p style="color:red;">Product not found.</p>`;
+      return;
+    }
+
     const p = snap.data();
-
-    // optional: stock per location
-    const balSnap = await db.collection("stockBalances").where("productId","==",id).get();
-    const balRows = [];
-    balSnap.forEach(d => {
-      const b = d.data();
-      balRows.push(
-        `<tr><td>${escapeHTML(b.location || "-")}</td><td>${Number(b.onHand||0)}</td><td>KES ${Number(b.unitCost||0).toFixed(2)}</td></tr>`
-      );
-    });
-    const balancesTable = balRows.length ? `
-      <h3 style="margin-top:12px;">Stock by Location</h3>
-      <table class="summary-table">
-        <tr><th>Location</th><th>On Hand</th><th>Unit Cost</th></tr>
-        ${balRows.join("")}
-      </table>` : "";
-
     box.innerHTML = `
-      <table class="summary-table">
-        <tr><td><strong>Name</strong></td><td>${escapeHTML(p.name||"-")}</td></tr>
-        <tr><td><strong>Category</strong></td><td>${escapeHTML(p.category||"-")}</td></tr>
-        <tr><td><strong>Brand</strong></td><td>${escapeHTML(p.brand||"-")}</td></tr>
-        <tr><td><strong>SKU</strong></td><td>${escapeHTML(p.sku||"-")}</td></tr>
-        <tr><td><strong>Barcode</strong></td><td>${escapeHTML(p.barcode||"-")}</td></tr>
-        <tr><td><strong>Unit</strong></td><td>${escapeHTML(p.unit||"-")}</td></tr>
-        <tr><td><strong>Buying Price</strong></td><td>KES ${Number(p.buyingPrice||0).toFixed(2)}</td></tr>
-        <tr><td><strong>Selling Price</strong></td><td>KES ${Number(p.sellingPrice||0).toFixed(2)}</td></tr>
-        <tr><td><strong>VAT</strong></td><td>${p.vatable ? `${(p.vatRate*100).toFixed(2)}% (${p.vatInclusion||"—"})` : "Non-VAT"}</td></tr>
-        <tr><td><strong>Locations</strong></td><td>${escapeHTML((p.locations||[]).join(", ")||"-")}</td></tr>
-        <tr><td><strong>Created</strong></td><td>${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString() : "-"}</td></tr>
-        <tr><td><strong>Updated</strong></td><td>${p.updatedAt?.toDate ? p.updatedAt.toDate().toLocaleString() : "-"}</td></tr>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr><td><strong>Product Name:</strong></td><td>${escapeHTML(p.name || "-")}</td></tr>
+        <tr><td><strong>Category:</strong></td><td>${escapeHTML(p.category || "-")}</td></tr>
+        <tr><td><strong>Brand:</strong></td><td>${escapeHTML(p.brand || "-")}</td></tr>
+        <tr><td><strong>Buying Price:</strong></td><td>KES ${Number(p.buyingPrice || 0).toFixed(2)}</td></tr>
+        <tr><td><strong>Selling Price:</strong></td><td>KES ${Number(p.sellingPrice || 0).toFixed(2)}</td></tr>
+        <tr><td><strong>Opening Stock:</strong></td><td>${p.openingStock ?? "-"}</td></tr>
+        <tr><td><strong>Locations:</strong></td><td>${escapeHTML((p.locations || []).join(", ") || "-")}</td></tr>
+        <tr><td><strong>Created:</strong></td><td>${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString() : "-"}</td></tr>
       </table>
-      ${balancesTable}
     `;
-  } catch (e) {
-    box.innerHTML = `<p class="error-text">Error: ${escapeHTML(e.message)}</p>`;
+  } catch (err) {
+    box.innerHTML = `<p style="color:red;">Error loading product: ${escapeHTML(err.message)}</p>`;
   }
 }
 
-// close on overlay click / Esc (optional nicety)
-document.getElementById("viewModal").addEventListener("click", e => {
-  if (e.target.id === "viewModal") closeModal("viewModal");
-});
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") closeModal("viewModal");
-});
+function editProduct(id) {
+  document.getElementById("editModal").style.display = "flex";
+}
 
-function editProduct(id){ document.getElementById("editModal").style.display="flex"; }
-function confirmDeleteProduct(id, name){ document.getElementById("deleteModal").style.display="flex"; document.getElementById("deleteModalMessage").textContent = `Delete “${name}”?`; }
-function closeModal(id){ const m=document.getElementById(id); if(m) m.style.display="none"; }
-function showToast(msg){ console.log(msg); } // replace with your real toast
+function confirmDeleteProduct(id, name) {
+  document.getElementById("deleteModal").style.display = "flex";
+  document.getElementById("deleteModalMessage").textContent = `Delete “${name}”?`;
+}
+
+function closeModal(id) {
+  const m = document.getElementById(id);
+  if (m) m.style.display = "none";
+}
+
+function showToast(msg) {
+  console.log(msg); // replace with your toast library if available
+}
+
 
 
 // Initialize locationManager for pagination
