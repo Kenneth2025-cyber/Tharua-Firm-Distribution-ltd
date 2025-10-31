@@ -4000,11 +4000,7 @@ async function showUnits() {
       .units-toolbar .btn { border:none; padding:8px 12px; border-radius:6px; cursor:pointer; }
       .btn-primary { background:#5b6ee1; color:#fff; }
       .btn-outline { background:#fff; border:1px solid #ddd; }
-      .btn-danger  { background:#dc3545; color:#fff; }
-
-      /* gray buttons for Columns & PDF (requested) */
-      .btn-gray { background:#f3f4f6; color:#111827; border:1px solid #d1d5db; }
-      .btn-gray:hover { background:#e5e7eb; }
+      .btn-danger { background:#dc3545; color:#fff; }
 
       /* colored export buttons + compact size */
       .export-group{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; white-space:nowrap; }
@@ -4031,7 +4027,7 @@ async function showUnits() {
 
       .badge { padding:2px 8px; border-radius:14px; font-size:12px; }
       .badge-yes { background:#e6f4ea; color:#2e7d32; }
-      .badge-no  { background:#fde7e9; color:#c62828; }
+      .badge-no { background:#fde7e9; color:#c62828; }
 
       /* tiny icon action buttons */
       .actions { white-space:nowrap; }
@@ -4074,7 +4070,7 @@ async function showUnits() {
           <button class="btn btn-excel btn-sm" onclick="exportUnitsExcel()">Excel</button>
           <button class="btn btn-print btn-sm" onclick="printUnits()">Print</button>
           <div class="col-visibility">
-            <button class="btn btn-gray btn-sm" onclick="toggleUnitsColPanel()">Columns</button>
+            <button class="btn btn-outline btn-sm" onclick="toggleUnitsColPanel()">Columns</button>
             <div id="unitsColPanel" class="col-panel">
               <label><input type="checkbox" checked onchange="setUnitsCol('name', this.checked)"> Name</label>
               <label><input type="checkbox" checked onchange="setUnitsCol('shortName', this.checked)"> Short name</label>
@@ -4082,7 +4078,7 @@ async function showUnits() {
               <label><input type="checkbox" checked onchange="setUnitsCol('actions', this.checked)"> Action</label>
             </div>
           </div>
-          <button class="btn btn-gray btn-sm" onclick="exportUnitsPDF()">PDF</button>
+          <button class="btn btn-outline btn-sm" onclick="exportUnitsPDF()">PDF</button>
         </div>
 
         <div style="margin-left:auto">
@@ -4240,14 +4236,14 @@ function toggleUnitsColPanel() {
 }
 function setUnitsCol(key, val) {
   unitsState.visibleCols[key] = !!val;
-// hide/show headers
-document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
-  th.style.display = val ? "" : "none";
-});
-
+  // hide/show headers
+  document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
+    th.style.display = val ? "" : "none";
+  });
   // rows are re-rendered to apply visibility
   renderUnits();
 }
+
 // ---------- Render ----------
 function renderUnits() {
   const tbody = document.getElementById("unitsTbody");
@@ -4281,7 +4277,7 @@ function renderUnits() {
           <span class="badge ${r.allowDecimal ? 'badge-yes':'badge-no'}">${r.allowDecimal ? 'Yes':'No'}</span>
         </td>
         <td class="actions" style="${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
-          <button class="icon-btn icon-edit" title="Edit" onclick="openUnitModal('${r.id}')">
+          <button class="icon-btn icon-edit"   title="Edit"   onclick="openUnitModal('${r.id}')">
             <i class="fas fa-pen"></i>
           </button>
           <button class="icon-btn icon-delete" title="Delete" onclick="openDeleteUnit('${r.id}', '${escapeHTML(r.name || '')}')">
@@ -4328,14 +4324,12 @@ function openUnitModal(id = null) {
   }
   document.getElementById("unitModal").style.display = "block";
 }
-
 function openDeleteUnit(id, name) {
   document.getElementById("unitDeleteModal").dataset.id = id;
   document.getElementById("unitDeleteText").textContent =
     `Delete unit "${name}"? This cannot be undone.`;
   document.getElementById("unitDeleteModal").style.display = "block";
 }
-
 async function confirmDeleteUnit() {
   const id = document.getElementById("unitDeleteModal").dataset.id;
   try {
@@ -4348,7 +4342,6 @@ async function confirmDeleteUnit() {
     alert(e.message || "Delete failed");
   }
 }
-
 function closeModal(id) {
   const m = document.getElementById(id);
   if (m) m.style.display = "none";
@@ -4397,7 +4390,7 @@ function exportUnitsCSV() {
   const rows = unitsState.filtered.map(r => cols.map(c => {
     let v = (c === "allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (r[c] || "");
     v = String(v).replace(/"/g,'""');
-    return \`"\${v}"\`;
+    return `"${v}"`;
   }).join(","));
   const csv = [header, ...rows].join("\n");
   downloadBlob(csv, "units.csv", "text/csv;charset=utf-8;");
@@ -4405,17 +4398,17 @@ function exportUnitsCSV() {
 
 function exportUnitsExcel() {
   const cols = ["name","shortName","allowDecimal"].filter(c => unitsState.visibleCols[c]);
-  const head = cols.map(c => \`<th>\${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>\`).join("");
+  const head = cols.map(c => `<th>${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>`).join("");
   const body = unitsState.filtered.map(r => `
     <tr>
-      \${cols.map(c => {
+      ${cols.map(c => {
         let v = (c==="allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (escapeHTML(r[c]||""));
-        return \`<td>\${v}</td>\`;
+        return `<td>${v}</td>`;
       }).join("")}
     </tr>`).join("");
   const html = `
     <html><head><meta charset="UTF-8"></head>
-    <body><table border="1"><thead><tr>\${head}</tr></thead><tbody>\${body}</tbody></table></body></html>`;
+    <body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
   downloadBlob(html, "units.xls", "application/vnd.ms-excel");
 }
 
@@ -4441,9 +4434,9 @@ function exportUnitsPDF() {
     </style>
     </head><body>
       <h2>Units</h2>
-      <table><thead><tr>\${cols.map(c=>\`<th>\${c}</th>\`).join("")}</tr></thead>
+      <table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
       <tbody>
-        \${rows.map(r=>\`<tr>\${r.map(c=>\`<td>\${c}</td>\`).join("")}</tr>\`).join("")}
+        ${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}
       </tbody></table>
       <script>window.onload = () => window.print();<\/script>
     </body></html>
