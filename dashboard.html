@@ -3999,9 +3999,10 @@ async function showUnits() {
       /* buttons */
       .units-toolbar .btn { border:none; padding:8px 12px; border-radius:6px; cursor:pointer; }
       .btn-primary { background:#5b6ee1; color:#fff; }
+      .btn-outline { background:#fff; border:1px solid #ddd; }
       .btn-danger  { background:#dc3545; color:#fff; }
 
-      /* muted gray buttons (Columns & PDF) */
+      /* gray buttons for Columns & PDF (requested) */
       .btn-gray { background:#f3f4f6; color:#111827; border:1px solid #d1d5db; }
       .btn-gray:hover { background:#e5e7eb; }
 
@@ -4240,7 +4241,7 @@ function toggleUnitsColPanel() {
 function setUnitsCol(key, val) {
   unitsState.visibleCols[key] = !!val;
   // hide/show headers
-  document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
+  document.querySelectorAll(\`#unitsTable [data-col="\${key}"]\`).forEach(th => {
     th.style.display = val ? "" : "none";
   });
   // rows are re-rendered to apply visibility
@@ -4270,9 +4271,9 @@ function renderUnits() {
 
   const slice = unitsState.filtered.slice(start, end);
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>`;
+    tbody.innerHTML = \`<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>\`;
   } else {
-    tbody.innerHTML = slice.map(r => `
+    tbody.innerHTML = slice.map(r => \`
       <tr>
         <td style="\${!unitsState.visibleCols.name ? 'display:none':''}" data-col="name">\${escapeHTML(r.name || "")}</td>
         <td style="\${!unitsState.visibleCols.shortName ? 'display:none':''}" data-col="shortName">\${escapeHTML(r.shortName || "")}</td>
@@ -4288,7 +4289,7 @@ function renderUnits() {
           </button>
         </td>
       </tr>
-    `).join("");
+    \`).join("");
   }
 
   const showing = total ? \`\${start + 1} to \${end} of \${total}\` : \`0 of 0\`;
