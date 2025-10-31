@@ -2328,17 +2328,12 @@ tbody.innerHTML = pageItems.map(p => `
     <td>${Number(p.sellingPrice || 0).toFixed(2)}</td>
     <td>${p.openingStock ?? "-"}</td>
     <td>${escapeHTML((p.locations || []).join(", ") || "-")}</td>
-  <td style="text-align:center;">
-  <button class="btn btn-sm btn-light" title="View">
-    <img src="images/view.png" alt="View" width="14">
-  </button>
-  <button class="btn btn-sm btn-primary" title="Edit">
-    <img src="images/edit.png" alt="Edit" width="14">
-  </button>
-  <button class="btn btn-sm btn-danger" title="Delete">
-    <img src="images/delete.png" alt="Delete" width="14">
-  </button>
+<td style="text-align:center;">
+  <button class="btn btn-sm btn-light" title="View">👁</button>
+  <button class="btn btn-sm btn-primary" title="Edit">✏</button>
+  <button class="btn btn-sm btn-danger" title="Delete">🗑</button>
 </td>
+
 
   </tr>
 `).join("");
