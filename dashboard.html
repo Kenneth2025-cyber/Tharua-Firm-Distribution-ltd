@@ -9330,380 +9330,277 @@ function showPurchaseReport() {
   `;
 }
 
-// ---------- Inventory Page State ----------
-const inventoryState = {
-  rows: [],
-  filtered: [],
-  currentPage: 1,
-  itemsPerPage: 25,
-  searchTerm: "",
-  visibleCols: {
-    product: true,
-    category: true,
-    brand: true,
-    location: true,
-    openingStock: true,
-    openingStockToday: true,
-    purchasedToday: true,
-    purchasedTotal: true,
-    soldToday: true,
-    soldTotal: true,
-    adjusted: true,
-    currentStock: true
-  },
-};
-
-// Column defs (order + labels)
-const inventoryColumns = [
-  { key: "product",            label: "Product" },
-  { key: "category",           label: "Category" },
-  { key: "brand",              label: "Brand" },
-  { key: "location",           label: "Location" },
-  { key: "openingStock",       label: "Opening Stock",          numeric: true },
-  { key: "openingStockToday",  label: "Opening Stock Today",    numeric: true },
-  { key: "purchasedToday",     label: "Purchased Today",        numeric: true },
-  { key: "purchasedTotal",     label: "Purchased Total",        numeric: true },
-  { key: "soldToday",          label: "Sold Today",             numeric: true },
-  { key: "soldTotal",          label: "Sold Total",             numeric: true },
-  { key: "adjusted",           label: "Adjusted",               numeric: true },
-  { key: "currentStock",       label: "Current Stocks Available", numeric: true },
-];
-
-const numericKeys = inventoryColumns.filter(c => c.numeric).map(c => c.key);
-
-// ---------- Page Entrypoint ----------
 async function showInventoryReport() {
   saveLastPage("showInventoryReport");
-  const el = document.getElementById("content");
-  el.innerHTML = `
-    <style data-inventory-style>
-      .units-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;}
-      .units-header h2{margin:0;}
-      .units-table-wrap{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06);padding:14px;}
-      .units-flex{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
-      .units-flex .input{padding:8px 10px;border:1px solid #ccc;border-radius:6px;}
-      .units-flex select{min-width:90px;}
-      .units-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-      .export-group{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;white-space:nowrap;}
-      .btn{border:none;padding:8px 12px;border-radius:6px;cursor:pointer;}
-      .btn-sm{padding:4px 8px;font-size:12px;line-height:1.2;}
-      .btn-csv{background:#0d6efd;color:#fff;}
-      .btn-excel{background:#198754;color:#fff;}
-      .btn-print{background:#dc3545;color:#fff;}
-      .btn-gray{background:#6b7280;color:#fff;border:1px solid #6b7280;}
-      .btn-csv:hover,.btn-excel:hover,.btn-print:hover,.btn-gray:hover{filter:brightness(0.95);}
-      .col-visibility{position:relative;}
-      .col-panel{position:absolute;top:40px;left:0;background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px 10px;display:none;z-index:10;}
-      .col-panel label{display:flex;gap:8px;align-items:center;padding:4px 2px;}
-      .table-container{overflow-x:auto;}
-      .units-table{width:100%;min-width:1200px;border-collapse:separate;border-spacing:0;}
-      .units-table th,.units-table td{border:0;border-bottom:1px solid #e9ecef;padding:10px;font-size:14px;white-space:nowrap;}
-      .units-table thead th{background:#f8f9fa;border-bottom:1px solid #dde1e6;text-align:left;}
-      tfoot .total-row td{background:#f5f5f5;font-weight:600;border-top:2px solid #e0e0e0;}
-      .pagination-section{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
-      .pagination-section .pager button{padding:8px 12px;border:none;background:#007bff;color:#fff;border-radius:6px;cursor:pointer;}
-      .pagination-section .pager button:disabled{background:#aaa;cursor:not-allowed;}
+
+  document.getElementById("content").innerHTML = `
+    <style>
+      .filter-section {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        align-items: center;
+        border: 1px solid #e0e0e0;
+      }
+      .filter-section label {
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+        margin-right: 8px;
+      }
+      .filter-section select, .filter-section input[type="text"] {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+        background: #fff;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .filter-section select { width: 140px; }
+      .filter-section input[type="text"] { width: 180px; }
+      .filter-section button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .filter-section .apply-btn { background: #0056b3; color: white; }
+      .filter-section .apply-btn:hover { background: #003d82; }
+      .filter-section .export-btn { background: #218838; color: white; }
+      .filter-section .export-btn:hover { background: #1a6d2e; }
+
+      .table-container {
+        max-height: 500px;
+        overflow-y: auto;
+        width: 100%;
+        position: relative;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .table-container table { width: 100%; border-collapse: collapse; }
+      .table-container th, .table-container td {
+        padding: 12px;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      .table-container th { font-weight: 600; color: #333; }
+
+      .pagination-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 15px;
+        font-size: 14px;
+      }
+      .pagination-section button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .pagination-section .prev-btn, .pagination-section .next-btn {
+        background: #007bff; color: white;
+      }
+      .pagination-section button:disabled { background: #ccc; cursor: not-allowed; }
     </style>
 
-    <div class="units-header">
-      <h2>Inventory Report</h2>
+    <h2>Inventory Report</h2>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <div class="filter-group">
+        <label for="locationFilter">Location:</label>
+        <select id="locationFilter"><option value="">Select Location</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="categoryFilter">Category:</label>
+        <select id="categoryFilter"><option value="">Select Category</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="brandFilter">Brand:</label>
+        <select id="brandFilter"><option value="">Select Brand</option></select>
+      </div>
+      <div class="search-group">
+        <label for="searchInventory">Search:</label>
+        <input type="text" id="searchInventory" placeholder="3+ chars..."/>
+      </div>
+      <button id="applyInventoryFilterBtn" class="apply-btn">Apply</button>
+      <button id="exportInventoryBtn" class="export-btn">Export</button>
     </div>
 
-    <div class="units-table-wrap">
-      <div class="units-flex">
-        <div>
-          Show
-          <select id="inventoryPerPage" class="input" onchange="changeInventoryPerPage(this.value)">
-            <option>10</option><option selected>25</option><option>50</option><option>100</option><option>1000</option><option value="all">All</option>
-          </select>
-          entries
-        </div>
+    <!-- Inventory Table -->
+    <div class="table-container">
+      <table border="1" cellpadding="8" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Brand</th>
+            <th>Location</th>
+            <th>Opening Stock</th>
+            <th>Purchased</th>
+            <th>Sold</th>
+            <th>Closing Stock</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryTbody">
+          <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-        <div class="units-toolbar export-group">
-          <button class="btn btn-csv btn-sm"   onclick="exportInventoryCSV()">CSV</button>
-          <button class="btn btn-excel btn-sm" onclick="exportInventoryExcel()">Excel</button>
-          <button class="btn btn-print btn-sm" onclick="printInventory()">Print</button>
-          <div class="col-visibility">
-            <button class="btn btn-gray btn-sm" onclick="toggleInventoryColPanel()">Columns</button>
-            <div id="inventoryColPanel" class="col-panel">
-              ${inventoryColumns.map(c => `
-                <label><input type="checkbox" ${inventoryState.visibleCols[c.key] ? "checked":""}
-                  onchange="setInventoryCol('${c.key}', this.checked)"> ${c.label}</label>`).join("")}
-            </div>
-          </div>
-          <button class="btn btn-gray btn-sm" onclick="exportInventoryPDF()">PDF</button>
-        </div>
-
-        <div style="margin-left:auto">
-          <input id="inventorySearch" class="input" placeholder="Search ..." oninput="searchInventory(this.value)">
-        </div>
+    <!-- Pagination -->
+    <div class="pagination-section">
+      <div>
+        <label for="inventoryItemsPerPage">Show:</label>
+        <select id="inventoryItemsPerPage">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all">All</option>
+        </select>
+        <span id="inventoryPaginationInfo"></span>
       </div>
-
-      <div class="table-container">
-        <table class="units-table" id="inventoryTable">
-          <thead>
-            <tr>
-              ${inventoryColumns.map(c => `<th data-col="${c.key}">${c.label}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody id="inventoryTbody">
-            <tr><td colspan="${inventoryColumns.length}" style="text-align:center;">Loading...</td></tr>
-          </tbody>
-          <tfoot id="inventoryTfoot">
-            <tr class="total-row">
-              ${inventoryColumns.map((c,i) => `<td data-col="${c.key}">${i===0?"Total":""}</td>`).join("")}
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <div class="pagination-section">
-        <div id="inventoryInfo"></div>
-        <div class="pager">
-          <button id="inventoryPrev" onclick="inventoryPrevPage()" disabled>Previous</button>
-          <button id="inventoryNext" onclick="inventoryNextPage()" disabled>Next</button>
-        </div>
+      <div>
+        <button id="inventoryPrevPageBtn" class="prev-btn" disabled>Previous</button>
+        <button id="inventoryNextPageBtn" class="next-btn">Next</button>
       </div>
     </div>
   `;
 
-  document.addEventListener("click", (e) => {
-    const panel = document.getElementById("inventoryColPanel");
-    if (!panel) return;
-    const trigger = e.target.closest(".col-visibility");
-    if (!trigger) panel.style.display = "none";
+  // Load filters (locations, categories, brands)
+  await loadInventoryFilters();
+
+  // Fetch first set of reports
+  fetchInventoryReports();
+
+  // Event listeners
+  document.getElementById("applyInventoryFilterBtn").addEventListener("click", fetchInventoryReports);
+  document.getElementById("searchInventory").addEventListener("input", () => {
+    if (document.getElementById("searchInventory").value.length >= 3 || document.getElementById("searchInventory").value === "") {
+      fetchInventoryReports();
+    }
   });
-
-  await loadInventoryProducts(); // products only
-  renderInventory();
+  document.getElementById("inventoryItemsPerPage").addEventListener("change", fetchInventoryReports);
+  document.getElementById("inventoryPrevPageBtn").addEventListener("click", () => changeInventoryPage(-1));
+  document.getElementById("inventoryNextPageBtn").addEventListener("click", () => changeInventoryPage(1));
+  document.getElementById("exportInventoryBtn").addEventListener("click", exportInventoryReport);
 }
 
-// ---------- Firestore I/O (products only) ----------
-async function loadInventoryProducts() {
-  const snap = await firebase.firestore().collection("products").get();
-  inventoryState.rows = snap.docs.map(d => {
-    const data = d.data() || {};
-    return {
-      id: d.id,
-      product: data.name || "",
-      category: data.category || "",
-      brand: data.brand || "",
-      location: (Array.isArray(data.locations) && data.locations[0]) || "",
-      openingStock: data.openingStock || 0,
-      openingStockToday: 0,
-      purchasedToday: 0,
-      purchasedTotal: 0,
-      soldToday: 0,
-      soldTotal: 0,
-      adjusted: 0,
-      currentStock: 0
-    };
-  });
-  inventoryState.filtered = [...inventoryState.rows];
-  inventoryState.currentPage = 1;
+// Load dropdown filter options
+async function loadInventoryFilters() {
+  const locSnap = await firebase.firestore().collection("businessLocations").get();
+  const catSnap = await firebase.firestore().collection("categories").get();
+  const brandSnap = await firebase.firestore().collection("brands").get();
+
+  const locationFilter = document.getElementById("locationFilter");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const brandFilter = document.getElementById("brandFilter");
+
+  locSnap.forEach(doc => locationFilter.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+  catSnap.forEach(doc => categoryFilter.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+  brandSnap.forEach(doc => brandFilter.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
 }
 
-// ---------- UI Handlers ----------
-function changeInventoryPerPage(v) {
-  inventoryState.itemsPerPage = (v === "all") ? "all" : parseInt(v, 10);
-  inventoryState.currentPage = 1;
-  renderInventory();
-}
-
-function searchInventory(term) {
-  const t = term.trim().toLowerCase();
-  inventoryState.searchTerm = t;
-  inventoryState.filtered = inventoryState.rows.filter(r =>
-    inventoryColumns.some(c => String(r[c.key] ?? "").toLowerCase().includes(t))
-  );
-  inventoryState.currentPage = 1;
-  renderInventory();
-}
-
-function inventoryPrevPage() {
-  if (inventoryState.currentPage > 1) { inventoryState.currentPage--; renderInventory(); }
-}
-function inventoryNextPage() {
-  const total = inventoryState.filtered.length;
-  const ipp = inventoryState.itemsPerPage === "all" ? total : inventoryState.itemsPerPage;
-  const pages = Math.max(1, Math.ceil(total / ipp));
-  if (inventoryState.currentPage < pages) { inventoryState.currentPage++; renderInventory(); }
-}
-
-function toggleInventoryColPanel() {
-  const p = document.getElementById("inventoryColPanel");
-  p.style.display = (p.style.display === "block" ? "none" : "block");
-}
-function setInventoryCol(key, val) {
-  inventoryState.visibleCols[key] = !!val;
-  // hide/show headers + total footer cells
-  document.querySelectorAll(`#inventoryTable [data-col="${key}"]`).forEach(th => {
-    th.style.display = val ? "" : "none";
-  });
-  renderInventory();
-}
-
-// ---------- Render ----------
-function renderInventory() {
+// Fetch reports based on filters
+async function fetchInventoryReports() {
   const tbody = document.getElementById("inventoryTbody");
-  const tfoot = document.getElementById("inventoryTfoot");
-  const info = document.getElementById("inventoryInfo");
-  const btnPrev = document.getElementById("inventoryPrev");
-  const btnNext = document.getElementById("inventoryNext");
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Loading...</td></tr>`;
 
-  const total = inventoryState.filtered.length;
-  let start = 0, end = total;
-  if (inventoryState.itemsPerPage !== "all") {
-    const ipp = inventoryState.itemsPerPage;
-    const pages = Math.max(1, Math.ceil(total / ipp));
-    inventoryState.currentPage = Math.min(inventoryState.currentPage, pages);
-    start = (inventoryState.currentPage - 1) * ipp;
-    end = Math.min(start + ipp, total);
-    btnPrev.disabled = inventoryState.currentPage <= 1;
-    btnNext.disabled = inventoryState.currentPage >= pages;
-  } else { btnPrev.disabled = true; btnNext.disabled = true; }
+  const loc = document.getElementById("locationFilter").value;
+  const cat = document.getElementById("categoryFilter").value;
+  const brand = document.getElementById("brandFilter").value;
+  const search = document.getElementById("searchInventory").value.toLowerCase();
 
-  const slice = inventoryState.filtered.slice(start, end);
+  // 🔹 Step 1: get all products
+  const snapshot = await firebase.firestore().collection("products").get();
+  let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // body
-  if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;">No inventory records found.</td></tr>`;
-  } else {
-    tbody.innerHTML = slice.map(r => `
-      <tr>
-        ${inventoryColumns.map(c => {
-          const show = inventoryState.visibleCols[c.key];
-          const val = r[c.key] ?? "";
-          return `<td style="${!show ? 'display:none':''}" data-col="${c.key}">${escapeHTML(val)}</td>`;
-        }).join("")}
-      </tr>
-    `).join("");
+  // 🔹 Step 2: apply filters in JS
+  if (loc) data = data.filter(d => d.locations && d.locations.includes(loc));
+  if (cat) data = data.filter(d => d.category === cat);
+  if (brand) data = data.filter(d => d.brand === brand);
+  if (search) data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
+
+  // 🔹 Step 3: build purchases totals map (productName + location → qty)
+  const purchasesSnap = await firebase.firestore().collection("purchases").get();
+  const purchaseTotals = {}; // key = productName|location
+  purchasesSnap.forEach(pDoc => {
+    const pdata = pDoc.data();
+    const purchaseLoc = pdata.location || "";
+    if (pdata.items && Array.isArray(pdata.items)) {
+      pdata.items.forEach(item => {
+        const pname = (item.productName || "").trim();
+        const qty = Number(item.quantity) || 0;
+        const key = `${pname}|${purchaseLoc}`;
+        if (!purchaseTotals[key]) purchaseTotals[key] = 0;
+        purchaseTotals[key] += qty;
+      });
+    }
+  });
+
+  // 🔹 Step 4: render table
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No inventory records found.</td></tr>`;
+    return;
   }
 
-  // totals over the FULL filtered dataset (not just page)
-  const totals = {};
-  numericKeys.forEach(k => {
-    totals[k] = inventoryState.filtered.reduce((sum, row) => sum + (Number(row[k]) || 0), 0);
-  });
+  tbody.innerHTML = data.map(d => {
+    const displayLocations = loc ? [loc] : (d.locations || []);
 
-  // footer row
-  const footerRow = `
-    <tr class="total-row">
-      ${inventoryColumns.map((c,i)=>{
-        const show = inventoryState.visibleCols[c.key];
-        let val = "";
-        if (i === 0) val = "Total";
-        if (numericKeys.includes(c.key)) val = (totals[c.key] || 0).toLocaleString();
-        return `<td style="${!show ? 'display:none':''}" data-col="${c.key}">${val}</td>`;
-      }).join("")}
-    </tr>`;
-  tfoot.innerHTML = footerRow;
+    return displayLocations.map(location => {
+      // 🔹 Opening stock: always read original value from Firestore
+      let opening = 0;
+      if (d.openingStock && typeof d.openingStock === "object") {
+        opening = Number(d.openingStock[location]) || 0;
+      } else if (typeof d.openingStock === "number") {
+        opening = d.openingStock;
+      }
 
-  // info
-  const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
-  info.textContent = `Showing ${showing} entries`;
+      // 🔹 Purchases (added separately, does NOT change opening)
+      const purchased = purchaseTotals[`${d.name}|${location}`] || 0;
+
+      // 🔹 Placeholder for sales (will deduct later if needed)
+      const sold = 0;
+
+      // 🔹 Closing = Opening + Purchases - Sales
+      const closing = opening + purchased - sold;
+
+      return `
+        <tr>
+          <td>${d.name || ""}</td>
+          <td>${d.category || ""}</td>
+          <td>${d.brand || ""}</td>
+          <td>${location}</td>
+          <td>${opening}</td>
+          <td>${purchased}</td>
+          <td>${sold}</td>
+          <td>${closing}</td>
+        </tr>
+      `;
+    }).join("");
+  }).join("");
 }
 
-// ---------- Exports & Print (includes totals row) ----------
-function exportInventoryCSV() {
-  const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
-  const header = cols.map(c => c.label).join(",");
-  const rows = inventoryState.filtered.map(r =>
-    cols.map(c => `"${String(r[c.key] ?? "").replace(/"/g,'""')}"`).join(",")
-  );
-  const totalsLine = cols.map((c,i)=>{
-    if (i===0) return `"Total"`;
-    return numericKeys.includes(c.key) ? `"${(inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()}"` : `""`;
-  }).join(",");
-  downloadBlob([header, ...rows, totalsLine].join("\n"), "inventory.csv", "text/csv;charset=utf-8;");
+// Pagination helpers
+function changeInventoryPage(direction) {
+  // Optional: implement pagination logic if needed
 }
 
-function exportInventoryExcel() {
-  const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
-  const head = cols.map(c => `<th>${c.label}</th>`).join("");
-  const body = inventoryState.filtered.map(r => `
-    <tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>
-  `).join("");
-
-  const totalsRow = `
-    <tr class="total-row">
-      ${cols.map((c,i)=>{
-        if (i===0) return `<td>Total</td>`;
-        const val = numericKeys.includes(c.key)
-          ? (inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()
-          : "";
-        return `<td>${val}</td>`;
-      }).join("")}
-    </tr>`;
-
-  const html = `
-    <html><head><meta charset="UTF-8"></head>
-    <body>
-      <table border="1">
-        <thead><tr>${head}</tr></thead>
-        <tbody>${body}</tbody>
-        <tfoot>${totalsRow}</tfoot>
-      </table>
-    </body></html>`;
-  downloadBlob(html, "inventory.xls", "application/vnd.ms-excel");
+// Export function
+function exportInventoryReport() {
+  alert("Exporting Inventory Report... (implement PDF/CSV export here)");
 }
-
-function exportInventoryPDF() {
-  const w = window.open("", "_blank");
-  const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
-
-  const bodyRows = inventoryState.filtered.map(r =>
-    `<tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>`
-  ).join("");
-
-  const totalsRow = `
-    <tr>
-      ${cols.map((c,i)=>{
-        if (i===0) return `<td><strong>Total</strong></td>`;
-        const val = numericKeys.includes(c.key)
-          ? (inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()
-          : "";
-        return `<td><strong>${val}</strong></td>`;
-      }).join("")}
-    </tr>`;
-
-  w.document.write(`
-    <html><head><title>Inventory</title>
-    <style>
-      body{font-family:Arial, sans-serif; padding:16px;}
-      table{width:100%; border-collapse:collapse;}
-      th,td{border:1px solid #333; padding:8px; font-size:12px;}
-      th{background:#eee;}
-      tfoot td{background:#f5f5f5; font-weight:600;}
-      h2{margin:0 0 10px;}
-    </style>
-    </head><body>
-      <h2>Inventory Report</h2>
-      <table>
-        <thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead>
-        <tbody>${bodyRows}</tbody>
-        <tfoot>${totalsRow}</tfoot>
-      </table>
-      <script>window.onload = () => window.print();<\/script>
-    </body></html>
-  `);
-  w.document.close();
-}
-
-function printInventory(){ exportInventoryPDF(); }
-
-// ---------- Utils ----------
-function downloadBlob(content, filename, type) {
-  const blob = new Blob([content], {type});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function escapeHTML(str){
-  return (str||"").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-}
-
 
 
 
