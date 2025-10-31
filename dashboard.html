@@ -3976,7 +3976,6 @@ async function togglePriceGroup(id, active) {
   showPriceGroups();
 }
 
-
 // ---------- Units Page State ----------
 const unitsState = {
   rows: [],
@@ -3984,7 +3983,7 @@ const unitsState = {
   currentPage: 1,
   itemsPerPage: 25,
   searchTerm: "",
-  visibleCols: { name:true, shortName:true, allowDecimal:true, actions:true },
+  visibleCols: { name: true, shortName: true, allowDecimal: true, actions: true },
 };
 
 // ---------- Page Entrypoint ----------
@@ -4000,6 +3999,12 @@ async function showUnits() {
       .btn-primary { background:#5b6ee1; color:#fff; }
       .btn-outline { background:#fff; border:1px solid #ddd; }
       .btn-danger { background:#dc3545; color:#fff; }
+      /* colored export buttons */
+      .btn-csv   { background:#0d6efd; color:#fff; }
+      .btn-excel { background:#198754; color:#fff; }
+      .btn-print { background:#dc3545; color:#fff; }
+      .btn-csv:hover, .btn-excel:hover, .btn-print:hover { filter:brightness(0.95); }
+
       .units-table-wrap { background:#fff; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.06); padding:14px; }
       .units-flex { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
       .units-flex .input { padding:8px 10px; border:1px solid #ccc; border-radius:6px; }
@@ -4007,23 +4012,27 @@ async function showUnits() {
       .col-visibility { position:relative; }
       .col-panel { position:absolute; top:40px; left:0; background:#fff; border:1px solid #ddd; border-radius:8px; padding:8px 10px; display:none; z-index:10; }
       .col-panel label { display:flex; gap:8px; align-items:center; padding:4px 2px; }
-      .units-table { width:100%; border-collapse:collapse; }
-      .units-table th, .units-table td { border:1px solid #eee; padding:10px; font-size:14px; }
-      .units-table th { background:#f7f7f7; text-align:left; }
+
+      /* thinner, cleaner table */
+      .units-table { width:100%; border-collapse:separate; border-spacing:0; }
+      .units-table th, .units-table td { border:0; border-bottom:1px solid #e9ecef; padding:10px; font-size:14px; }
+      .units-table thead th { background:#f8f9fa; border-bottom:1px solid #dde1e6; text-align:left; }
+
       .badge { padding:2px 8px; border-radius:14px; font-size:12px; }
       .badge-yes { background:#e6f4ea; color:#2e7d32; }
       .badge-no { background:#fde7e9; color:#c62828; }
       .actions button { margin-right:6px; padding:6px 10px; font-size:12px; border-radius:6px; border:none; cursor:pointer; }
       .actions .edit { background:#6f42c1; color:#fff; }
       .actions .delete { background:#ff6b6b; color:#fff; }
+
       .pagination-section { display:flex; justify-content:space-between; align-items:center; margin-top:12px; }
       .pagination-section .pager button { padding:8px 12px; border:none; background:#007bff; color:#fff; border-radius:6px; cursor:pointer; }
       .pagination-section .pager button:disabled { background:#aaa; cursor:not-allowed; }
+
       @media (max-width:600px){
         .units-header { flex-direction:column; align-items:flex-start; gap:8px; }
         .units-toolbar { width:100%; }
       }
-      /* Reuse your modal styles already in the file */
     </style>
 
     <div class="units-header">
@@ -4042,9 +4051,9 @@ async function showUnits() {
         </div>
 
         <div class="units-toolbar">
-          <button class="btn btn-outline" onclick="exportUnitsCSV()">Export CSV</button>
-          <button class="btn btn-outline" onclick="exportUnitsExcel()">Export Excel</button>
-          <button class="btn btn-outline" onclick="printUnits()">Print</button>
+          <button class="btn btn-csv"   onclick="exportUnitsCSV()">Export CSV</button>
+          <button class="btn btn-excel" onclick="exportUnitsExcel()">Export Excel</button>
+          <button class="btn btn-print" onclick="printUnits()">Print</button>
           <div class="col-visibility">
             <button class="btn btn-outline" onclick="toggleUnitsColPanel()">Column visibility</button>
             <div id="unitsColPanel" class="col-panel">
@@ -4125,7 +4134,7 @@ async function showUnits() {
   `;
 
   // close column panel when clicking outside
-  document.addEventListener("click", (e)=> {
+  document.addEventListener("click", (e) => {
     const panel = document.getElementById("unitsColPanel");
     if (!panel) return;
     const trigger = e.target.closest(".col-visibility");
@@ -4179,7 +4188,7 @@ async function deleteUnit(id) {
 
 // ---------- UI Handlers ----------
 function changeUnitsPerPage(v) {
-  unitsState.itemsPerPage = (v === "all") ? "all" : parseInt(v,10);
+  unitsState.itemsPerPage = (v === "all") ? "all" : parseInt(v, 10);
   unitsState.currentPage = 1;
   renderUnits();
 }
@@ -4260,18 +4269,18 @@ function renderUnits() {
     `).join("");
   }
 
-  const showing = total ? `${start+1} to ${end} of ${total}` : `0 of 0`;
+  const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
   info.textContent = `Showing ${showing} entries`;
 
   // ensure header visibility matches toggles
-  ["name","shortName","allowDecimal","actions"].forEach(k=>{
+  ["name","shortName","allowDecimal","actions"].forEach(k => {
     const th = document.querySelector(`#unitsTable thead [data-col="${k}"]`);
     if (th) th.style.display = unitsState.visibleCols[k] ? "" : "none";
   });
 }
 
 // ---------- Modal Logic ----------
-function openUnitModal(id=null) {
+function openUnitModal(id = null) {
   const title = document.getElementById("unitModalTitle");
   const idEl = document.getElementById("unitId");
   const nameEl = document.getElementById("unitName");
@@ -4348,7 +4357,7 @@ async function submitUnitForm(e) {
     }
     closeModal("unitModal");
     await loadUnits();
-    searchUnits(unitsState.searchTerm); // keeps filters active
+    searchUnits(unitsState.searchTerm); // keep current filter
   } catch (e) {
     err.textContent = e.message || "Failed to save unit.";
     err.style.display = "block";
@@ -4358,9 +4367,7 @@ async function submitUnitForm(e) {
 // ---------- Exports & Print ----------
 function exportUnitsCSV() {
   const cols = ["name","shortName","allowDecimal"].filter(c => unitsState.visibleCols[c]);
-  const header = cols.map(h => ({
-    name:"Name", shortName:"Short name", allowDecimal:"Allow decimal"
-  }[h])).join(",");
+  const header = cols.map(h => ({ name:"Name", shortName:"Short name", allowDecimal:"Allow decimal" }[h])).join(",");
   const rows = unitsState.filtered.map(r => cols.map(c => {
     let v = (c === "allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (r[c] || "");
     v = String(v).replace(/"/g,'""');
@@ -4371,12 +4378,11 @@ function exportUnitsCSV() {
 }
 
 function exportUnitsExcel() {
-  // Simple Excel-compatible HTML table
   const cols = ["name","shortName","allowDecimal"].filter(c => unitsState.visibleCols[c]);
-  const head = cols.map(c=> `<th>${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>`).join("");
-  const body = unitsState.filtered.map(r=> `
+  const head = cols.map(c => `<th>${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>`).join("");
+  const body = unitsState.filtered.map(r => `
     <tr>
-      ${cols.map(c=>{
+      ${cols.map(c => {
         let v = (c==="allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (escapeHTML(r[c]||""));
         return `<td>${v}</td>`;
       }).join("")}
@@ -4388,16 +4394,15 @@ function exportUnitsExcel() {
 }
 
 function exportUnitsPDF() {
-  // Quick PDF via print-friendly window; users can "Save as PDF"
   const w = window.open("", "_blank");
-  const cols = ["Name","Short name","Allow decimal"].filter((_,i)=>{
+  const cols = ["Name","Short name","Allow decimal"].filter((_,i) => {
     return [unitsState.visibleCols.name, unitsState.visibleCols.shortName, unitsState.visibleCols.allowDecimal][i];
   });
-  const rows = unitsState.filtered.map(r=>[
+  const rows = unitsState.filtered.map(r => [
     unitsState.visibleCols.name ? escapeHTML(r.name||"") : null,
     unitsState.visibleCols.shortName ? escapeHTML(r.shortName||"") : null,
     unitsState.visibleCols.allowDecimal ? (r.allowDecimal?"Yes":"No") : null
-  ].filter(x=>x!==null));
+  ].filter(x => x!==null));
 
   w.document.write(`
     <html><head><title>Units</title>
@@ -4421,7 +4426,7 @@ function exportUnitsPDF() {
 }
 
 function printUnits() {
-  exportUnitsPDF(); // same flow; opens print dialog
+  exportUnitsPDF();
 }
 
 function downloadBlob(content, filename, type) {
@@ -4429,14 +4434,13 @@ function downloadBlob(content, filename, type) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename; a.click();
-  setTimeout(()=> URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---------- Utility ----------
 function escapeHTML(str) {
   return (str||"").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 }
-
 
 
 function togglePurchases() {
