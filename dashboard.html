@@ -4241,7 +4241,7 @@ function toggleUnitsColPanel() {
 function setUnitsCol(key, val) {
   unitsState.visibleCols[key] = !!val;
   // hide/show headers
-  document.querySelectorAll(`#unitsTable [data-col="${key}"]`).forEach(th => {
+  document.querySelectorAll(\`#unitsTable [data-col="\${key}"]\`).forEach(th => {
     th.style.display = val ? "" : "none";
   });
   // rows are re-rendered to apply visibility
@@ -4271,29 +4271,31 @@ function renderUnits() {
 
   const slice = unitsState.filtered.slice(start, end);
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>`;
+    tbody.innerHTML = \`<tr><td colspan="4" style="text-align:center;">No units found.</td></tr>\`;
   } else {
-    tbody.innerHTML = slice.map(r => `
+    tbody.innerHTML = slice.map(r => \`
       <tr>
-        <td style="${!unitsState.visibleCols.name ? 'display:none':''}" data-col="name">${escapeHTML(r.name || "")}</td>
-        <td style="${!unitsState.visibleCols.shortName ? 'display:none':''}" data-col="shortName">${escapeHTML(r.shortName || "")}</td>
-        <td style="${!unitsState.visibleCols.allowDecimal ? 'display:none':''}" data-col="allowDecimal">
-          <span class="badge ${r.allowDecimal ? 'badge-yes':'badge-no'}">${r.allowDecimal ? 'Yes':'No'}</span>
+        <td style="\${!unitsState.visibleCols.name ? 'display:none':''}" data-col="name">\${escapeHTML(r.name || "")}</td>
+        <td style="\${!unitsState.visibleCols.shortName ? 'display:none':''}" data-col="shortName">\${escapeHTML(r.shortName || "")}</td>
+        <td style="\${!unitsState.visibleCols.allowDecimal ? 'display:none':''}" data-col="allowDecimal">
+          <span class="badge \${r.allowDecimal ? 'badge-yes':'badge-no'}">\${r.allowDecimal ? 'Yes':'No'}</span>
         </td>
-        <td class="actions" style="${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
-          <button class="icon-btn icon-edit"   title="Edit"   aria-label="Edit">✏</button>
-          <button class="icon-btn icon-delete" title="Delete" aria-label="Delete">🗑</button>
+        <td class="actions" style="\${!unitsState.visibleCols.actions ? 'display:none':''}" data-col="actions">
+          <button class="icon-btn icon-edit"   title="Edit"   aria-label="Edit"
+                  onclick="openUnitModal('\${r.id}')">✏</button>
+          <button class="icon-btn icon-delete" title="Delete" aria-label="Delete"
+                  onclick="openDeleteUnit('\${r.id}', \${JSON.stringify(r.name || "")})">🗑</button>
         </td>
       </tr>
-    `).join("");
+    \`).join("");
   }
 
-  const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
-  info.textContent = `Showing ${showing} entries`;
+  const showing = total ? \`\${start + 1} to \${end} of \${total}\` : \`0 of 0\`;
+  info.textContent = \`Showing \${showing} entries\`;
 
   // ensure header visibility matches toggles
   ["name","shortName","allowDecimal","actions"].forEach(k => {
-    const th = document.querySelector(`#unitsTable thead [data-col="${k}"]`);
+    const th = document.querySelector(\`#unitsTable thead [data-col="\${k}"]\`);
     if (th) th.style.display = unitsState.visibleCols[k] ? "" : "none";
   });
 }
@@ -4327,7 +4329,7 @@ function openUnitModal(id = null) {
 function openDeleteUnit(id, name) {
   document.getElementById("unitDeleteModal").dataset.id = id;
   document.getElementById("unitDeleteText").textContent =
-    `Delete unit "${name}"? This cannot be undone.`;
+    \`Delete unit "\${name}"? This cannot be undone.\`;
   document.getElementById("unitDeleteModal").style.display = "block";
 }
 async function confirmDeleteUnit() {
@@ -4390,7 +4392,7 @@ function exportUnitsCSV() {
   const rows = unitsState.filtered.map(r => cols.map(c => {
     let v = (c === "allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (r[c] || "");
     v = String(v).replace(/"/g,'""');
-    return `"${v}"`;
+    return \`"\${v}"\`;
   }).join(","));
   const csv = [header, ...rows].join("\n");
   downloadBlob(csv, "units.csv", "text/csv;charset=utf-8;");
@@ -4398,17 +4400,17 @@ function exportUnitsCSV() {
 
 function exportUnitsExcel() {
   const cols = ["name","shortName","allowDecimal"].filter(c => unitsState.visibleCols[c]);
-  const head = cols.map(c => `<th>${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>`).join("");
-  const body = unitsState.filtered.map(r => `
+  const head = cols.map(c => \`<th>\${({name:"Name",shortName:"Short name",allowDecimal:"Allow decimal"})[c]}</th>\`).join("");
+  const body = unitsState.filtered.map(r => \`
     <tr>
-      ${cols.map(c => {
+      \${cols.map(c => {
         let v = (c==="allowDecimal") ? (r.allowDecimal ? "Yes":"No") : (escapeHTML(r[c]||""));
-        return `<td>${v}</td>`;
+        return \`<td>\${v}</td>\`;
       }).join("")}
-    </tr>`).join("");
-  const html = `
+    </tr>\`).join("");
+  const html = \`
     <html><head><meta charset="UTF-8"></head>
-    <body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    <body><table border="1"><thead><tr>\${head}</tr></thead><tbody>\${body}</tbody></table></body></html>\`;
   downloadBlob(html, "units.xls", "application/vnd.ms-excel");
 }
 
@@ -4423,7 +4425,7 @@ function exportUnitsPDF() {
     unitsState.visibleCols.allowDecimal ? (r.allowDecimal?"Yes":"No") : null
   ].filter(x => x!==null));
 
-  w.document.write(`
+  w.document.write(\`
     <html><head><title>Units</title>
     <style>
       body{font-family:Arial, sans-serif; padding:16px;}
@@ -4434,13 +4436,13 @@ function exportUnitsPDF() {
     </style>
     </head><body>
       <h2>Units</h2>
-      <table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead>
+      <table><thead><tr>\${cols.map(c=>\`<th>\${c}</th>\`).join("")}</tr></thead>
       <tbody>
-        ${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}
+        \${rows.map(r=>\`<tr>\${r.map(c=>\`<td>\${c}</td>\`).join("")}</tr>\`).join("")}
       </tbody></table>
-      <script>window.onload = () => window.print();<\/script>
+      <script>window.onload = () => window.print();<\\/script>
     </body></html>
-  `);
+  \`);
   w.document.close();
 }
 
