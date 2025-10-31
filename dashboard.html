@@ -1343,409 +1343,8 @@ window.addEventListener("load", async () => {
   }
 });
 
-async function showAddProduct() {
-  // Save page state
-  saveLastPage("showAddProduct");
-
-  // Show loading overlay
-  document.getElementById("content").innerHTML = `
-    <div class="loading-overlay">
-      <div class="spinner"></div>
-      <p>Loading product form...</p>
-    </div>
-  `;
-
-  // Load categories, brands, and locations from Firestore
-  const categories = await getCollectionOptions("categories");
-  const brands = await getCollectionOptions("brands");
-  const locations = await getCollectionOptions("businessLocations");
-
-  // Render professional, responsive form
-  document.getElementById("content").innerHTML = `
-    <style>
-      .loading-overlay {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.9);
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 1000;
-      }
-      .spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #3498db;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin-bottom: 10px;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      .form-container {
-        max-width: 600px;
-        width: 90%;
-        margin: 20px auto;
-        padding: 20px;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      }
-      .form-container h2 {
-        color: #333;
-        font-size: 24px;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-      .form-group {
-        margin-bottom: 15px;
-      }
-      .form-group label {
-        display: block;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 5px;
-        font-size: 14px;
-      }
-      .form-group input,
-      .form-group select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        box-sizing: border-box;
-      }
-      .form-group select[multiple] {
-        height: 100px;
-        padding: 5px;
-      }
-      .form-group input[type="checkbox"],
-      .form-group input[type="radio"] {
-        width: auto;
-        margin-right: 10px;
-      }
-      .form-group .radio-group {
-        display: flex;
-        flex-direction: row;
-        gap: 20px;
-        flex-wrap: wrap;
-      }
-      .submit-btn {
-        background: #3498db;
-        color: #fff;
-        padding: 12px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 16px;
-        width: 100%;
-        transition: background 0.3s;
-      }
-      .submit-btn:hover {
-        background: #2980b9;
-      }
-      #addProductMessage {
-        margin-top: 15px;
-        text-align: center;
-        font-size: 14px;
-      }
-      /* Mobile responsiveness */
-      @media (max-width: 600px) {
-        .form-container {
-          width: 95%;
-          padding: 15px;
-        }
-        .form-container h2 {
-          font-size: 20px;
-        }
-        .form-group label {
-          font-size: 12px;
-        }
-        .form-group input,
-        .form-group select {
-          font-size: 12px;
-          padding: 8px;
-        }
-        .form-group select[multiple] {
-          height: 80px;
-        }
-        .submit-btn {
-          font-size: 14px;
-          padding: 10px;
-        }
-        .radio-group {
-          flex-direction: column;
-          gap: 10px;
-        }
-      }
-    </style>
-    <div class="form-container">
-      <h2>Add New Product</h2>
-      <form id="addProductForm">
-        <div class="form-group">
-          <label for="productName">Product Name *</label>
-          <input type="text" id="productName" placeholder="Enter product name" required aria-label="Product Name" />
-        </div>
-
-        <div class="form-group">
-          <label for="category">Category *</label>
-          <select id="category" required aria-label="Category">
-            <option value="">Select category</option>
-            ${categories.map(c => `<option value="${c}">${c}</option>`).join("")}
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="brand">Brand *</label>
-          <select id="brand" required aria-label="Brand">
-            <option value="">Select brand</option>
-            ${brands.map(b => `<option value="${b}">${b}</option>`).join("")}
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="buyingPrice">Buying Price (KES) *</label>
-          <input type="number" id="buyingPrice" min="0" step="0.01" placeholder="Enter buying price" required aria-label="Buying Price" />
-        </div>
-
-        <div class="form-group">
-          <label for="sellingPrice">Selling Price (KES) *</label>
-          <input type="number" id="sellingPrice" min="0" step="0.01" placeholder="Enter selling price" required aria-label="Selling Price" />
-        </div>
-
-        <div class="form-group">
-          <label for="openingStock">Opening Stock</label>
-          <input type="number" id="openingStock" min="0" step="1" placeholder="Enter opening stock" aria-label="Opening Stock" />
-        </div>
-
-        <div class="form-group">
-          <label for="businessLocations">Business Locations *</label>
-          <select id="businessLocations" multiple required aria-label="Business Locations">
-            ${locations.map(l => `<option value="${l}">${l}</option>`).join("")}
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>
-            <input type="checkbox" id="vatable" aria-label="Vatable Product" /> Vatable Product
-          </label>
-        </div>
-
-        <div class="form-group" id="vatOptions" style="display: none;">
-          <label for="vatPercentage">VAT Percentage (%)</label>
-          <input type="number" id="vatPercentage" min="0" max="100" step="0.01" value="16" placeholder="Enter VAT percentage" aria-label="VAT Percentage" />
-
-          <label>VAT Inclusion *</label>
-          <div class="radio-group">
-            <label>
-              <input type="radio" name="vatInclusion" value="inclusive" checked /> Inclusive of Buying Price
-            </label>
-            <label>
-              <input type="radio" name="vatInclusion" value="exclusive" /> Exclusive of Buying Price
-            </label>
-          </div>
-        </div>
-
-        <button type="submit" class="submit-btn">Add Product</button>
-      </form>
-      <div id="addProductMessage" style="color: red;"></div>
-    </div>
-  `;
-
-  // Show/hide VAT options based on vatable checkbox
-  const vatableCheckbox = document.getElementById("vatable");
-  const vatOptions = document.getElementById("vatOptions");
-  vatableCheckbox.addEventListener("change", () => {
-    vatOptions.style.display = vatableCheckbox.checked ? "block" : "none";
-  });
-
-  document.getElementById("addProductForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await addProductSubmit();
-  });
-}
-
-async function getCollectionOptions(collectionName) {
-  try {
-    const snapshot = await firebase.firestore().collection(collectionName).get();
-    return snapshot.docs.map(doc => doc.data().name || doc.id);
-  } catch (error) {
-    console.error(`Error loading ${collectionName}:`, error);
-    return [];
-  }
-}
-
-async function addProductSubmit() {
-  const name = escapeHTML(document.getElementById("productName").value.trim());
-  const category = document.getElementById("category").value;
-  const brand = document.getElementById("brand").value;
-  const buyingPrice = parseFloat(document.getElementById("buyingPrice").value);
-  const sellingPrice = parseFloat(document.getElementById("sellingPrice").value);
-  const openingStock = parseInt(document.getElementById("openingStock").value) || 0;
-  const locationSelect = document.getElementById("businessLocations");
-  const locations = Array.from(locationSelect.selectedOptions).map(option => option.value);
-  const vatable = document.getElementById("vatable").checked;
-  const vatPercentage = vatable ? parseFloat(document.getElementById("vatPercentage").value) : 0;
-  const vatInclusion = vatable ? document.querySelector('input[name="vatInclusion"]:checked').value : null;
-
-  const messageEl = document.getElementById("addProductMessage");
-  messageEl.style.color = "red";
-
-  // Basic validation
-  if (!name || !category || !brand || isNaN(buyingPrice) || isNaN(sellingPrice) || locations.length === 0) {
-    messageEl.textContent = "Please fill in all required fields correctly.";
-    return;
-  }
-
-  if (buyingPrice < 0 || sellingPrice < 0 || openingStock < 0) {
-    messageEl.textContent = "Prices and stock cannot be negative.";
-    return;
-  }
-
-  // Validate selling price >= buying price
-  if (sellingPrice < buyingPrice) {
-    messageEl.textContent = "Selling price cannot be less than buying price.";
-    return;
-  }
-
-  // Validate VAT percentage and inclusion
-  if (vatable) {
-    if (isNaN(vatPercentage) || vatPercentage < 0 || vatPercentage > 100) {
-      messageEl.textContent = "VAT percentage must be between 0 and 100.";
-      return;
-    }
-    if (!vatInclusion) {
-      messageEl.textContent = "Please select whether VAT is inclusive or exclusive.";
-      return;
-    }
-  }
-
-  // Check for duplicate product by name
-  const existing = await firebase.firestore().collection("products")
-    .where("name", "==", name)
-    .get();
-  if (!existing.empty) {
-    messageEl.textContent = "Product name already exists.";
-    return;
-  }
-
-  // Generate SKU with category code
-  const catCode = category.substring(0, 3).toUpperCase();
-  const sku = `PROD-${catCode}-${Date.now()}`;
-
-  const productData = {
-    name,
-    sku,
-    category,
-    brand,
-    buyingPrice,
-    sellingPrice,
-    openingStock,
-    locations, // Store as array
-    vatable,
-    vatRate: vatable ? vatPercentage / 100 : 0, // Store as decimal
-    vatInclusion: vatable ? vatInclusion : null,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-
-  messageEl.innerHTML = `<span class="spinner"></span> Saving...`;
-  try {
-    await firebase.firestore().collection("products").add(productData);
-    messageEl.style.color = "green";
-    messageEl.textContent = `Product added successfully with SKU: ${sku}`;
-    showSuccessNotification(`Product added successfully with SKU: ${sku}`);
-    document.getElementById("addProductForm").reset();
-    document.getElementById("vatOptions").style.display = "none"; // Reset VAT options visibility
-  } catch (error) {
-    messageEl.style.color = "red";
-    messageEl.textContent = error.code === "permission-denied"
-      ? "You do not have permission to add products."
-      : `Error adding product: ${error.message}`;
-    console.error("Error adding product:", error);
-  }
-}
-
-
-// Initialize productManager with default filter values and pagination
-const productManager = {
-  products: [],
-  locations: [],
-  categories: [],
-  brands: [],
-  selectedLocation: "",
-  selectedCategory: "",
-  selectedBrand: "",
-  currentPage: 1,
-  itemsPerPage: 10
-};
-
-// Toast notification functions
-function playSuccessSound() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioContext();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(360, ctx.currentTime);
-    g.gain.setValueAtTime(0.8, ctx.currentTime); // Increased volume for louder sound
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.35);
-    o.stop(ctx.currentTime + 0.36);
-    setTimeout(() => { try { ctx.close(); } catch (e) {} }, 500);
-  } catch (e) {
-    console.warn("playSuccessSound error:", e);
-  }
-}
-
-function showToast(message, type) {
-  const prev = document.getElementById("globalToast");
-  if (prev) prev.remove();
-
-  const toast = document.createElement("div");
-  toast.id = "globalToast";
-  toast.textContent = message;
-  Object.assign(toast.style, {
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    background: type === "success" ? "#27ae60" : "#dc3545",
-    color: "white",
-    padding: "12px 16px",
-    borderRadius: "8px",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
-    zIndex: 99999,
-    opacity: "0",
-    transform: "translateY(-8px)",
-    transition: "opacity 300ms ease, transform 300ms ease",
-    fontFamily: "Arial, sans-serif",
-    fontSize: "14px"
-  });
-  document.body.appendChild(toast);
-  requestAnimationFrame(() => {
-    toast.style.opacity = "1";
-    toast.style.transform = "translateY(0)";
-  });
-  if (type === "success") playSuccessSound();
-  if (type === "error") document.getElementById("errorSound").play();
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transform = "translateY(-8px)";
-    setTimeout(() => { try { toast.remove(); } catch (e) {} }, 350);
-  }, 3000);
-}// =========================
-// ADD PRODUCT PAGE (integrated; multi-location; no opening stock field)
+// =========================
+// ADD PRODUCT PAGE (integrated; multi-location; modal opening stock BEFORE save)
 // =========================
 async function showAddProduct() {
   saveLastPage("showAddProduct");
@@ -1768,6 +1367,21 @@ async function showAddProduct() {
       .btn.secondary{background:#2c3e50}
       .btn[disabled]{opacity:.6;cursor:not-allowed}
       @media(max-width:720px){.form-grid{grid-template-columns:repeat(6,1fr)}.col-6{grid-column:span 6}.col-4{grid-column:span 6}.col-8{grid-column:span 6}}
+
+      /* Sweet modal */
+      .sweet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:10000;opacity:0;transition:opacity .15s ease}
+      .sweet-overlay.show{opacity:1}
+      .sweet-modal{width:min(720px,94vw);background:#fff;border-radius:14px;box-shadow:0 18px 45px rgba(0,0,0,.22);transform:translateY(12px) scale(.98);transition:transform .18s ease;overflow:hidden}
+      .sweet-overlay.show .sweet-modal{transform:translateY(0) scale(1)}
+      .sweet-head{padding:16px 18px;border-bottom:1px solid #eef1f4;display:flex;align-items:center;justify-content:space-between}
+      .sweet-title{margin:0;font-size:18px}
+      .sweet-body{padding:16px 18px;max-height:66vh;overflow:auto}
+      .sweet-foot{padding:14px 18px;border-top:1px solid #eef1f4;display:flex;gap:10px;justify-content:flex-end}
+      .xbtn{background:transparent;border:none;font-size:20px;cursor:pointer;line-height:1}
+      .grid-rows{display:grid;grid-template-columns:1.5fr .8fr .8fr;gap:10px;align-items:center}
+      .grid-rows .hdr{font-weight:700;color:#444}
+      .grid-rows input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
+      .badge{display:inline-block;background:#f1f5f9;color:#334155;padding:2px 8px;border-radius:999px;font-size:12px;margin-left:6px}
     </style>
 
     <div class="form-container">
@@ -1835,9 +1449,7 @@ async function showAddProduct() {
           </label>
           <div id="vatOptions" style="display:none;margin-top:8px">
             <div class="inline" style="gap:16px;flex-wrap:wrap">
-              <label class="inline">VAT % 
-                <input type="number" id="vatPercentage" min="0" max="100" step="0.01" value="16" style="width:96px;margin-left:6px"/>
-              </label>
+              <label class="inline">VAT % <input type="number" id="vatPercentage" min="0" max="100" step="0.01" value="16" style="width:96px;margin-left:6px"/></label>
               <div class="inline" style="gap:16px">
                 <label class="inline"><input type="radio" name="vatInclusion" value="inclusive" checked/> Inclusive of Buying Price</label>
                 <label class="inline"><input type="radio" name="vatInclusion" value="exclusive"/> Exclusive of Buying Price</label>
@@ -1856,7 +1468,7 @@ async function showAddProduct() {
 
         <!-- ✅ Multi-select Business Locations stays -->
         <div class="form-group col-12">
-          <label for="businessLocations">Business Locations *</label>
+          <label for="businessLocations">Business Locations * <span class="badge">multi</span></label>
           <select id="businessLocations" multiple required>
             <option value="">Loading locations…</option>
           </select>
@@ -1940,14 +1552,14 @@ async function showAddProduct() {
   fillSelect("category", cats, "Select category");
   fillSelect("brand", brands, "Select brand");
   fillSelect("unit", units, "Select unit");
-
-  // populate locations in the existing multi-select
   const locEl = document.getElementById("businessLocations");
   if (locEl) locEl.innerHTML = (locs||[]).map(l=>`<option value="${l}">${l}</option>`).join("");
 }
 
 // =========================
 // ADD PRODUCT SUBMIT (mode: "save" | "stock")
+// - "save": save product only
+// - "stock": open modal first; then save product + opening balances in one batch
 // =========================
 async function addProductSubmitIntegrated(mode = "save") {
   const msgEl = document.getElementById("addProductMessage");
@@ -1955,6 +1567,27 @@ async function addProductSubmitIntegrated(mode = "save") {
   const btnStock = document.getElementById("btnSaveAndStock");
   msgEl.style.color = "red";
 
+  // Gather + validate core fields (no save yet for 'stock' path)
+  const base = getProductFormValues();
+  if (base.error) { msgEl.textContent = base.error; return; }
+
+  // Duplicate by name (case-insensitive)
+  const existing = await firebase.firestore().collection("products")
+    .where("nameLower","==",base.data.nameLower).limit(1).get();
+  if (!existing.empty) { msgEl.textContent = "Product name already exists."; return; }
+
+  if (mode === "save") {
+    await saveProductOnly(base.data, btnSave);
+  } else {
+    // Open modal to collect opening stock per selected location BEFORE save
+    openOpeningStockModal(base.data, btnStock);
+  }
+}
+
+// -------------------------
+// Read + validate base form values (no DB calls)
+// -------------------------
+function getProductFormValues() {
   const vatable = document.getElementById("vatable").checked;
   const vatInclusion = vatable ? document.querySelector('input[name="vatInclusion"]:checked').value : null;
 
@@ -1973,81 +1606,171 @@ async function addProductSubmitIntegrated(mode = "save") {
   const vatPercentage = vatable ? parseFloat(document.getElementById("vatPercentage").value) : 0;
 
   if (!name || !category || !brand || !unit || isNaN(buyingPrice) || isNaN(sellingPrice) || !locations.length) {
-    msgEl.textContent = "Please fill in all required fields correctly (select at least one business location).";
-    return;
+    return { error: "Please fill in all required fields correctly (select at least one business location)." };
   }
-  if (buyingPrice < 0 || sellingPrice < 0) {
-    msgEl.textContent = "Prices cannot be negative.";
-    return;
-  }
-  if (sellingPrice < buyingPrice) {
-    msgEl.textContent = "Selling price cannot be less than buying price.";
-    return;
-  }
+  if (buyingPrice < 0 || sellingPrice < 0) return { error: "Prices cannot be negative." };
+  if (sellingPrice < buyingPrice) return { error: "Selling price cannot be less than buying price." };
   if (vatable && (isNaN(vatPercentage) || vatPercentage < 0 || vatPercentage > 100)) {
-    msgEl.textContent = "VAT percentage must be between 0 and 100.";
-    return;
+    return { error: "VAT percentage must be between 0 and 100." };
   }
 
-  // Duplicate by name (case-insensitive)
-  const nameLower = name.toLowerCase();
-  const existing = await firebase.firestore().collection("products")
-    .where("nameLower","==",nameLower).limit(1).get();
-  if (!existing.empty) {
-    msgEl.textContent = "Product name already exists.";
-    return;
-  }
-
-  const productData = {
-    name,
-    nameLower,
-    sku: sku || null,
-    barcode: barcode || null,
-    category,
-    brand,
-    unit,
-    buyingPrice,
-    sellingPrice,
-    desiredMargin,
-    locations,                  // multi-select stays
-    vatable,
-    vatRate: vatable ? vatPercentage / 100 : 0,
-    vatInclusion: vatable ? vatInclusion : null,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    isActive: true
+  return {
+    data: {
+      name,
+      nameLower: name.toLowerCase(),
+      sku: sku || null,
+      barcode: barcode || null,
+      category,
+      brand,
+      unit,
+      buyingPrice,
+      sellingPrice,
+      desiredMargin,
+      locations,                  // multi-select stays
+      vatable,
+      vatRate: vatable ? vatPercentage / 100 : 0,
+      vatInclusion: vatable ? vatInclusion : null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      isActive: true
+    }
   };
+}
 
-  // UI: disable only the clicked button and show inline progress
-  const targetBtn = mode === "stock" ? btnStock : btnSave;
+// -------------------------
+// Save product ONLY
+// -------------------------
+async function saveProductOnly(productData, targetBtn) {
+  const msgEl = document.getElementById("addProductMessage");
   const originalText = targetBtn.textContent;
-  targetBtn.disabled = true;
-  targetBtn.textContent = originalText + " …";
+  targetBtn.disabled = true; targetBtn.textContent = originalText + " …";
 
   try {
-    const ref = await firebase.firestore().collection("products").add(productData);
-
-    // Sweet success + louder chime
-    showSweetSuccess(`✅ Product “${name}” saved${productData.sku ? ` (SKU: ${productData.sku})` : ""}.`);
-
-    // Reset form + hide VAT
+    await firebase.firestore().collection("products").add(productData);
+    showSweetSuccess(`✅ Product “${productData.name}” saved${productData.sku ? ` (SKU: ${productData.sku})` : ""}.`);
     document.getElementById("addProductForm").reset();
-    const vatBox = document.getElementById("vatOptions");
-    if (vatBox) vatBox.style.display = "none";
-
-    // Route to opening stock step if chosen
-    if (mode === "stock") {
-      showOpeningStockForProduct(ref.id, name, locations);
-    }
+    const vatBox = document.getElementById("vatOptions"); if (vatBox) vatBox.style.display = "none";
   } catch (error) {
     console.error("Error adding product:", error);
     msgEl.style.color = "red";
-    msgEl.textContent = error.code === "permission-denied"
-      ? "You do not have permission to add products."
-      : `Error adding product: ${error.message}`;
+    msgEl.textContent = error.code === "permission-denied" ? "You do not have permission to add products." : `Error adding product: ${error.message}`;
   } finally {
-    targetBtn.disabled = false;
-    targetBtn.textContent = originalText;
+    targetBtn.disabled = false; targetBtn.textContent = originalText;
+  }
+}
+
+// -------------------------
+// Modal: collect opening stock per selected location BEFORE saving
+// -------------------------
+function openOpeningStockModal(productData, targetBtn) {
+  // Build rows from selected locations
+  const rows = productData.locations.map(loc => `
+    <div class="grid-rows">
+      <div><strong>${loc}</strong></div>
+      <div><input type="number" class="os-qty" data-loc="${loc}" min="0" step="1" placeholder="Qty"/></div>
+      <div><input type="number" class="os-cost" data-loc="${loc}" min="0" step="0.01" placeholder="Unit Cost (optional)"/></div>
+    </div>
+  `).join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "sweet-overlay";
+  overlay.innerHTML = `
+    <div class="sweet-modal" role="dialog" aria-modal="true" aria-label="Opening Stock">
+      <div class="sweet-head">
+        <h3 class="sweet-title">Opening Stock per Location</h3>
+        <button class="xbtn" id="osCloseBtn" aria-label="Close">×</button>
+      </div>
+      <div class="sweet-body">
+        <p class="muted" style="margin:0 0 10px">Enter starting quantities per selected location. Leave blank or 0 to skip a location.</p>
+        <div class="grid-rows" style="margin-bottom:6px">
+          <div class="hdr">Location</div>
+          <div class="hdr">Quantity</div>
+          <div class="hdr">Unit Cost</div>
+        </div>
+        ${rows || '<p style="margin:8px 0 0"><em>No locations selected.</em></p>'}
+      </div>
+      <div class="sweet-foot">
+        <button class="btn secondary" id="osCancelBtn">Cancel</button>
+        <button class="btn" id="osSaveBtn">Save Opening Stock</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add("show"));
+
+  const closeModal = () => { overlay.classList.remove("show"); setTimeout(()=>overlay.remove(),150); };
+  document.getElementById("osCloseBtn").onclick = closeModal;
+  document.getElementById("osCancelBtn").onclick = closeModal;
+
+  document.getElementById("osSaveBtn").onclick = async () => {
+    // Collect entries
+    const entries = [];
+    productData.locations.forEach(loc => {
+      const qty = parseInt((document.querySelector(`.os-qty[data-loc="${loc}"]`)?.value || "0"), 10);
+      const unitCost = parseFloat(document.querySelector(`.os-cost[data-loc="${loc}"]`)?.value || "");
+      if (!isNaN(qty) && qty > 0) {
+        entries.push({ location: loc, qty, unitCost: isNaN(unitCost) ? null : unitCost });
+    }});
+
+    // Proceed to save product + opening balances in one batch
+    await saveProductWithOpeningStock(productData, entries, targetBtn, closeModal);
+  };
+}
+
+// -------------------------
+// Save product + opening balances in one batch
+// -------------------------
+async function saveProductWithOpeningStock(productData, openingEntries, targetBtn, closeModal) {
+  const msgEl = document.getElementById("addProductMessage");
+  const originalText = targetBtn.textContent;
+  targetBtn.disabled = true; targetBtn.textContent = originalText + " …";
+
+  try {
+    const db = firebase.firestore();
+    const productRef = db.collection("products").doc();
+    const batch = db.batch();
+
+    // Product
+    batch.set(productRef, productData);
+
+    // Opening stock balances + movements (only for qty > 0)
+    openingEntries.forEach(({ location, qty, unitCost }) => {
+      const balRef = db.collection("stockBalances").doc(`${productRef.id}_${location}`);
+      batch.set(balRef, {
+        productId: productRef.id,
+        location,
+        onHand: qty,
+        unitCost: unitCost != null ? unitCost : productData.buyingPrice,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      const movRef = db.collection("stockMovements").doc();
+      batch.set(movRef, {
+        productId: productRef.id,
+        type: "OPENING_BALANCE",
+        location,
+        qty,
+        unitCost: unitCost != null ? unitCost : productData.buyingPrice,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        note: "Opening stock on product creation"
+      });
+    });
+
+    await batch.commit();
+
+    // Close modal + success
+    closeModal();
+    showSweetSuccess(`✅ Product “${productData.name}” saved with opening stock.`);
+
+    // Reset form
+    document.getElementById("addProductForm").reset();
+    const vatBox = document.getElementById("vatOptions"); if (vatBox) vatBox.style.display = "none";
+  } catch (error) {
+    console.error("Error saving product with opening stock:", error);
+    msgEl.style.color = "red";
+    msgEl.textContent = error.code === "permission-denied" ? "You do not have permission to add products." : `Error saving: ${error.message}`;
+  } finally {
+    targetBtn.disabled = false; targetBtn.textContent = originalText;
   }
 }
 
@@ -2073,9 +1796,7 @@ function playSuccessSoundLoud() {
     o.start(now);
     o.stop(now + 0.56);
     setTimeout(() => { try { ctx.close(); } catch (e) {} }, 700);
-  } catch (e) {
-    console.warn("playSuccessSoundLoud error:", e);
-  }
+  } catch (e) { console.warn("playSuccessSoundLoud error:", e); }
 }
 
 function showSweetSuccess(message) {
@@ -2086,35 +1807,20 @@ function showSweetSuccess(message) {
   toast.id = "sweetToast";
   toast.textContent = message;
   Object.assign(toast.style, {
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    background: "#22c55e",
-    color: "#fff",
-    padding: "12px 16px",
-    borderRadius: "12px",
-    boxShadow: "0 10px 22px rgba(0,0,0,0.18)",
-    zIndex: 99999,
-    opacity: "0",
-    transform: "translateY(-10px)",
+    position: "fixed", top: "20px", right: "20px",
+    background: "#22c55e", color: "#fff",
+    padding: "12px 16px", borderRadius: "12px",
+    boxShadow: "0 10px 22px rgba(0,0,0,0.18)", zIndex: 99999,
+    opacity: "0", transform: "translateY(-10px)",
     transition: "opacity 220ms ease, transform 220ms ease",
     fontFamily: "Inter, system-ui, -apple-system, Segoe UI, Arial, sans-serif",
-    fontSize: "14px",
-    fontWeight: "600",
-    letterSpacing: ".2px"
+    fontSize: "14px", fontWeight: "600", letterSpacing: ".2px"
   });
   document.body.appendChild(toast);
-
-  requestAnimationFrame(() => {
-    toast.style.opacity = "1";
-    toast.style.transform = "translateY(0)";
-  });
-
+  requestAnimationFrame(() => { toast.style.opacity = "1"; toast.style.transform = "translateY(0)"; });
   playSuccessSoundLoud();
-
   setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transform = "translateY(-10px)";
+    toast.style.opacity = "0"; toast.style.transform = "translateY(-10px)";
     setTimeout(() => { try { toast.remove(); } catch (e) {} }, 250);
   }, 2600);
 }
@@ -2132,23 +1838,6 @@ async function getCollectionOptions(collectionName) {
   }
 }
 
-// =========================
-// Placeholder route (Opening Stock step – to be built next)
-// =========================
-function showOpeningStockForProduct(productId, productName, locations) {
-  const content = document.getElementById("content");
-  content.innerHTML = `
-    <div style="max-width:780px;width:92%;margin:20px auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.08)">
-      <h2 style="margin-top:0">Opening Stock • ${productName}</h2>
-      <p class="muted">Product ID: ${productId}</p>
-      <p style="margin-top:12px">We’ll add per-location opening stock here next. Selected locations:</p>
-      <ul style="margin:8px 0 16px; padding-left:18px;">
-        ${(locations||[]).map(l=>`<li>${l}</li>`).join("") || "<li><em>None</em></li>"}
-      </ul>
-      <button onclick="showProductsHome()" class="btn">← Back to Products</button>
-    </div>
-  `;
-}
 
 
 function showListProducts() {
