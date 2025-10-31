@@ -9353,21 +9353,23 @@ const inventoryState = {
   },
 };
 
-// Column defs (order + labels like screenshot)
+// Column defs (order + labels)
 const inventoryColumns = [
   { key: "product",            label: "Product" },
   { key: "category",           label: "Category" },
   { key: "brand",              label: "Brand" },
   { key: "location",           label: "Location" },
-  { key: "openingStock",       label: "Opening Stock" },
-  { key: "openingStockToday",  label: "Opening Stock Today" },
-  { key: "purchasedToday",     label: "Purchased Today" },
-  { key: "purchasedTotal",     label: "Purchased Total" },
-  { key: "soldToday",          label: "Sold Today" },
-  { key: "soldTotal",          label: "Sold Total" },
-  { key: "adjusted",           label: "Adjusted" },
-  { key: "currentStock",       label: "Current Stocks Available" },
+  { key: "openingStock",       label: "Opening Stock",          numeric: true },
+  { key: "openingStockToday",  label: "Opening Stock Today",    numeric: true },
+  { key: "purchasedToday",     label: "Purchased Today",        numeric: true },
+  { key: "purchasedTotal",     label: "Purchased Total",        numeric: true },
+  { key: "soldToday",          label: "Sold Today",             numeric: true },
+  { key: "soldTotal",          label: "Sold Total",             numeric: true },
+  { key: "adjusted",           label: "Adjusted",               numeric: true },
+  { key: "currentStock",       label: "Current Stocks Available", numeric: true },
 ];
+
+const numericKeys = inventoryColumns.filter(c => c.numeric).map(c => c.key);
 
 // ---------- Page Entrypoint ----------
 async function showInventoryReport() {
@@ -9397,6 +9399,7 @@ async function showInventoryReport() {
       .units-table{width:100%;min-width:1200px;border-collapse:separate;border-spacing:0;}
       .units-table th,.units-table td{border:0;border-bottom:1px solid #e9ecef;padding:10px;font-size:14px;white-space:nowrap;}
       .units-table thead th{background:#f8f9fa;border-bottom:1px solid #dde1e6;text-align:left;}
+      tfoot .total-row td{background:#f5f5f5;font-weight:600;border-top:2px solid #e0e0e0;}
       .pagination-section{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
       .pagination-section .pager button{padding:8px 12px;border:none;background:#007bff;color:#fff;border-radius:6px;cursor:pointer;}
       .pagination-section .pager button:disabled{background:#aaa;cursor:not-allowed;}
@@ -9446,6 +9449,11 @@ async function showInventoryReport() {
           <tbody id="inventoryTbody">
             <tr><td colspan="${inventoryColumns.length}" style="text-align:center;">Loading...</td></tr>
           </tbody>
+          <tfoot id="inventoryTfoot">
+            <tr class="total-row">
+              ${inventoryColumns.map((c,i) => `<td data-col="${c.key}">${i===0?"Total":""}</td>`).join("")}
+            </tr>
+          </tfoot>
         </table>
       </div>
 
@@ -9459,7 +9467,6 @@ async function showInventoryReport() {
     </div>
   `;
 
-  // close column panel when clicking outside
   document.addEventListener("click", (e) => {
     const panel = document.getElementById("inventoryColPanel");
     if (!panel) return;
@@ -9467,7 +9474,7 @@ async function showInventoryReport() {
     if (!trigger) panel.style.display = "none";
   });
 
-  await loadInventoryProducts(); // fetch products only
+  await loadInventoryProducts(); // products only
   renderInventory();
 }
 
@@ -9529,7 +9536,7 @@ function toggleInventoryColPanel() {
 }
 function setInventoryCol(key, val) {
   inventoryState.visibleCols[key] = !!val;
-  // hide/show headers
+  // hide/show headers + total footer cells
   document.querySelectorAll(`#inventoryTable [data-col="${key}"]`).forEach(th => {
     th.style.display = val ? "" : "none";
   });
@@ -9539,6 +9546,7 @@ function setInventoryCol(key, val) {
 // ---------- Render ----------
 function renderInventory() {
   const tbody = document.getElementById("inventoryTbody");
+  const tfoot = document.getElementById("inventoryTfoot");
   const info = document.getElementById("inventoryInfo");
   const btnPrev = document.getElementById("inventoryPrev");
   const btnNext = document.getElementById("inventoryNext");
@@ -9556,6 +9564,8 @@ function renderInventory() {
   } else { btnPrev.disabled = true; btnNext.disabled = true; }
 
   const slice = inventoryState.filtered.slice(start, end);
+
+  // body
   if (!slice.length) {
     tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;">No inventory records found.</td></tr>`;
   } else {
@@ -9570,24 +9580,42 @@ function renderInventory() {
     `).join("");
   }
 
+  // totals over the FULL filtered dataset (not just page)
+  const totals = {};
+  numericKeys.forEach(k => {
+    totals[k] = inventoryState.filtered.reduce((sum, row) => sum + (Number(row[k]) || 0), 0);
+  });
+
+  // footer row
+  const footerRow = `
+    <tr class="total-row">
+      ${inventoryColumns.map((c,i)=>{
+        const show = inventoryState.visibleCols[c.key];
+        let val = "";
+        if (i === 0) val = "Total";
+        if (numericKeys.includes(c.key)) val = (totals[c.key] || 0).toLocaleString();
+        return `<td style="${!show ? 'display:none':''}" data-col="${c.key}">${val}</td>`;
+      }).join("")}
+    </tr>`;
+  tfoot.innerHTML = footerRow;
+
+  // info
   const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
   info.textContent = `Showing ${showing} entries`;
-
-  // sync header visibility with toggles
-  inventoryColumns.forEach(c => {
-    const th = document.querySelector(`#inventoryTable thead [data-col="${c.key}"]`);
-    if (th) th.style.display = inventoryState.visibleCols[c.key] ? "" : "none";
-  });
 }
 
-// ---------- Exports & Print (exact Units logic) ----------
+// ---------- Exports & Print (includes totals row) ----------
 function exportInventoryCSV() {
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
   const header = cols.map(c => c.label).join(",");
   const rows = inventoryState.filtered.map(r =>
     cols.map(c => `"${String(r[c.key] ?? "").replace(/"/g,'""')}"`).join(",")
   );
-  downloadBlob([header, ...rows].join("\n"), "inventory.csv", "text/csv;charset=utf-8;");
+  const totalsLine = cols.map((c,i)=>{
+    if (i===0) return `"Total"`;
+    return numericKeys.includes(c.key) ? `"${(inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()}"` : `""`;
+  }).join(",");
+  downloadBlob([header, ...rows, totalsLine].join("\n"), "inventory.csv", "text/csv;charset=utf-8;");
 }
 
 function exportInventoryExcel() {
@@ -9596,16 +9624,48 @@ function exportInventoryExcel() {
   const body = inventoryState.filtered.map(r => `
     <tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>
   `).join("");
+
+  const totalsRow = `
+    <tr class="total-row">
+      ${cols.map((c,i)=>{
+        if (i===0) return `<td>Total</td>`;
+        const val = numericKeys.includes(c.key)
+          ? (inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()
+          : "";
+        return `<td>${val}</td>`;
+      }).join("")}
+    </tr>`;
+
   const html = `
     <html><head><meta charset="UTF-8"></head>
-    <body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    <body>
+      <table border="1">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot>${totalsRow}</tfoot>
+      </table>
+    </body></html>`;
   downloadBlob(html, "inventory.xls", "application/vnd.ms-excel");
 }
 
 function exportInventoryPDF() {
   const w = window.open("", "_blank");
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
-  const rows = inventoryState.filtered.map(r => cols.map(c => escapeHTML(r[c.key] ?? "")));
+
+  const bodyRows = inventoryState.filtered.map(r =>
+    `<tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>`
+  ).join("");
+
+  const totalsRow = `
+    <tr>
+      ${cols.map((c,i)=>{
+        if (i===0) return `<td><strong>Total</strong></td>`;
+        const val = numericKeys.includes(c.key)
+          ? (inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()
+          : "";
+        return `<td><strong>${val}</strong></td>`;
+      }).join("")}
+    </tr>`;
 
   w.document.write(`
     <html><head><title>Inventory</title>
@@ -9614,14 +9674,16 @@ function exportInventoryPDF() {
       table{width:100%; border-collapse:collapse;}
       th,td{border:1px solid #333; padding:8px; font-size:12px;}
       th{background:#eee;}
+      tfoot td{background:#f5f5f5; font-weight:600;}
       h2{margin:0 0 10px;}
     </style>
     </head><body>
       <h2>Inventory Report</h2>
-      <table><thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead>
-      <tbody>
-        ${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}
-      </tbody></table>
+      <table>
+        <thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join("")}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+        <tfoot>${totalsRow}</tfoot>
+      </table>
       <script>window.onload = () => window.print();<\/script>
     </body></html>
   `);
