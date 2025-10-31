@@ -2322,9 +2322,9 @@ tbody.innerHTML = pageItems.map(p => `
     <td>${p.openingStock ?? "-"}</td>
     <td>${escapeHTML((p.locations || []).join(", ") || "-")}</td>
 <td style="text-align:center;">
-  <button class="btn btn-sm btn-light" title="View">👁</button>
-  <button class="btn btn-sm btn-primary" title="Edit">✏</button>
-  <button class="btn btn-sm btn-danger" title="Delete">🗑</button>
+  <button class="btn btn-sm btn-light" title="View" onclick="viewProduct('${p.id}')">👁</button>
+  <button class="btn btn-sm btn-primary" title="Edit" onclick="editProduct('${p.id}')">✏</button>
+  <button class="btn btn-sm btn-danger" title="Delete" onclick="confirmDeleteProduct('${p.id}', '${escapeHTML(p.name||"")}')">🗑</button>
 </td>
 
 
