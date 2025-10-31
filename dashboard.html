@@ -2364,7 +2364,7 @@ async function viewProduct(id) {
     const margin = sell > 0 ? ((markup / sell) * 100).toFixed(1) : 0;
 
     box.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:15px;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:10px;">
         <tr><td><strong>Product Name:</strong></td><td>${escapeHTML(p.name || "-")}</td></tr>
         <tr><td><strong>Category:</strong></td><td>${escapeHTML(p.category || "-")}</td></tr>
         <tr><td><strong>Brand:</strong></td><td>${escapeHTML(p.brand || "-")}</td></tr>
@@ -2372,34 +2372,47 @@ async function viewProduct(id) {
         <tr><td><strong>Selling Price:</strong></td><td>KES ${sell.toFixed(2)}</td></tr>
         <tr><td><strong>Markup:</strong></td><td>KES ${markup.toFixed(2)}</td></tr>
         <tr><td><strong>Margin:</strong></td><td>${margin}%</td></tr>
-        <tr><td><strong>Opening Stock:</strong></td><td>${p.openingStock ?? "-"}</td></tr>
-        <tr><td><strong>Locations:</strong></td><td>${escapeHTML((p.locations || []).join(", ") || "-")}</td></tr>
       </table>
 
-      <div style="text-align:center;">
-        <canvas id="profitChart" width="280" height="280"></canvas>
+      <div style="position:relative;text-align:center;margin-top:10px;">
+        <canvas id="profitChart" width="180" height="180" style="filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));"></canvas>
+        <div id="chartCenterText"
+          style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+          font-size:16px;font-weight:bold;color:#333;">
+          ${margin}%
+        </div>
+        <p style="font-size:13px;color:#555;margin-top:5px;">Cost vs Profit</p>
       </div>
     `;
 
-    // draw chart
+    // Draw chart
     const ctx = document.getElementById("profitChart").getContext("2d");
     new Chart(ctx, {
       type: "doughnut",
       data: {
-        labels: ["Cost (Buy)", "Profit (Markup)"],
+        labels: ["Cost", "Profit"],
         datasets: [{
-          data: [buy, markup],
+          data: [buy, markup > 0 ? markup : 0],
           backgroundColor: ["#007bff", "#28a745"],
+          borderWidth: 2,
+          hoverOffset: 8,
         }]
       },
       options: {
+        cutout: "65%",
+        radius: "80%",
+        rotation: -90,
         plugins: {
-          legend: { position: "bottom" },
+          legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (context) => `${context.label}: KES ${context.parsed.toFixed(2)}`
+              label: ctx => `${ctx.label}: KES ${ctx.parsed.toFixed(2)}`
             }
           }
+        },
+        animation: {
+          animateRotate: true,
+          animateScale: true
         }
       }
     });
@@ -2408,6 +2421,7 @@ async function viewProduct(id) {
     box.innerHTML = `<p style="color:red;">Error loading product: ${escapeHTML(err.message)}</p>`;
   }
 }
+
 
 
 function editProduct(id) {
@@ -9576,6 +9590,7 @@ document.addEventListener("click", function (e) {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 
 </body>
 </html>
