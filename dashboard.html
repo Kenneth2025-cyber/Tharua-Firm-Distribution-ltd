@@ -2492,11 +2492,45 @@ async function editProduct(id) {
   };
 }
 
-
 function confirmDeleteProduct(id, name) {
-  document.getElementById("deleteModal").style.display = "flex";
-  document.getElementById("deleteModalMessage").textContent = `Delete “${name}”?`;
+  Swal.fire({
+    title: `Delete “${name}”?`,
+    text: "This action cannot be undone.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#6c757d",
+    confirmButtonText: "Yes, delete it",
+    cancelButtonText: "Cancel"
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const db = firebase.firestore();
+      try {
+        await db.collection("products").doc(id).delete();
+
+        // ✅ Sweet success popup
+        Swal.fire({
+          title: "Deleted!",
+          text: `Product “${name}” has been removed.`,
+          icon: "success",
+          confirmButtonColor: "#28a745",
+          timer: 2000,
+          showConfirmButton: false
+        });
+
+        if (typeof showListProducts === "function") showListProducts();
+      } catch (err) {
+        Swal.fire({
+          title: "Error!",
+          text: `Failed to delete product: ${err.message}`,
+          icon: "error",
+          confirmButtonColor: "#d33"
+        });
+      }
+    }
+  });
 }
+
 
 function closeModal(id) {
   const m = document.getElementById(id);
