@@ -2345,6 +2345,14 @@ tbody.innerHTML = pageItems.map(p => `
 
 // 5) Button actions with functional view modal
 async function viewProduct(id) {
+  // ensure modal is scrollable
+  if (!document.getElementById("modalScrollCSS")) {
+    const s = document.createElement("style");
+    s.id = "modalScrollCSS";
+    s.textContent = `.modal-content{max-height:85vh;overflow-y:auto}`;
+    document.head.appendChild(s);
+  }
+
   const modal = document.getElementById("viewModal");
   const box = document.getElementById("viewModalContent");
   modal.style.display = "flex";
@@ -2352,75 +2360,57 @@ async function viewProduct(id) {
 
   try {
     const snap = await firebase.firestore().collection("products").doc(id).get();
-    if (!snap.exists) {
-      box.innerHTML = `<p style="color:red;">Product not found.</p>`;
-      return;
-    }
+    if (!snap.exists) { box.innerHTML = `<p style="color:red;">Product not found.</p>`; return; }
 
     const p = snap.data();
     const buy = Number(p.buyingPrice || 0);
     const sell = Number(p.sellingPrice || 0);
-    const markup = sell - buy;
-    const margin = sell > 0 ? ((markup / sell) * 100).toFixed(1) : 0;
+    const rawMarkup = sell - buy;
+    const markupForChart = Math.max(0, rawMarkup); // don't draw negative slice
+    const margin = sell > 0 ? ((rawMarkup / sell) * 100).toFixed(1) : 0;
 
     box.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px;">
         <tr><td><strong>Product Name:</strong></td><td>${escapeHTML(p.name || "-")}</td></tr>
         <tr><td><strong>Category:</strong></td><td>${escapeHTML(p.category || "-")}</td></tr>
         <tr><td><strong>Brand:</strong></td><td>${escapeHTML(p.brand || "-")}</td></tr>
         <tr><td><strong>Buying Price:</strong></td><td>KES ${buy.toFixed(2)}</td></tr>
         <tr><td><strong>Selling Price:</strong></td><td>KES ${sell.toFixed(2)}</td></tr>
-        <tr><td><strong>Markup:</strong></td><td>KES ${markup.toFixed(2)}</td></tr>
+        <tr><td><strong>Markup:</strong></td><td>KES ${rawMarkup.toFixed(2)}</td></tr>
         <tr><td><strong>Margin:</strong></td><td>${margin}%</td></tr>
       </table>
-
-      <div style="position:relative;text-align:center;margin-top:10px;">
-        <canvas id="profitChart" width="180" height="180" style="filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));"></canvas>
-        <div id="chartCenterText"
-          style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-          font-size:16px;font-weight:bold;color:#333;">
-          ${margin}%
-        </div>
-        <p style="font-size:13px;color:#555;margin-top:5px;">Cost vs Profit</p>
+      <div style="text-align:center;">
+        <div id="profitPie3D" style="width:240px;height:150px;margin:0 auto;"></div>
+        <p style="font-size:13px;color:#555;margin-top:4px;">Cost vs Profit</p>
       </div>
     `;
 
-    // Draw chart
-    const ctx = document.getElementById("profitChart").getContext("2d");
-    new Chart(ctx, {
-      type: "doughnut",
-      data: {
-        labels: ["Cost", "Profit"],
-        datasets: [{
-          data: [buy, markup > 0 ? markup : 0],
-          backgroundColor: ["#007bff", "#28a745"],
-          borderWidth: 2,
-          hoverOffset: 8,
-        }]
-      },
-      options: {
-        cutout: "65%",
-        radius: "80%",
-        rotation: -90,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => `${ctx.label}: KES ${ctx.parsed.toFixed(2)}`
-            }
-          }
-        },
-        animation: {
-          animateRotate: true,
-          animateScale: true
-        }
-      }
+    // 3D pie with percentage labels on slices
+    google.charts.load("current", { packages: ["corechart"] });
+    google.charts.setOnLoadCallback(() => {
+      const data = google.visualization.arrayToDataTable([
+        ["Part", "Value"],
+        ["Cost", buy],
+        ["Profit", markupForChart],
+      ]);
+      const options = {
+        is3D: true,
+        legend: "none",
+        pieSliceText: "percentage",                  // shows numbers as percentages
+        slices: { 1: { offset: markupForChart > 0 ? 0.15 : 0 } }, // explode profit
+        chartArea: { width: "95%", height: "90%" },
+        colors: ["#b36b2c", "#f2a24c"],              // orange/brown like your sample
+        backgroundColor: "transparent"
+      };
+      new google.visualization.PieChart(document.getElementById("profitPie3D"))
+        .draw(data, options);
     });
 
   } catch (err) {
     box.innerHTML = `<p style="color:red;">Error loading product: ${escapeHTML(err.message)}</p>`;
   }
 }
+
 
 
 
@@ -9688,7 +9678,7 @@ document.addEventListener("click", function (e) {
 <!-- External libraries -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
 
 
 </body>
