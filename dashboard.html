@@ -9501,30 +9501,53 @@ async function showInventoryReport() {
   renderInventory();
 }
 
-// ---------- Firestore I/O (products only) ----------
+// ---------- Firestore I/O (products + stockBalances) ----------
 async function loadInventoryProducts() {
-  const snap = await firebase.firestore().collection("products").get();
-  inventoryState.rows = snap.docs.map(d => {
-    const data = d.data() || {};
-    return {
-      id: d.id,
+  const db = firebase.firestore();
+
+  // get all products
+  const snap = await db.collection("products").get();
+
+  // map products with their opening stock (from stockBalances.onHand)
+  const rows = [];
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    const productId = doc.id;
+
+    // 🔹 Fetch stockBalances with same productId
+    const balSnap = await db.collection("stockBalances")
+      .where("productId", "==", productId)
+      .get();
+
+    // sum all onHand values across locations
+    let totalOnHand = 0;
+    balSnap.forEach(b => {
+      const bal = b.data();
+      totalOnHand += Number(bal.onHand) || 0;
+    });
+
+    rows.push({
+      id: productId,
       product: data.name || "",
       category: data.category || "",
       brand: data.brand || "",
       location: (Array.isArray(data.locations) && data.locations[0]) || "",
-      openingStock: data.openingStock || 0,
+      openingStock: totalOnHand,      // ✅ now shows stockBalances.onHand sum
       openingStockToday: 0,
       purchasedToday: 0,
       purchasedTotal: 0,
       soldToday: 0,
       soldTotal: 0,
       adjusted: 0,
-      currentStock: 0
-    };
-  });
-  inventoryState.filtered = [...inventoryState.rows];
+      currentStock: totalOnHand       // optional duplicate if you want same value
+    });
+  }
+
+  inventoryState.rows = rows;
+  inventoryState.filtered = [...rows];
   inventoryState.currentPage = 1;
 }
+
 
 // ---------- FILTERS (only additions below) ----------
 async function loadInventoryFilters(){
