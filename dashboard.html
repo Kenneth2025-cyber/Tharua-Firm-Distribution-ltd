@@ -9506,46 +9506,58 @@ async function loadInventoryProducts() {
   const db = firebase.firestore();
 
   try {
-    // 1️⃣ Fetch all products
+    // 1) Products
     const productsSnap = await db.collection("products").get();
-    const products = productsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const products = {};
+    productsSnap.forEach(d => { products[d.id] = { id: d.id, ...(d.data() || {}) }; });
 
-    // 2️⃣ Fetch all stockMovements that are OPENING_BALANCE
+    // 2) Opening balances from stockMovements
     const movesSnap = await db.collection("stockMovements")
       .where("type", "==", "OPENING_BALANCE")
       .get();
 
-    // 3️⃣ Build a map of productId => total qty
+    // Map: productId -> location -> qty
     const openingMap = {};
     movesSnap.forEach(doc => {
-      const m = doc.data();
-      if (!m.productId) return;
+      const m = doc.data() || {};
       const pid = m.productId;
-      openingMap[pid] = (openingMap[pid] || 0) + (Number(m.qty) || 0);
+      const loc = m.location || "";
+      const qty = Number(m.qty) || 0;
+      if (!pid) return;
+      if (!openingMap[pid]) openingMap[pid] = {};
+      openingMap[pid][loc] = (openingMap[pid][loc] || 0) + qty;
     });
 
-    // 4️⃣ Merge into rows for table
-    const rows = products.map(p => ({
-      id: p.id,
-      product: p.name || "",
-      category: p.category || "",
-      brand: p.brand || "",
-      location: (Array.isArray(p.locations) && p.locations[0]) || "",
-      openingStock: openingMap[p.id] || 0,  // ✅ now from stockMovements.qty
-      openingStockToday: 0,
-      purchasedToday: 0,
-      purchasedTotal: 0,
-      soldToday: 0,
-      soldTotal: 0,
-      adjusted: 0,
-      currentStock: openingMap[p.id] || 0
-    }));
+    // 3) Build rows (one per product per location found; if none, one blank-location row)
+    const rows = [];
+    Object.values(products).forEach(p => {
+      const perLoc = openingMap[p.id] || {};
+      const locKeys = Object.keys(perLoc).length ? Object.keys(perLoc) : [""];
 
-    // 5️⃣ Push to state + render
+      locKeys.forEach(loc => {
+        const opening = perLoc[loc] || 0;
+        rows.push({
+          id: p.id,
+          product: p.name || "",
+          category: p.category || "",
+          brand: p.brand || "",
+          location: loc,                 // <- actual location from movement
+          openingStock: opening,         // <- from stockMovements.qty
+          openingStockToday: 0,
+          purchasedToday: 0,
+          purchasedTotal: 0,
+          soldToday: 0,
+          soldTotal: 0,
+          adjusted: 0,
+          currentStock: opening          // keep same for now
+        });
+      });
+    });
+
     inventoryState.rows = rows;
     inventoryState.filtered = [...rows];
     inventoryState.currentPage = 1;
-    renderInventory(); // refresh table
+    renderInventory();
   } catch (err) {
     console.error("Error loading inventory:", err);
     const tbody = document.getElementById("inventoryTbody");
