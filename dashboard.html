@@ -9565,6 +9565,9 @@ async function loadInventoryProducts() {
       tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;color:red;">Error loading data: ${err.message}</td></tr>`;
   }
 }
+function escapeHTML(str){
+  return String(str ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
 
 
 // ---------- FILTERS (only additions below) ----------
