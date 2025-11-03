@@ -9501,51 +9501,57 @@ async function showInventoryReport() {
   renderInventory();
 }
 
-// ---------- Firestore I/O (products + stockBalances) ----------
+// ---------- Firestore I/O (products + stockMovements) ----------
 async function loadInventoryProducts() {
   const db = firebase.firestore();
 
-  // get all products
-  const snap = await db.collection("products").get();
+  try {
+    // 1️⃣ Fetch all products
+    const productsSnap = await db.collection("products").get();
+    const products = productsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // map products with their opening stock (from stockBalances.onHand)
-  const rows = [];
-  for (const doc of snap.docs) {
-    const data = doc.data() || {};
-    const productId = doc.id;
-
-    // 🔹 Fetch stockBalances with same productId
-    const balSnap = await db.collection("stockBalances")
-      .where("productId", "==", productId)
+    // 2️⃣ Fetch all stockMovements that are OPENING_BALANCE
+    const movesSnap = await db.collection("stockMovements")
+      .where("type", "==", "OPENING_BALANCE")
       .get();
 
-    // sum all onHand values across locations
-    let totalOnHand = 0;
-    balSnap.forEach(b => {
-      const bal = b.data();
-      totalOnHand += Number(bal.onHand) || 0;
+    // 3️⃣ Build a map of productId => total qty
+    const openingMap = {};
+    movesSnap.forEach(doc => {
+      const m = doc.data();
+      if (!m.productId) return;
+      const pid = m.productId;
+      openingMap[pid] = (openingMap[pid] || 0) + (Number(m.qty) || 0);
     });
 
-    rows.push({
-      id: productId,
-      product: data.name || "",
-      category: data.category || "",
-      brand: data.brand || "",
-      location: (Array.isArray(data.locations) && data.locations[0]) || "",
-      openingStock: totalOnHand,      // ✅ now shows stockBalances.onHand sum
+    // 4️⃣ Merge into rows for table
+    const rows = products.map(p => ({
+      id: p.id,
+      product: p.name || "",
+      category: p.category || "",
+      brand: p.brand || "",
+      location: (Array.isArray(p.locations) && p.locations[0]) || "",
+      openingStock: openingMap[p.id] || 0,  // ✅ now from stockMovements.qty
       openingStockToday: 0,
       purchasedToday: 0,
       purchasedTotal: 0,
       soldToday: 0,
       soldTotal: 0,
       adjusted: 0,
-      currentStock: totalOnHand       // optional duplicate if you want same value
-    });
-  }
+      currentStock: openingMap[p.id] || 0
+    }));
 
-  inventoryState.rows = rows;
-  inventoryState.filtered = [...rows];
-  inventoryState.currentPage = 1;
+    // 5️⃣ Push to state + render
+    inventoryState.rows = rows;
+    inventoryState.filtered = [...rows];
+    inventoryState.currentPage = 1;
+    renderInventory(); // refresh table
+  } catch (err) {
+    console.error("Error loading inventory:", err);
+    const tbody = document.getElementById("inventoryTbody");
+    if (tbody)
+      tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;color:red;">Error loading data: ${err.message}</td></tr>`;
+  }
 }
 
 
