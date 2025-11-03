@@ -9505,68 +9505,56 @@ async function showInventoryReport() {
 async function loadInventoryProducts() {
   const db = firebase.firestore();
 
-  try {
-    // 1) Products
-    const productsSnap = await db.collection("products").get();
-    const products = {};
-    productsSnap.forEach(d => { products[d.id] = { id: d.id, ...(d.data() || {}) }; });
+  // 1) get products
+  const productsSnap = await db.collection("products").get();
+  const products = {};
+  productsSnap.forEach(d => { products[d.id] = { id: d.id, ...(d.data() || {}) }; });
 
-    // 2) Opening balances from stockMovements
-    const movesSnap = await db.collection("stockMovements")
-      .where("type", "==", "OPENING_BALANCE")
-      .get();
+  // 2) get opening balances from stockMovements
+  const movesSnap = await db.collection("stockMovements")
+    .where("type", "==", "OPENING_BALANCE")
+    .get();
 
-    // Map: productId -> location -> qty
-    const openingMap = {};
-    movesSnap.forEach(doc => {
-      const m = doc.data() || {};
-      const pid = m.productId;
-      const loc = m.location || "";
-      const qty = Number(m.qty) || 0;
-      if (!pid) return;
-      if (!openingMap[pid]) openingMap[pid] = {};
-      openingMap[pid][loc] = (openingMap[pid][loc] || 0) + qty;
-    });
+  // productId -> location -> qty
+  const openingMap = {};
+  movesSnap.forEach(doc => {
+    const m = doc.data() || {};
+    const pid = m.productId;
+    const loc = m.location || "";
+    const qty = Number(m.qty) || 0;
+    if (!pid) return;
+    if (!openingMap[pid]) openingMap[pid] = {};
+    openingMap[pid][loc] = (openingMap[pid][loc] || 0) + qty;
+  });
 
-    // 3) Build rows (one per product per location found; if none, one blank-location row)
-    const rows = [];
-    Object.values(products).forEach(p => {
-      const perLoc = openingMap[p.id] || {};
-      const locKeys = Object.keys(perLoc).length ? Object.keys(perLoc) : [""];
-
-      locKeys.forEach(loc => {
-        const opening = perLoc[loc] || 0;
-        rows.push({
-          id: p.id,
-          product: p.name || "",
-          category: p.category || "",
-          brand: p.brand || "",
-          location: loc,                 // <- actual location from movement
-          openingStock: opening,         // <- from stockMovements.qty
-          openingStockToday: 0,
-          purchasedToday: 0,
-          purchasedTotal: 0,
-          soldToday: 0,
-          soldTotal: 0,
-          adjusted: 0,
-          currentStock: opening          // keep same for now
-        });
+  // 3) build rows (per product/location)
+  const rows = [];
+  Object.values(products).forEach(p => {
+    const perLoc = openingMap[p.id] || {};
+    const locKeys = Object.keys(perLoc).length ? Object.keys(perLoc) : [""];
+    locKeys.forEach(loc => {
+      const opening = perLoc[loc] || 0;
+      rows.push({
+        id: p.id,
+        product: p.name || "",
+        category: p.category || "",
+        brand: p.brand || "",
+        location: loc,
+        openingStock: opening,     // ← from stockMovements.qty
+        openingStockToday: 0,
+        purchasedToday: 0,
+        purchasedTotal: 0,
+        soldToday: 0,
+        soldTotal: 0,
+        adjusted: 0,
+        currentStock: opening
       });
     });
+  });
 
-    inventoryState.rows = rows;
-    inventoryState.filtered = [...rows];
-    inventoryState.currentPage = 1;
-    renderInventory();
-  } catch (err) {
-    console.error("Error loading inventory:", err);
-    const tbody = document.getElementById("inventoryTbody");
-    if (tbody)
-      tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;color:red;">Error loading data: ${err.message}</td></tr>`;
-  }
-}
-function escapeHTML(str){
-  return String(str ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  inventoryState.rows = rows;
+  inventoryState.filtered = [...rows];
+  inventoryState.currentPage = 1;
 }
 
 
