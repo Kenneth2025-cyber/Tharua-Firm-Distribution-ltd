@@ -9886,21 +9886,40 @@ function exportInventoryCSV() {
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
   const header = cols.map(c => c.label).join(",");
   const rows = inventoryState.filtered.map(r =>
-    cols.map(c => `"${String(r[c.key] ?? "").replace(/"/g,'""')}"`).join(",")
+    cols.map(c => {
+      if (numericKeys.includes(c.key)) {
+        const num = (Number(r[c.key]) || 0).toLocaleString();
+        const withUnit = r.unitShort ? `${num} ${r.unitShort}` : num;
+        return `"${String(withUnit).replace(/"/g,'""')}"`;
+      } else {
+        return `"${String(r[c.key] ?? "").replace(/"/g,'""')}"`;
+      }
+    }).join(",")
   );
   const totalsLine = cols.map((c,i)=>{
     if (i===0) return `"Total"`;
-    return numericKeys.includes(c.key) ? `"${(inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()}"` : `""`;
+    return numericKeys.includes(c.key)
+      ? `"${(inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()}"`
+      : `""`;
   }).join(",");
   downloadBlob([header, ...rows, totalsLine].join("\n"), "inventory.csv", "text/csv;charset=utf-8;");
 }
 
+
 function exportInventoryExcel() {
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
   const head = cols.map(c => `<th>${c.label}</th>`).join("");
-  const body = inventoryState.filtered.map(r => `
-    <tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>
-  `).join("");
+  const body = inventoryState.filtered.map(r => {
+    return `<tr>${cols.map(c => {
+      if (numericKeys.includes(c.key)) {
+        const num = (Number(r[c.key]) || 0).toLocaleString();
+        const withUnit = r.unitShort ? `${num} ${escapeHTML(r.unitShort)}` : num;
+        return `<td>${withUnit}</td>`;
+      } else {
+        return `<td>${escapeHTML(r[c.key] ?? "")}</td>`;
+      }
+    }).join("")}</tr>`;
+  }).join("");
 
   const totalsRow = `
     <tr class="total-row">
@@ -9925,12 +9944,21 @@ function exportInventoryExcel() {
   downloadBlob(html, "inventory.xls", "application/vnd.ms-excel");
 }
 
+
 function exportInventoryPDF() {
   const w = window.open("", "_blank");
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
 
   const bodyRows = inventoryState.filtered.map(r =>
-    `<tr>${cols.map(c => `<td>${escapeHTML(r[c.key] ?? "")}</td>`).join("")}</tr>`
+    `<tr>${cols.map(c => {
+      if (numericKeys.includes(c.key)) {
+        const num = (Number(r[c.key]) || 0).toLocaleString();
+        const withUnit = r.unitShort ? `${num} ${escapeHTML(r.unitShort)}` : num;
+        return `<td>${withUnit}</td>`;
+      } else {
+        return `<td>${escapeHTML(r[c.key] ?? "")}</td>`;
+      }
+    }).join("")}</tr>`
   ).join("");
 
   const totalsRow = `
@@ -9966,6 +9994,8 @@ function exportInventoryPDF() {
   `);
   w.document.close();
 }
+
+
 
 function printInventory(){ exportInventoryPDF(); }
 
