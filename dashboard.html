@@ -9908,7 +9908,8 @@ function exportInventoryCSV() {
 
 function exportInventoryExcel() {
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
-  const head = cols.map(c => `<th>${c.label}</th>`).join("");
+  const head = cols.map(c => `<th><strong>${c.label}</strong></th>`).join("");
+
   const body = inventoryState.filtered.map(r => {
     return `<tr>${cols.map(c => {
       if (numericKeys.includes(c.key)) {
@@ -9921,14 +9922,15 @@ function exportInventoryExcel() {
     }).join("")}</tr>`;
   }).join("");
 
+  // Make totals bold as requested
   const totalsRow = `
     <tr class="total-row">
       ${cols.map((c,i)=>{
-        if (i===0) return `<td>Total</td>`;
+        if (i===0) return `<td><strong>Total</strong></td>`;
         const val = numericKeys.includes(c.key)
           ? (inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()
           : "";
-        return `<td>${val}</td>`;
+        return `<td><strong>${val}</strong></td>`;
       }).join("")}
     </tr>`;
 
@@ -9941,8 +9943,10 @@ function exportInventoryExcel() {
         <tfoot>${totalsRow}</tfoot>
       </table>
     </body></html>`;
+    
   downloadBlob(html, "inventory.xls", "application/vnd.ms-excel");
 }
+
 
 
 function exportInventoryPDF() {
