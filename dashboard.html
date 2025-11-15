@@ -9501,7 +9501,7 @@ async function showInventoryReport() {
   renderInventory();
 }
 
-// ---------- Firestore I/O (products + stockMovements + purchases) ----------
+// ---------- Firestore I/O (products + stockMovements + purchases + sales) ----------
 async function loadInventoryProducts() {
   const db = firebase.firestore();
 
@@ -9533,7 +9533,6 @@ async function loadInventoryProducts() {
       openingMap[pid][loc] = (openingMap[pid][loc] || 0) + qty;
     });
   } catch (e) {
-    // ignore if stockMovements not accessible
     console.warn("opening balances load failed", e);
   }
 
@@ -9545,7 +9544,6 @@ async function loadInventoryProducts() {
       const pd = doc.data() || {};
       const loc = (pd.location || pd.businessLocation || pd.locationName || pd.store || "").toString();
 
-      // common field names for purchase line items
       const items = pd.items || pd.products || pd.purchaseItems || pd.lineItems || pd.itemsBought || [];
       if (Array.isArray(items) && items.length) {
         items.forEach(it => {
@@ -9553,22 +9551,16 @@ async function loadInventoryProducts() {
           let pid = it.productId || it.product_id || null;
           const pname = String(it.productName || it.product || it.name || "").trim();
 
-          if (!pid && pname) {
-            pid = nameToId[pname.toLowerCase()] || null;
-          }
-
+          if (!pid && pname) pid = nameToId[pname.toLowerCase()] || null;
           if (!pid) {
-            // try matching by exact product name in products set
             const found = Object.values(products).find(p => String(p.name || "").trim().toLowerCase() === pname.toLowerCase());
             if (found) pid = found.id;
           }
-
           if (!pid) return;
           if (!purchaseMap[pid]) purchaseMap[pid] = {};
           purchaseMap[pid][loc] = (purchaseMap[pid][loc] || 0) + qty;
         });
       } else {
-        // fallback: single-line purchase document with productName/quantity at root
         const qty = Number(pd.quantity || pd.qty || pd.totalQty || 0) || 0;
         const pname = String(pd.productName || pd.product || pd.name || "").trim();
         if (qty && pname) {
@@ -9588,7 +9580,53 @@ async function loadInventoryProducts() {
     console.warn("purchases read failed", e);
   }
 
-  // 4) (optional) also aggregate any PURCHASE-type stockMovements into purchaseMap
+  // 4) aggregate sales from sales collection (for sold totals)
+  const soldMap = {}; // productId -> location -> total sold
+  try {
+    const salesSnap = await db.collection("sales").get();
+    salesSnap.forEach(doc => {
+      const sd = doc.data() || {};
+      const loc = (sd.location || sd.businessLocation || sd.locationName || sd.store || "").toString();
+
+      // sales may store items in an array or as single-line fields
+      const items = sd.items || sd.products || sd.saleItems || sd.lineItems || sd.itemsSold || [];
+      if (Array.isArray(items) && items.length) {
+        items.forEach(it => {
+          const qty = Number(it.quantity || it.qty || it.Qty || it.qtySold || 0) || 0;
+          let pid = it.productId || it.product_id || null;
+          const pname = String(it.productName || it.prodName || it.product || it.name || "").trim();
+
+          if (!pid && pname) pid = nameToId[pname.toLowerCase()] || null;
+          if (!pid) {
+            const found = Object.values(products).find(p => String(p.name || "").trim().toLowerCase() === pname.toLowerCase());
+            if (found) pid = found.id;
+          }
+          if (!pid) return;
+          if (!soldMap[pid]) soldMap[pid] = {};
+          soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
+        });
+      } else {
+        // fallback: root-level fields
+        const qty = Number(sd.quantity || sd.qty || sd.totalQty || sd.qtySold || 0) || 0;
+        const pname = String(sd.prodName || sd.productName || sd.product || sd.name || "").trim();
+        if (qty && pname) {
+          let pid = nameToId[pname.toLowerCase()] || null;
+          if (!pid) {
+            const found = Object.values(products).find(p => String(p.name || "").trim().toLowerCase() === pname.toLowerCase());
+            if (found) pid = found.id;
+          }
+          if (pid) {
+            if (!soldMap[pid]) soldMap[pid] = {};
+            soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("sales read failed", e);
+  }
+
+  // 5) (optional) include PURCHASE-type stockMovements into purchaseMap and SALE-type into soldMap
   try {
     const movesAll = await db.collection("stockMovements").get();
     movesAll.forEach(doc => {
@@ -9601,26 +9639,33 @@ async function loadInventoryProducts() {
       if (t.includes("PURCH")) {
         if (!purchaseMap[pid]) purchaseMap[pid] = {};
         purchaseMap[pid][loc] = (purchaseMap[pid][loc] || 0) + qty;
+      } else if (t.includes("SALE") || t.includes("SOLD")) {
+        if (!soldMap[pid]) soldMap[pid] = {};
+        soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
+      } else if (t.includes("OPENING")) {
+        // already handled earlier
       }
     });
   } catch (e) {
-    // ignore if moves missing
+    // ignore if not accessible
   }
 
-  // 5) build rows (combine openingMap + purchaseMap). sold/adjust totals remain zero unless you aggregate them too.
+  // 6) build rows (combine openingMap + purchaseMap + soldMap). adjusted ignored unless you add it.
   const rows = [];
   Object.values(products).forEach(p => {
     const pid = p.id;
     const locSet = new Set([
       ...(openingMap[pid] ? Object.keys(openingMap[pid]) : []),
       ...(purchaseMap[pid] ? Object.keys(purchaseMap[pid]) : []),
+      ...(soldMap[pid] ? Object.keys(soldMap[pid]) : [])
     ]);
     if (locSet.size === 0) locSet.add("");
 
     locSet.forEach(loc => {
       const opening = openingMap[pid]?.[loc] || 0;
       const purchasedTotal = purchaseMap[pid]?.[loc] || 0;
-      const currentStock = opening + purchasedTotal; // sold/adjust ignored here
+      const soldTotal = soldMap[pid]?.[loc] || 0;
+      const currentStock = opening + purchasedTotal - soldTotal; // adjusted not included
 
       rows.push({
         id: pid,
@@ -9633,7 +9678,7 @@ async function loadInventoryProducts() {
         purchasedToday: 0,
         purchasedTotal: purchasedTotal,
         soldToday: 0,
-        soldTotal: 0,
+        soldTotal: soldTotal,
         adjusted: 0,
         currentStock: currentStock
       });
