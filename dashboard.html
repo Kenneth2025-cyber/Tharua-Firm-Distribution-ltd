@@ -9910,19 +9910,59 @@ function exportInventoryExcel() {
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
   const head = cols.map(c => `<th><strong>${c.label}</strong></th>`).join("");
 
+  // conversion rules (product name checks are lowercased, simplified)
+  const convRules = [
+    { // 24 pcs = 1 ctn
+      names: ["amingo tomatoe/ chilli 250ml", "amingo 400ml", "amingo chilli 250ml", "amingo tomatoe 250ml", "amingo 400 ml"],
+      factor: 24
+    },
+    { // 4 pcs = 1 ctn
+      names: ["amingo chilli 5l", "amingo tomatoe 5l", "amingo chilli 5 l", "amingo tomatoe 5 l"],
+      factor: 4
+    },
+    { // 6 pcs = 1 ctn
+      names: ["amingo tomatoe 2l", "amingo tomatoe 2 l"],
+      factor: 6
+    }
+  ];
+
+  const normalize = s => String(s || "").toLowerCase().replace(/[\s\-_,.\/\\]+/g, " ").trim();
+
   const body = inventoryState.filtered.map(r => {
     return `<tr>${cols.map(c => {
       if (numericKeys.includes(c.key)) {
-        const num = (Number(r[c.key]) || 0).toLocaleString();
-        const withUnit = r.unitShort ? `${num} ${escapeHTML(r.unitShort)}` : num;
-        return `<td>${withUnit}</td>`;
+        const num = (Number(r[c.key]) || 0);
+        const numStr = num.toLocaleString();
+
+        // determine product identifier for matching (try original product and raw name fields)
+        const prodRaw = normalize(r.product || r.name || r.productName || "");
+        let bracketPart = "";
+
+        // check rules only for the specific products listed
+        for (const rule of convRules) {
+          for (const nm of rule.names) {
+            if (prodRaw.includes(normalize(nm))) {
+              const ctns = num / rule.factor;
+              const ctnsStr = (Math.abs(ctns - Math.round(ctns)) < 1e-9) ? Math.round(ctns).toString() : ctns.toFixed(2);
+              bracketPart = ` (${escapeHTML(ctnsStr + " Ctns")})`;
+              // stop at first match
+              break;
+            }
+          }
+          if (bracketPart) break;
+        }
+
+        // display original number + unitShort (if any) + bracketed carton conversion (only for matched products)
+        const unitShort = (r.unitShort || "").toString();
+        const withUnit = unitShort ? `${numStr} ${escapeHTML(unitShort)}` : numStr;
+        return `<td>${withUnit}${bracketPart}</td>`;
       } else {
         return `<td>${escapeHTML(r[c.key] ?? "")}</td>`;
       }
     }).join("")}</tr>`;
   }).join("");
 
-  // Make totals bold as requested
+  // Make totals bold (no bracketed conversions in totals)
   const totalsRow = `
     <tr class="total-row">
       ${cols.map((c,i)=>{
