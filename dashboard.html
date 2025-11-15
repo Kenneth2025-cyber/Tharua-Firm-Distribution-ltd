@@ -9315,7 +9315,7 @@ function toggleReports() {
 
 // Placeholder report functions
 
-// ---------- Page Entrypoint: Sales Report (clean with working date + location filters + exports) ----------
+// ---------- Page Entrypoint: Sales Report (clean with working date + location filters + exports + Filter-by-date dropdown + Apply button) ----------
 async function showSalesReport() {
   saveLastPage("showSalesReport");
   const el = document.getElementById("content");
@@ -9336,167 +9336,196 @@ async function showSalesReport() {
       .btn-excel{background:#198754;color:#fff}
       .btn-pdf{background:#6b7280;color:#fff}
       .sr-table-placeholder{padding:28px;border:1px dashed #e6e6e6;border-radius:6px;color:#666;margin-top:8px}
+      /* Filter-by-date dropdown on the right (purple button + menu) */
+      .date-filter-wrap{position:relative;display:inline-block}
+      .date-filter-btn{background:#6f2cc1;color:#fff;padding:10px 12px;border-radius:6px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center}
+      .date-filter-menu{position:absolute;right:0;top:42px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.08);min-width:220px;padding:12px;display:none;z-index:50}
+      .date-filter-menu label{display:block;margin-bottom:8px;font-size:13px}
+      .date-filter-menu .preset-list{max-height:240px;overflow:auto;border-top:1px solid #eee;padding-top:8px;margin-top:8px}
+      .apply-filters{background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;border:none;cursor:pointer;width:100%}
+      .small-link{font-size:12px;color:#6f2cc1;cursor:pointer;text-decoration:underline;margin-top:8px;display:inline-block}
     </style>
 
     <div class="sr-wrap">
       <div class="sr-head">
         <h2>Sales Report</h2>
-        <div class="sr-export">
-          <button id="srExportCsv" class="btn btn-csv btn-sm">Export CSV</button>
-          <button id="srExportExcel" class="btn btn-excel btn-sm">Export Excel</button>
-          <button id="srExportPdf" class="btn btn-pdf btn-sm">Export PDF</button>
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="sr-export">
+            <button id="srExportCsv" class="btn btn-csv btn-sm">Export CSV</button>
+            <button id="srExportExcel" class="btn btn-excel btn-sm">Export Excel</button>
+            <button id="srExportPdf" class="btn btn-pdf btn-sm">Export PDF</button>
+          </div>
+
+          <div class="date-filter-wrap" id="dateFilterWrap">
+            <button id="srDateFilterBtn" class="date-filter-btn">
+              <span>Filter by date</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.9"><path d="M6 9l6 6 6-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+
+            <div id="srDateMenu" class="date-filter-menu" role="menu" aria-hidden="true">
+              <label>
+                Date range:
+                <select id="srDatePreset" class="input" style="width:100%;margin-top:6px;">
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="last7">Last 7 Days</option>
+                  <option value="last30" selected>Last 30 Days</option>
+                  <option value="thisMonth">This Month</option>
+                  <option value="lastMonth">Last Month</option>
+                  <option value="thisYear">This Year</option>
+                  <option value="lastYear">Last Year</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </label>
+
+              <div id="srMenuCustomDates" style="display:none;margin-top:8px">
+                <label>From: <input id="srFrom" type="date" class="input" style="width:100%"></label>
+                <label style="margin-top:8px">To:   <input id="srTo"   type="date" class="input" style="width:100%"></label>
+              </div>
+
+              <div style="margin-top:10px">
+                <button id="srApplyFilters" class="apply-filters">Apply filters</button>
+              </div>
+
+              <div style="border-top:1px solid #f0f0f0;margin-top:10px;padding-top:8px">
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <label style="flex:1">Location:</label>
+                  <select id="srLocationSmall" class="input" style="min-width:110px">
+                    <option value="">All locations</option>
+                  </select>
+                </div>
+                <div style="margin-top:8px;text-align:right"><span id="srCloseMenu" class="small-link">Close</span></div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
       <div class="sr-controls">
-        <div class="sr-presets">
-          <label>
-            Date range:
-            <select id="srDatePreset" class="input">
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="last7">Last 7 Days</option>
-              <option value="last30" selected>Last 30 Days</option>
-              <option value="thisMonth">This Month</option>
-              <option value="lastMonth">Last Month</option>
-              <option value="thisYear">This Year</option>
-              <option value="lastYear">Last Year</option>
-              <option value="custom">Custom Range</option>
-            </select>
-          </label>
-        </div>
-
-        <div id="srCustomDates" style="display:none" class="sr-custom-dates">
-          <label>From: <input id="srFrom" type="date" class="input"></label>
-          <label>To:   <input id="srTo"   type="date" class="input"></label>
-        </div>
-
-        <label>
-          Business Location:
-          <select id="srLocation" class="input">
-            <option value="">All locations</option>
-          </select>
-        </label>
-
+        <div style="flex:1;color:#666">Use <strong>Filter by date</strong> (top-right) to choose presets or a custom range — then click <strong>Apply filters</strong>.</div>
         <div style="margin-left:auto;color:#666">Choose date range and location, then export.</div>
       </div>
 
       <div id="srResults" class="sr-table-placeholder">
-        No data aggregated yet. Use the filters above and then ask me to wire the aggregation (sales -> grouped data) — exports will export the current rows when present.
+        No data aggregated yet. Use the filters (top-right) and then click Apply filters to load aggregated data — exports will export current filtered rows when present.
       </div>
     </div>
   `;
 
-  // state for the page (rows should be filled by aggregation when you ask)
+  /************ state ************/
   const salesState = {
-    rows: [],        // aggregated rows: [{ product, salesperson, location, qtySold, revenue, cost, unitShort, ... }]
-    filtered: []     // filtered subset based on date+location
+    rows: [],        // aggregated rows: you will define aggregation later
+    filtered: [],    // filtered subset
+    from: null,
+    to: null,
+    location: ""
   };
 
-  // helper: set date inputs
+  /************ helpers: presets & dates ************/
   function setPresetRange(preset) {
     const today = new Date();
-    const to = new Date(today);
     let from = new Date(today);
+    let to = new Date(today);
 
     switch(preset) {
       case "today":
-        from = new Date(today); break;
+        break;
       case "yesterday":
-        from = new Date(today); from.setDate(from.getDate()-1); to.setDate(to.getDate()-1); break;
+        from.setDate(from.getDate()-1); to.setDate(to.getDate()-1); break;
       case "last7":
         from.setDate(from.getDate()-6); break;
       case "last30":
         from.setDate(from.getDate()-29); break;
       case "thisMonth":
-        from = new Date(today.getFullYear(), today.getMonth(), 1); break;
+        from = new Date(today.getFullYear(), today.getMonth(), 1); to = new Date(today.getFullYear(), today.getMonth()+1, 0); break;
       case "lastMonth":
         from = new Date(today.getFullYear(), today.getMonth()-1, 1);
         to = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
       case "thisYear":
-        from = new Date(today.getFullYear(), 0, 1); break;
+        from = new Date(today.getFullYear(), 0, 1); to = new Date(today.getFullYear(), 11, 31); break;
       case "lastYear":
         from = new Date(today.getFullYear()-1, 0, 1);
         to = new Date(today.getFullYear()-1, 11, 31);
         break;
       case "custom":
-        // show custom inputs without changing values
-        document.getElementById("srCustomDates").style.display = "";
+        // do not change inputs
         return;
       default:
         from.setDate(from.getDate()-29);
     }
-    // set inputs
-    const f = document.getElementById("srFrom");
-    const t = document.getElementById("srTo");
-    f.valueAsDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-    t.valueAsDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-    document.getElementById("srCustomDates").style.display = "none";
+    const fEl = document.getElementById("srFrom");
+    const tEl = document.getElementById("srTo");
+    if (fEl && tEl) {
+      fEl.valueAsDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+      tEl.valueAsDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+      document.getElementById("srMenuCustomDates").style.display = "none";
+    }
   }
 
-  // populate locations from Firestore
+  /************ load locations ************/
   async function loadLocations() {
     try {
       const db = firebase.firestore();
       const snap = await db.collection("businessLocations").get();
-      const sel = document.getElementById("srLocation");
+      const selSmall = document.getElementById("srLocationSmall");
       const seen = new Set();
       snap.forEach(doc => {
         const name = String(doc.data()?.name || "").trim();
         if (!name || seen.has(name)) return;
         seen.add(name);
-        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
+        selSmall.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
       });
     } catch(e) {
-      // silent fail (user may not have collection)
       console.warn("loadLocations() failed", e);
     }
   }
 
-  // apply filters to salesState.rows -> salesState.filtered
+  /************ apply filters (called when user clicks Apply) ************/
   function applyFilters() {
     const preset = document.getElementById("srDatePreset").value;
-    const fromVal = document.getElementById("srFrom").value;
-    const toVal = document.getElementById("srTo").value;
-    const loc = document.getElementById("srLocation").value;
+    const fromVal = document.getElementById("srFrom")?.value || "";
+    const toVal = document.getElementById("srTo")?.value || "";
+    const loc = document.getElementById("srLocationSmall")?.value || "";
 
-    // convert to Date for comparisons (if present)
-    const fromDate = fromVal ? new Date(fromVal + "T00:00:00") : null;
-    const toDate = toVal ? new Date(toVal + "T23:59:59") : null;
+    // store in state
+    salesState.location = loc;
+    salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
+    salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
 
-    salesState.filtered = salesState.rows.filter(r => {
-      // r.saleDate is expected to be ISO-ish or Date; if you aggregate later ensure saleDate exists
-      if (fromDate && toDate && r.saleDate) {
+    // apply to rows (if rows present)
+    salesState.filtered = (salesState.rows || []).filter(r => {
+      if (salesState.from && salesState.to && r.saleDate) {
         const d = (r.saleDate instanceof Date) ? r.saleDate : new Date(r.saleDate);
         if (isNaN(d)) return false;
-        if (d < fromDate || d > toDate) return false;
+        if (d < salesState.from || d > salesState.to) return false;
       }
       if (loc && String(r.location||"") !== String(loc)) return false;
       return true;
     });
 
-    renderResultsPlaceholder(); // placeholder will show count when rows are present
+    renderResultsPlaceholder();
+    // hide menu after apply
+    closeDateMenu();
   }
 
-  // simple render for placeholder / count (you'll replace with full table later)
+  /************ render placeholder / summary ************/
   function renderResultsPlaceholder() {
     const container = document.getElementById("srResults");
     if (!salesState.rows.length) {
-      container.innerHTML = `<div class="sr-table-placeholder">No aggregated sales yet. Filters are working — when you ask, I'll wire aggregation and the table will show results.<br><br>Current filters: From <strong>${document.getElementById("srFrom").value}</strong> To <strong>${document.getElementById("srTo").value}</strong> Location <strong>${document.getElementById("srLocation").value || 'All'}</strong></div>`;
+      container.innerHTML = `<div class="sr-table-placeholder">No aggregated sales yet. Apply filters to process data when aggregation is implemented.<br><br>Selected range: <strong>${document.getElementById("srFrom")?.value || 'N/A'}</strong> — <strong>${document.getElementById("srTo")?.value || 'N/A'}</strong>; Location: <strong>${document.getElementById("srLocationSmall")?.value || 'All'}</strong></div>`;
       return;
     }
-    // show a small summary and a simple table (lightweight)
     const count = salesState.filtered.length;
     container.innerHTML = `<div><strong>${count}</strong> aggregated rows match the filters.</div>
-      <div style="margin-top:10px;color:#666;font-size:13px">When you confirm the aggregation schema I will render the full grouped table here (per salesperson or per product) and enable exports of the real data.</div>`;
+      <div style="margin-top:10px;color:#666;font-size:13px">When you confirm aggregation details I will render the full grouped table here and enable exports of the real data.</div>`;
   }
 
-  // Export helpers (export current filtered rows)
+  /************ exports (same as before) ************/
   function exportCSV() {
     const rows = salesState.filtered || [];
     if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
-    // build CSV from row keys (simple generic exporter)
     const keys = Object.keys(rows[0]);
     const header = keys.join(",");
     const data = rows.map(r => keys.map(k => `"${String(r[k] ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
@@ -9522,30 +9551,51 @@ async function showSalesReport() {
     w.document.close();
   }
 
-  // wire UI events
-  document.getElementById("srDatePreset").addEventListener("change", (e) => {
-    setPresetRange(e.target.value);
-    applyFilters();
-  });
-  document.getElementById("srFrom").addEventListener("change", applyFilters);
-  document.getElementById("srTo").addEventListener("change", applyFilters);
-  document.getElementById("srLocation").addEventListener("change", applyFilters);
+  /************ date menu open/close logic ************/
+  const dateBtn = document.getElementById("srDateFilterBtn");
+  const dateMenu = document.getElementById("srDateMenu");
+  const closeMenuLink = document.getElementById("srCloseMenu");
 
+  function openDateMenu(){ dateMenu.style.display = "block"; dateMenu.setAttribute("aria-hidden","false"); }
+  function closeDateMenu(){ dateMenu.style.display = "none"; dateMenu.setAttribute("aria-hidden","true"); }
+
+  dateBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (dateMenu.style.display === "block") closeDateMenu(); else openDateMenu();
+  });
+  closeMenuLink.addEventListener("click", closeDateMenu);
+  // clicking outside closes menu
+  document.addEventListener("click", (e) => {
+    const menu = document.getElementById("srDateMenu");
+    const wrap = document.getElementById("dateFilterWrap");
+    if (!menu || !wrap) return;
+    if (!wrap.contains(e.target)) closeDateMenu();
+  });
+
+  /************ wire UI controls ************/
+  document.getElementById("srDatePreset").addEventListener("change", (e) => {
+    if (e.target.value === "custom") {
+      document.getElementById("srMenuCustomDates").style.display = "";
+    } else {
+      document.getElementById("srMenuCustomDates").style.display = "none";
+      setPresetRange(e.target.value);
+    }
+  });
+  document.getElementById("srApplyFilters").addEventListener("click", applyFilters);
   document.getElementById("srExportCsv").addEventListener("click", exportCSV);
   document.getElementById("srExportExcel").addEventListener("click", exportExcel);
   document.getElementById("srExportPdf").addEventListener("click", exportPDF);
 
-  // initial setup
+  /************ initial setup ************/
   setPresetRange(document.getElementById("srDatePreset").value);
   await loadLocations();
   applyFilters();
   renderResultsPlaceholder();
 
-  // NOTE: aggregation of sales into salesState.rows is intentionally left out
-  // so we keep this page minimal and focused on the filters & exports.
-  // When you confirm the aggregation details (group by product / by salesperson,
+  // NOTE: aggregation of sales into salesState.rows still intentionally left out.
+  // When you confirm aggregation details (group by product / by salesperson,
   // which sales fields to use for qty/revenue/cost, and any conversions),
-  // I will implement the aggregation and replace the placeholder with the real table.
+  // I will implement aggregation and render the full table here.
 }
 
 
