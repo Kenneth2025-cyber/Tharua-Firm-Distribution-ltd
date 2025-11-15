@@ -9510,44 +9510,81 @@ async function loadInventoryProducts() {
   const products = {};
   productsSnap.forEach(d => { products[d.id] = { id: d.id, ...(d.data() || {}) }; });
 
-  // 2) get opening balances from stockMovements
-  const movesSnap = await db.collection("stockMovements")
-    .where("type", "==", "OPENING_BALANCE")
-    .get();
+  // 2) get ALL stockMovements (Opening, Purchase, Sale, Adjustments)
+  const movesSnap = await db.collection("stockMovements").get();
 
-  // productId -> location -> qty
-  const openingMap = {};
+  // Maps
+  const openingMap = {};        // productId -> location -> opening qty
+  const purchaseMap = {};       // productId -> location -> total purchased
+  const soldMap = {};           // productId -> location -> total sold
+  const adjustMap = {};         // productId -> location -> adjusted qty
+
   movesSnap.forEach(doc => {
     const m = doc.data() || {};
     const pid = m.productId;
     const loc = m.location || "";
     const qty = Number(m.qty) || 0;
     if (!pid) return;
-    if (!openingMap[pid]) openingMap[pid] = {};
-    openingMap[pid][loc] = (openingMap[pid][loc] || 0) + qty;
+
+    // OPENING BALANCE
+    if (m.type === "OPENING_BALANCE") {
+      if (!openingMap[pid]) openingMap[pid] = {};
+      openingMap[pid][loc] = (openingMap[pid][loc] || 0) + qty;
+    }
+
+    // PURCHASE
+    if (m.type === "PURCHASE") {
+      if (!purchaseMap[pid]) purchaseMap[pid] = {};
+      purchaseMap[pid][loc] = (purchaseMap[pid][loc] || 0) + qty;
+    }
+
+    // SALE
+    if (m.type === "SALE") {
+      if (!soldMap[pid]) soldMap[pid] = {};
+      soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
+    }
+
+    // ADJUSTMENT
+    if (m.type === "ADJUSTMENT") {
+      if (!adjustMap[pid]) adjustMap[pid] = {};
+      adjustMap[pid][loc] = (adjustMap[pid][loc] || 0) + qty;
+    }
   });
 
-  // 3) build rows (per product/location)
+  // 3) Build rows (per product/location)
   const rows = [];
   Object.values(products).forEach(p => {
-    const perLoc = openingMap[p.id] || {};
-    const locKeys = Object.keys(perLoc).length ? Object.keys(perLoc) : [""];
+    const locKeys = new Set([
+      ...(openingMap[p.id] ? Object.keys(openingMap[p.id]) : []),
+      ...(purchaseMap[p.id] ? Object.keys(purchaseMap[p.id]) : []),
+      ...(soldMap[p.id] ? Object.keys(soldMap[p.id]) : []),
+      ...(adjustMap[p.id] ? Object.keys(adjustMap[p.id]) : [])
+    ]);
+
+    if (locKeys.size === 0) locKeys.add("");
+
     locKeys.forEach(loc => {
-      const opening = perLoc[loc] || 0;
+      const opening  = (openingMap[p.id]?.[loc] || 0);
+      const purchasedTotal = (purchaseMap[p.id]?.[loc] || 0);
+      const soldTotal = (soldMap[p.id]?.[loc] || 0);
+      const adjusted = (adjustMap[p.id]?.[loc] || 0);
+
+      const currentStock = opening + purchasedTotal - soldTotal + adjusted;
+
       rows.push({
         id: p.id,
         product: p.name || "",
         category: p.category || "",
         brand: p.brand || "",
         location: loc,
-        openingStock: opening,     // ← from stockMovements.qty
+        openingStock: opening,
         openingStockToday: 0,
         purchasedToday: 0,
-        purchasedTotal: 0,
+        purchasedTotal,
         soldToday: 0,
-        soldTotal: 0,
-        adjusted: 0,
-        currentStock: opening
+        soldTotal,
+        adjusted,
+        currentStock
       });
     });
   });
@@ -9556,6 +9593,7 @@ async function loadInventoryProducts() {
   inventoryState.filtered = [...rows];
   inventoryState.currentPage = 1;
 }
+
 
 
 // ---------- FILTERS (only additions below) ----------
