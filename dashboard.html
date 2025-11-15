@@ -9501,7 +9501,7 @@ async function showInventoryReport() {
   renderInventory();
 }
 
-// ---------- Firestore I/O (products + stockMovements + purchases + sales) ----------
+// ---------- Firestore I/O (products + stockMovements + purchases + sales + unit short names) ----------
 async function loadInventoryProducts() {
   const db = firebase.firestore();
 
@@ -9514,7 +9514,7 @@ async function loadInventoryProducts() {
       const u = d.data() || {};
       const id = d.id;
       const name = String(u.name || "").trim();
-      const shortName = String(u.shortName || u.short || u.short_name || "").trim();
+      const shortName = String(u.shortName || u.short || u.short_name || u.shortname || "").trim();
       if (id && shortName) unitsMapById[id] = shortName;
       if (name && shortName) unitsMapByName[name.toLowerCase()] = shortName;
     });
@@ -9657,12 +9657,10 @@ async function loadInventoryProducts() {
       } else if (t.includes("SALE") || t.includes("SOLD")) {
         if (!soldMap[pid]) soldMap[pid] = {};
         soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
-      } else if (t.includes("OPENING")) {
-        // handled earlier
       }
     });
   } catch (e) {
-    // ignore
+    // ignore if not accessible
   }
 
   // 6) build rows (combine openingMap + purchaseMap + soldMap) and append unit short name to product label
@@ -9680,7 +9678,7 @@ async function loadInventoryProducts() {
     let unitShort = "";
     try {
       // common product fields that may reference unit: unit (name or id), unitId, unitName, unit_short, unitShort
-      const uField = p.unit || p.unitId || p.unitName || p.unit_id || "";
+      const uField = p.unit || p.unitId || p.unitName || p.unit_id || p.unitObj || "";
       if (uField) {
         const uStr = String(uField).trim();
         // check by id first
@@ -9699,7 +9697,6 @@ async function loadInventoryProducts() {
       unitShort = "";
     }
 
-    // final display name builder
     const baseName = String(p.name || "").trim();
     const displayName = unitShort ? `${baseName} ${unitShort}` : baseName;
 
