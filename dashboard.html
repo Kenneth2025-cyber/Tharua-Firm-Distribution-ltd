@@ -9663,7 +9663,7 @@ async function loadInventoryProducts() {
     // ignore if not accessible
   }
 
-  // 6) build rows (combine openingMap + purchaseMap + soldMap) and append unit short name to product label
+  // 6) build rows (combine openingMap + purchaseMap + soldMap) and append unit short name to each row as unitShort
   const rows = [];
   Object.values(products).forEach(p => {
     const pid = p.id;
@@ -9677,28 +9677,19 @@ async function loadInventoryProducts() {
     // determine unit short for this product (try multiple product fields)
     let unitShort = "";
     try {
-      // common product fields that may reference unit: unit (name or id), unitId, unitName, unit_short, unitShort
       const uField = p.unit || p.unitId || p.unitName || p.unit_id || p.unitObj || "";
       if (uField) {
         const uStr = String(uField).trim();
-        // check by id first
         if (unitsMapById[uStr]) unitShort = unitsMapById[uStr];
         else if (unitsMapByName[uStr.toLowerCase()]) unitShort = unitsMapByName[uStr.toLowerCase()];
-        else {
-          // sometimes product stores the full unit object
-          if (typeof uField === "object" && uField !== null) {
-            unitShort = String(uField.shortName || uField.short || uField.short_name || "").trim();
-          }
+        else if (typeof uField === "object" && uField !== null) {
+          unitShort = String(uField.shortName || uField.short || uField.short_name || "").trim();
         }
       }
-      // fallback: product may contain 'unitShort' or 'unit_short'
       if (!unitShort) unitShort = String(p.unitShort || p.unit_short || p.unitShortName || "").trim();
     } catch (e) {
       unitShort = "";
     }
-
-    const baseName = String(p.name || "").trim();
-    const displayName = unitShort ? `${baseName} ${unitShort}` : baseName;
 
     locSet.forEach(loc => {
       const opening = openingMap[pid]?.[loc] || 0;
@@ -9708,7 +9699,7 @@ async function loadInventoryProducts() {
 
       rows.push({
         id: pid,
-        product: displayName,
+        product: p.name || "",
         category: p.category || "",
         brand: p.brand || "",
         location: loc,
@@ -9719,7 +9710,8 @@ async function loadInventoryProducts() {
         soldToday: 0,
         soldTotal: soldTotal,
         adjusted: 0,
-        currentStock: currentStock
+        currentStock: currentStock,
+        unitShort: unitShort // <-- added here
       });
     });
   });
@@ -9842,15 +9834,26 @@ function renderInventory() {
   if (!slice.length) {
     tbody.innerHTML = `<tr><td colspan="${inventoryColumns.length}" style="text-align:center;">No inventory records found.</td></tr>`;
   } else {
-    tbody.innerHTML = slice.map(r => `
+    tbody.innerHTML = slice.map(r => {
+      // per-row unit short (may be empty)
+      const unit = r.unitShort ? ` ${escapeHTML(r.unitShort)}` : "";
+      return `
       <tr>
         ${inventoryColumns.map(c => {
           const show = inventoryState.visibleCols[c.key];
-          const val = r[c.key] ?? "";
-          return `<td style="${!show ? 'display:none':''}" data-col="${c.key}">${escapeHTML(val)}</td>`;
+          const raw = r[c.key] ?? "";
+          let cellHtml = "";
+          if (numericKeys.includes(c.key)) {
+            const num = Number(raw) || 0;
+            cellHtml = num.toLocaleString() + unit;
+          } else {
+            cellHtml = escapeHTML(raw);
+          }
+          return `<td style="${!show ? 'display:none':''}" data-col="${c.key}">${cellHtml}</td>`;
         }).join("")}
       </tr>
-    `).join("");
+    `;
+    }).join("");
   }
 
   // totals over the FULL filtered dataset (not just page)
@@ -9859,7 +9862,7 @@ function renderInventory() {
     totals[k] = inventoryState.filtered.reduce((sum, row) => sum + (Number(row[k]) || 0), 0);
   });
 
-  // footer row
+  // footer row (totals - unit omitted because totals may mix units)
   const footerRow = `
     <tr class="total-row">
       ${inventoryColumns.map((c,i)=>{
@@ -9876,6 +9879,7 @@ function renderInventory() {
   const showing = total ? `${start + 1} to ${end} of ${total}` : `0 of 0`;
   info.textContent = `Showing ${showing} entries`;
 }
+
 
 // ---------- Exports & Print (includes totals row) ----------
 function exportInventoryCSV() {
