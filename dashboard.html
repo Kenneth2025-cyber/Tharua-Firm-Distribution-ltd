@@ -9496,32 +9496,59 @@ async function showSalesReport() {
     }
   }
 
-  /************ apply filters (called when user clicks Apply) ************/
-  function applyFilters() {
-    const fromVal = document.getElementById("srFrom")?.value || "";
-    const toVal = document.getElementById("srTo")?.value || "";
-    const loc = document.getElementById("srLocationSmall")?.value || "";
+// ---------- apply filters (upgrade: aggregates when detailed mode is active) ----------
+async function applyFilters() {
+  const preset = document.getElementById("srDatePreset").value;
+  const fromVal = document.getElementById("srFrom")?.value || "";
+  const toVal = document.getElementById("srTo")?.value || "";
+  const loc = document.getElementById("srLocationSmall")?.value || "";
 
-    // store in state
-    salesState.location = loc;
-    salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
-    salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
+  // store in state
+  salesState.location = loc;
+  salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
+  salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
 
-    // apply to rows (if rows present)
-    salesState.filtered = (salesState.rows || []).filter(r => {
-      if (salesState.from && salesState.to && r.saleDate) {
-        const d = (r.saleDate instanceof Date) ? r.saleDate : new Date(r.saleDate);
-        if (isNaN(d)) return false;
-        if (d < salesState.from || d > salesState.to) return false;
-      }
-      if (loc && String(r.location||"") !== String(loc)) return false;
-      return true;
-    });
+  // clear previous aggregation
+  salesState.rows = [];
+  salesState.filtered = [];
 
-    renderModePlaceholder();
-    // hide menu after apply
+  // If the selected mode is detailed, run aggregation and render the repeated salesperson tables
+  if (salesState.reportMode === "detailed") {
+    // show a loading placeholder
+    const container = document.getElementById("srResults");
+    container.innerHTML = `<div class="sr-table-placeholder">Aggregating sales... please wait.</div>`;
+
+    try {
+      // aggregate from Firestore and populate salesState.rows as grouped structure
+      await aggregateSalesDetailed(); // populates salesState.rows with grouped sales
+      // Apply the same filters to the aggregated rows (should already be filtered by date/location by the query)
+      salesState.filtered = salesState.rows.slice();
+      // Render the detailed repeated tables
+      renderDetailedTable();
+    } catch (err) {
+      console.error("Aggregation failed", err);
+      document.getElementById("srResults").innerHTML = `<div class="sr-table-placeholder">Aggregation error: ${escapeHTML(String(err?.message || err))}</div>`;
+    }
+    // close menu
     closeDateMenu();
+    return;
   }
+
+  // For other modes (not implemented) simply filter raw rows if any
+  salesState.filtered = (salesState.rows || []).filter(r => {
+    if (salesState.from && salesState.to && r.saleDate) {
+      const d = (r.saleDate instanceof Date) ? r.saleDate : new Date(r.saleDate);
+      if (isNaN(d)) return false;
+      if (d < salesState.from || d > salesState.to) return false;
+    }
+    if (loc && String(r.location||"") !== String(loc)) return false;
+    return true;
+  });
+
+  renderModePlaceholder();
+  closeDateMenu();
+}
+
 
 /************ render per-mode placeholder (clean report skeleton) ************/
 function renderModePlaceholder() {
@@ -9766,6 +9793,259 @@ function renderModePlaceholder() {
   // default render for the chosen mode
   setReportMode(salesState.reportMode);
   applyFilters(); // populate salesState.filtered based on default dates (rows empty until aggregation is implemented)
+}
+
+
+// ----------------- Wire report mode buttons -----------------
+function setReportModeButtons() {
+  // ensures there's a default mode
+  if (!salesState.reportMode) salesState.reportMode = "detailed";
+
+  const btnsHtml = `
+    <button id="modeDetailed" class="btn btn-sm" style="background:#6f2cc1;color:#fff">Detailed Sales Report (per Salesperson)</button>
+    <button id="modeByDate" class="btn btn-sm" style="opacity:.45" disabled>Sales By Date</button>
+    <button id="modeProduct" class="btn btn-sm" style="opacity:.45" disabled>Sales By Product</button>
+    <button id="modeCustomer" class="btn btn-sm" style="opacity:.45" disabled>Sales By Customer</button>
+    <button id="modeCustGroup" class="btn btn-sm" style="opacity:.45" disabled>Sales By Customer Group</button>
+  `;
+  // insert buttons near top-left controls (adjust selector if needed)
+  const head = document.querySelector(".sr-controls");
+  if (head) {
+    const wrapper = document.createElement("div");
+    wrapper.style.display = "flex";
+    wrapper.style.gap = "8px";
+    wrapper.innerHTML = btnsHtml;
+    head.insertBefore(wrapper, head.firstChild);
+  }
+
+  const setActive = (mode) => {
+    salesState.reportMode = mode;
+    // style buttons: only detailed active for now
+    ["modeDetailed","modeByDate","modeProduct","modeCustomer","modeCustGroup"].forEach(id=>{
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (id === "modeDetailed" && mode === "detailed") { el.style.opacity = "1"; el.style.pointerEvents="auto"; el.style.background="#6f2cc1"; el.style.color="#fff"; }
+      else { el.style.opacity = ".45"; el.style.pointerEvents="none"; el.style.background=""; el.style.color=""; }
+    });
+    // re-render placeholder for new mode
+    renderModePlaceholder();
+  };
+
+  document.getElementById("modeDetailed")?.addEventListener("click", () => setActive("detailed"));
+  // other buttons are placeholders (disabled) — future hook here
+  setActive("detailed");
+}
+setReportModeButtons();
+
+// ---------- aggregateSalesDetailed(): query Firestore and group sales by salesperson -> product ----------
+async function aggregateSalesDetailed() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+
+  // Build Firestore query with date + location filters (saleDate assumed stored as Firestore Timestamp or ISO)
+  let q = db.collection("sales").orderBy("saleDate", "desc");
+  if (from && to) {
+    // Firestore expects Timestamp objects if saleDate is Timestamp; using Date works with .where('saleDate', '>=', from)
+    q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  }
+  if (loc) {
+    // try a few candidate location field names
+    q = q.where("location", "==", loc);
+    // If your sales collection uses another field name for location, adjust the above to the correct field.
+  }
+
+  const snap = await q.get();
+
+  // temporary map: salesperson -> productName -> aggregated data
+  const spMap = {}; // { spName: { products: { prodKey: { qty, revenue, cost, unitShort } }, totals: {...} } }
+  const nameToId = {}; // fallback mapping if needed (not strictly necessary here)
+
+  // helper: read numeric
+  const toNum = (v) => (typeof v === "number" ? v : (Number(v) || 0));
+
+  snap.forEach(doc => {
+    const sd = doc.data() || {};
+    // sale date
+    const saleDate = sd.saleDate ? (sd.saleDate.toDate ? sd.saleDate.toDate() : new Date(sd.saleDate)) : null;
+    // salesperson name
+    const sp = String(sd.salesperson || sd.salespersonName || sd.saleperson || "").trim() || "Unknown";
+    // location
+    const sLoc = String(sd.location || sd.businessLocation || sd.locationName || sd.store || "").trim() || "";
+
+    // if page-level location filter exists and this sale is different, skip it
+    if (salesState.location && sLoc !== salesState.location) return;
+
+    // items array candidates
+    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || sd.itemsSold || [];
+    if (!Array.isArray(items) || !items.length) {
+      // sometimes the sale is single-line with qty at root - skip those unless you want to handle
+      return;
+    }
+
+    // ensure salesperson entry exists
+    if (!spMap[sp]) spMap[sp] = { salesperson: sp, products: {}, totals: { qty:0, revenue:0, cost:0 } };
+
+    items.forEach(it => {
+      // attempt to extract product name/id, qty, price, cost, unitShort
+      const pname = String(it.productName || it.prodName || it.product || it.name || "").trim();
+      const pid = it.productId || it.product_id || null;
+      const qty = toNum(it.quantity || it.qty || it.Qty || it.qtySold || it.amount || it.qty_sold || 0);
+      const price = toNum(it.price || it.unitPrice || it.sellingPrice || it.sellPrice || it.rate || 0);
+      const cost = toNum(it.cost || it.costPrice || it.purchasePrice || 0);
+      // some items may provide unit (e.g. "pcs" or "Ctns") or the product doc defines units - check for it.unit or it.unitShort
+      const unitShort = String(it.unit || it.unitShort || it.u || "").trim();
+
+      const prodKey = pname || pid || ("_prod_" + Math.random().toString(36).slice(2,7));
+
+      if (!spMap[sp].products[prodKey]) {
+        spMap[sp].products[prodKey] = {
+          productName: pname || pid || "Unknown Product",
+          qty: 0,
+          revenue: 0,
+          cost: 0,
+          unitShort: unitShort || ""
+        };
+      }
+
+      spMap[sp].products[prodKey].qty += qty;
+      spMap[sp].products[prodKey].revenue += (qty * price);
+      spMap[sp].products[prodKey].cost += (qty * cost);
+
+      // accumulate totals per salesperson
+      spMap[sp].totals.qty += qty;
+      spMap[sp].totals.revenue = (spMap[sp].totals.revenue || 0) + (qty * price);
+      spMap[sp].totals.cost = (spMap[sp].totals.cost || 0) + (qty * cost);
+    });
+  });
+
+  // convert spMap into an ordered array. Each entry contains salesperson + array of products.
+  const result = [];
+  Object.keys(spMap).forEach(spName => {
+    const entry = spMap[spName];
+    const products = Object.keys(entry.products).map(k => {
+      const p = entry.products[k];
+      return {
+        productKey: k,
+        productName: p.productName,
+        qty: p.qty,
+        revenue: p.revenue,
+        cost: p.cost,
+        unitShort: p.unitShort || ""
+      };
+    });
+
+    // optionally sort products by name
+    products.sort((a,b) => String(a.productName).localeCompare(String(b.productName)));
+
+    result.push({
+      salesperson: entry.salesperson,
+      salespersonId: null, // not tracked here, could be added if you choose
+      location: salesState.location || "",
+      totals: entry.totals,
+      products: products
+    });
+  });
+
+  // sort salespeople alphabetically
+  result.sort((a,b) => String(a.salesperson).localeCompare(String(b.salesperson)));
+
+  // store aggregated result
+  salesState.rows = result;
+  salesState.filtered = result.slice();
+}
+
+// ---------- renderDetailedTable(): renders repeated per-salesperson tables into srResults ----------
+function renderDetailedTable() {
+  const container = document.getElementById("srResults");
+  if (!salesState.rows || !salesState.rows.length) {
+    container.innerHTML = `<div class="sr-table-placeholder">No aggregated sales found for the selected filters.</div>`;
+    return;
+  }
+
+  // build HTML for each salesperson
+  const htmlParts = [];
+  salesState.rows.forEach(spEntry => {
+    const spName = escapeHTML(spEntry.salesperson || "Unknown");
+    const prodRows = spEntry.products.map(p => {
+      // show qty plus unit if present
+      const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
+      const revenueText = Number(p.revenue || 0).toLocaleString();
+      const costText = Number(p.cost || 0).toLocaleString();
+      const gp = (Number(p.revenue || 0) - Number(p.cost || 0)) || 0;
+      const gpText = gp.toLocaleString();
+      return `<tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee">${escapeHTML(p.productName)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${qtyText}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${revenueText}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${costText}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${gpText}</td>
+      </tr>`;
+    }).join("");
+
+    // Subtotal row
+    const subQty = Number(spEntry.totals.qty || 0).toLocaleString();
+    const subRev = Number(spEntry.totals.revenue || 0).toLocaleString();
+    const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
+    const subGp = Number((spEntry.totals.revenue || 0) - (spEntry.totals.cost || 0)).toLocaleString();
+
+    const block = `
+      <div style="margin-bottom:20px">
+        <div style="font-weight:700;margin-bottom:8px">Sales Person: ${spName}</div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:6px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Product</th>
+              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
+              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
+              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost of sales</th>
+              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${prodRows || `<tr><td colspan="5" style="padding:8px;color:#666">No products sold by this salesperson in the selected range.</td></tr>`}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="padding:8px;font-weight:700">Sub total: ${spName}</td>
+              <td style="padding:8px;text-align:right;font-weight:700">${subQty}</td>
+              <td style="padding:8px;text-align:right;font-weight:700">${subRev}</td>
+              <td style="padding:8px;text-align:right;font-weight:700">${subCost}</td>
+              <td style="padding:8px;text-align:right;font-weight:700">${subGp}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+    htmlParts.push(block);
+  });
+
+  // overall footer totals
+  const grand = salesState.rows.reduce((acc, sp) => {
+    acc.qty += Number(sp.totals.qty || 0);
+    acc.revenue += Number(sp.totals.revenue || 0);
+    acc.cost += Number(sp.totals.cost || 0);
+    return acc;
+  }, { qty:0, revenue:0, cost:0 });
+
+  const overall = `
+    <div style="border-top:2px solid #ddd;padding-top:10px;margin-top:8px;font-weight:700">
+      Overall totals - Qty: ${grand.qty.toLocaleString()} | Sales: ${grand.revenue.toLocaleString()} | Cost: ${grand.cost.toLocaleString()} | GP: ${(grand.revenue - grand.cost).toLocaleString()}
+    </div>
+  `;
+
+  container.innerHTML = htmlParts.join("") + overall;
+
+  // Optionally update the right-hand expenses box (first salesperson shown)
+  const first = salesState.rows[0];
+  if (first) {
+    document.getElementById("spName")?.textContent = `Salesperson: ${first.salesperson}`;
+    // expenses not implemented — leave placeholders
+    document.getElementById("spExpensesList")?.textContent = "No expenses";
+    document.getElementById("spTotal")?.textContent = "0";
+    document.getElementById("spNet")?.textContent = ( (first.totals.revenue||0) - (first.totals.cost||0) ).toLocaleString();
+  }
 }
 
 
