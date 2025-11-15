@@ -9523,53 +9523,154 @@ async function showSalesReport() {
     closeDateMenu();
   }
 
-  /************ render per-mode placeholder (real aggregation to be added later) ************/
-  function renderModePlaceholder() {
-    const container = document.getElementById("srResults");
-    const mode = salesState.reportMode;
-    const fromStr = document.getElementById("srFrom")?.value || 'N/A';
-    const toStr = document.getElementById("srTo")?.value || 'N/A';
-    const locStr = document.getElementById("srLocationSmall")?.value || 'All';
+/************ render per-mode placeholder (clean report skeleton) ************/
+function renderModePlaceholder() {
+  const container = document.getElementById("srResults");
+  const mode = salesState.reportMode;
+  const fromStr = document.getElementById("srFrom")?.value || 'N/A';
+  const toStr = document.getElementById("srTo")?.value || 'N/A';
+  const locStr = document.getElementById("srLocationSmall")?.value || 'All';
 
-    // if there are rows, show count + mode info
-    if (salesState.rows && salesState.rows.length) {
-      container.innerHTML = `<div class="muted">Mode: <strong>${modeLabel(mode)}</strong> — Showing <strong>${salesState.filtered.length}</strong> aggregated rows for <strong>${escapeHTML(locStr)}</strong> from <strong>${escapeHTML(fromStr)}</strong> to <strong>${escapeHTML(toStr)}</strong>.</div>
-        <div style="margin-top:10px;color:#666">Aggregation is implemented: replace this area with the full table for the selected mode (grouped/summarized). Exports will download the currently filtered rows.</div>`;
-      return;
-    }
-
-    // no rows yet — friendly instruction + button list explanation
-    let html = `<div style="font-weight:700;margin-bottom:8px">Mode: ${modeLabel(mode)}</div>`;
-    html += `<div class="muted">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>`;
-    html += `<div style="margin-top:12px;color:#444">What this mode will show once aggregation is implemented:</div>`;
-
-    if (mode === "detailed") {
-      html += `<ul style="margin-top:8px;color:#666">
-        <li>Grouped by salesperson. Each salesperson header will list products sold, qty (with unit and carton-bracket conversions), sales value, cost and gross profit.</li>
-        <li>Subtotals per salesperson and overall totals at the bottom.</li>
-      </ul>`;
-    } else if (mode === "byDate") {
-      html += `<ul style="margin-top:8px;color:#666">
-        <li>Aggregated rows per day (or period) with Qty Sold, Sales, Cost, Gross Profit and #Invoices.</li>
-        <li>Option to change aggregation granularity (daily/weekly/monthly) later.</li>
-      </ul>`;
-    } else if (mode === "product") {
-      html += `<ul style="margin-top:8px;color:#666">
-        <li>Rows per product showing Qty Sold (with units + conversions), Sales (revenue), Cost and Gross Profit. Sortable by qty or sales.</li>
-      </ul>`;
-    } else if (mode === "customer") {
-      html += `<ul style="margin-top:8px;color:#666">
-        <li>Rows per customer showing Qty Sold, Sales, #Invoices and Avg Invoice value.</li>
-      </ul>`;
-    } else if (mode === "custGroup") {
-      html += `<ul style="margin-top:8px;color:#666">
-        <li>Rows per customer group showing aggregated sales metrics for the group.</li>
-      </ul>`;
-    }
-
-    html += `<div style="margin-top:14px;color:#666">Click <strong>Apply filters</strong> after choosing a date range & location to run aggregation. When you confirm the aggregation rules I will implement the actual grouped tables for the selected mode.</div>`;
-    container.innerHTML = html;
+  // If we already have aggregated rows, show a compact summary and keep the area for the real table
+  if (salesState.rows && salesState.rows.length) {
+    container.innerHTML = `
+      <div class="muted">Mode: <strong>${modeLabel(mode)}</strong> — Showing <strong>${salesState.filtered.length}</strong> aggregated rows for <strong>${escapeHTML(locStr)}</strong> from <strong>${escapeHTML(fromStr)}</strong> to <strong>${escapeHTML(toStr)}</strong>.</div>
+      <div style="margin-top:10px;color:#666">Aggregation is ready — the full table will render here.</div>
+    `;
+    return;
   }
+
+  // No rows yet: render a clean empty report skeleton according to selected mode.
+  if (mode === "detailed") {
+    // Detailed Sales Report per salesperson layout
+    container.innerHTML = `
+      <div style="display:flex;gap:18px">
+        <!-- Left: main report table -->
+        <div style="flex:1">
+          <div style="text-align:center;font-weight:700;margin-bottom:12px">Detailed Sales Report</div>
+
+          <div style="margin-bottom:8px;color:#444">
+            <span style="margin-right:18px">Date or Date range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong></span>
+            <span>Business Location: <strong>${escapeHTML(locStr)}</strong></span>
+          </div>
+
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Product</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Selling Prices</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Unit Price</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost of sales</th>
+                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
+              </tr>
+            </thead>
+            <tbody id="detailedBody">
+              <!-- salesperson groups will be injected here when aggregation is implemented -->
+            </tbody>
+            <tfoot id="detailedFooter">
+              <!-- totals/subtotals injected here -->
+            </tfoot>
+          </table>
+
+          <div id="detailedNote" style="margin-top:12px;color:#666;font-size:13px">
+            No aggregated sales yet. Click <strong>Apply filters</strong> to run aggregation (data will appear here).
+          </div>
+        </div>
+
+        <!-- Right: salesperson expenses / summary box -->
+        <aside style="width:320px;flex-shrink:0">
+          <div style="border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:8px;text-align:center;font-weight:600">Salesperson Expenses</div>
+          <div style="background:#fafafa;border:1px solid #eee;padding:10px;border-radius:6px;min-height:200px;color:#444">
+            <div style="font-weight:600;margin-bottom:6px" id="spName">Salesperson: —</div>
+            <div style="font-size:13px;color:#666;margin-bottom:12px">Expense Category & Amount</div>
+            <div id="spExpensesList" style="min-height:80px">No expenses</div>
+
+            <div style="margin-top:12px;border-top:1px solid #eee;padding-top:8px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="muted">Total Expenses</span><span id="spTotal" class="muted">0</span></div>
+              <div style="display:flex;justify-content:space-between"><span class="muted">Net Revenue</span><strong id="spNet" style="background:#ffd7b2;padding:4px 8px;border-radius:4px;display:inline-block">0</strong></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    `;
+    // nothing else to fill yet — when aggregation is ready you will populate #detailedBody, #detailedFooter, #spName, #spExpensesList, #spTotal, #spNet
+    return;
+  }
+
+  // For other modes render a simple table skeleton
+  if (mode === "byDate") {
+    container.innerHTML = `
+      <div style="font-weight:700;margin-bottom:8px">Sales By Date</div>
+      <div style="margin-bottom:8px;color:#444">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Date</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
+          </tr>
+        </thead>
+        <tbody id="byDateBody"></tbody>
+        <tfoot id="byDateFoot"></tfoot>
+      </table>
+      <div style="margin-top:10px;color:#666">No aggregated rows yet. Click <strong>Apply filters</strong>.</div>
+    `;
+    return;
+  }
+
+  if (mode === "product") {
+    container.innerHTML = `
+      <div style="font-weight:700;margin-bottom:8px">Sales By Product</div>
+      <div style="margin-bottom:8px;color:#444">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Product</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
+          </tr>
+        </thead>
+        <tbody id="byProductBody"></tbody>
+        <tfoot id="byProductFoot"></tfoot>
+      </table>
+      <div style="margin-top:10px;color:#666">No aggregated rows yet. Click <strong>Apply filters</strong>.</div>
+    `;
+    return;
+  }
+
+  if (mode === "customer" || mode === "custGroup") {
+    const title = mode === "customer" ? "Sales By Customer" : "Sales By Customer Group";
+    container.innerHTML = `
+      <div style="font-weight:700;margin-bottom:8px">${escapeHTML(title)}</div>
+      <div style="margin-bottom:8px;color:#444">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">${escapeHTML(mode === "customer" ? "Customer" : "Customer Group")}</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">#Invoices</th>
+            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Avg Invoice</th>
+          </tr>
+        </thead>
+        <tbody id="byCustomerBody"></tbody>
+        <tfoot id="byCustomerFoot"></tfoot>
+      </table>
+      <div style="margin-top:10px;color:#666">No aggregated rows yet. Click <strong>Apply filters</strong>.</div>
+    `;
+    return;
+  }
+
+  // fallback — simple message
+  container.innerHTML = `<div class="sr-table-placeholder">Select a report mode and click <strong>Apply filters</strong> to run aggregation.</div>`;
+}
+
 
   function modeLabel(mode) {
     switch(mode) {
