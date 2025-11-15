@@ -9910,67 +9910,85 @@ function exportInventoryExcel() {
   const cols = inventoryColumns.filter(c => inventoryState.visibleCols[c.key]);
   const head = cols.map(c => `<th><strong>${c.label}</strong></th>`).join("");
 
-  // conversion rules (product name checks are lowercased, simplified)
+  // conversion rules
   const convRules = [
-    { // 24 pcs = 1 ctn
-      names: ["amingo tomatoe/ chilli 250ml", "amingo 400ml", "amingo chilli 250ml", "amingo tomatoe 250ml", "amingo 400 ml"],
-      factor: 24
-    },
-    { // 4 pcs = 1 ctn
-      names: ["amingo chilli 5l", "amingo tomatoe 5l", "amingo chilli 5 l", "amingo tomatoe 5 l"],
-      factor: 4
-    },
-    { // 6 pcs = 1 ctn
-      names: ["amingo tomatoe 2l", "amingo tomatoe 2 l"],
-      factor: 6
-    }
+    { names: ["amingo tomatoe/ chilli 250ml", "amingo 400ml"], factor: 24 },
+    { names: ["amingo chilli 250ml", "amingo tomatoe 250ml"], factor: 24 },
+    { names: ["amingo chilli 5l", "amingo chilli 5 l", "amingo tomatoe 5l", "amingo tomatoe 5 l"], factor: 4 },
+    { names: ["amingo tomatoe 2l", "amingo tomatoe 2 l"], factor: 6 }
   ];
 
   const normalize = s => String(s || "").toLowerCase().replace(/[\s\-_,.\/\\]+/g, " ").trim();
 
+  const findFactor = (prodName) => {
+    const n = normalize(prodName);
+    for (const rule of convRules) {
+      for (const nm of rule.names) {
+        if (n.includes(normalize(nm))) return rule.factor;
+      }
+    }
+    return null;
+  };
+
   const body = inventoryState.filtered.map(r => {
     return `<tr>${cols.map(c => {
       if (numericKeys.includes(c.key)) {
-        const num = (Number(r[c.key]) || 0);
+        const num = Number(r[c.key]) || 0;
         const numStr = num.toLocaleString();
 
-        // determine product identifier for matching (try original product and raw name fields)
-        const prodRaw = normalize(r.product || r.name || r.productName || "");
-        let bracketPart = "";
+        const unitShort = (r.unitShort || "").toString();
+        let display = unitShort ? `${numStr} ${escapeHTML(unitShort)}` : numStr;
 
-        // check rules only for the specific products listed
-        for (const rule of convRules) {
-          for (const nm of rule.names) {
-            if (prodRaw.includes(normalize(nm))) {
-              const ctns = num / rule.factor;
-              const ctnsStr = (Math.abs(ctns - Math.round(ctns)) < 1e-9) ? Math.round(ctns).toString() : ctns.toFixed(2);
-              bracketPart = ` (${escapeHTML(ctnsStr + " Ctns")})`;
-              // stop at first match
-              break;
-            }
-          }
-          if (bracketPart) break;
+        const factor = findFactor(r.product || "");
+        if (factor) {
+          const ctns = num / factor;
+          const ctnsStr = (Math.abs(ctns - Math.round(ctns)) < 1e-9)
+            ? Math.round(ctns).toString()
+            : ctns.toFixed(2);
+
+          // MAROON COLOR INSIDE BRACKETS
+          display += ` (<span style="color:#800000;">${escapeHTML(ctnsStr + " Ctns")}</span>)`;
         }
 
-        // display original number + unitShort (if any) + bracketed carton conversion (only for matched products)
-        const unitShort = (r.unitShort || "").toString();
-        const withUnit = unitShort ? `${numStr} ${escapeHTML(unitShort)}` : numStr;
-        return `<td>${withUnit}${bracketPart}</td>`;
+        return `<td>${display}</td>`;
       } else {
         return `<td>${escapeHTML(r[c.key] ?? "")}</td>`;
       }
     }).join("")}</tr>`;
   }).join("");
 
-  // Make totals bold (no bracketed conversions in totals)
+  // ---- TOTALS ROW (CONVERT TO CTNS IF APPLICABLE) ----
   const totalsRow = `
     <tr class="total-row">
       ${cols.map((c,i)=>{
         if (i===0) return `<td><strong>Total</strong></td>`;
-        const val = numericKeys.includes(c.key)
-          ? (inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0)).toLocaleString()
-          : "";
-        return `<td><strong>${val}</strong></td>`;
+
+        if (!numericKeys.includes(c.key)) return `<td></td>`;
+
+        // sum pieces
+        const totalPieces = inventoryState.filtered.reduce((s,row)=>s+(Number(row[c.key])||0),0);
+
+        // find factor for this column (if the first matching product belongs to rule)
+        let factor = null;
+        for (const row of inventoryState.filtered) {
+          const f = findFactor(row.product || "");
+          if (f) { factor = f; break; }
+        }
+
+        let val = "";
+        if (factor) {
+          // convert TOTAL pieces to CTNS
+          const ctns = totalPieces / factor;
+          const ctnsStr = (Math.abs(ctns - Math.round(ctns)) < 1e-9)
+            ? Math.round(ctns).toString()
+            : ctns.toFixed(2);
+
+          val = `<strong>${ctnsStr} Ctns</strong>`;
+        } else {
+          val = `<strong>${totalPieces.toLocaleString()}</strong>`;
+        }
+
+        return `<td>${val}</td>`;
       }).join("")}
     </tr>`;
 
@@ -9983,7 +10001,7 @@ function exportInventoryExcel() {
         <tfoot>${totalsRow}</tfoot>
       </table>
     </body></html>`;
-    
+
   downloadBlob(html, "inventory.xls", "application/vnd.ms-excel");
 }
 
