@@ -10040,13 +10040,21 @@ function renderDetailedTable() {
   // Optionally update the right-hand expenses box (first salesperson shown)
   const first = salesState.rows[0];
   if (first) {
-    document.getElementById("spName")?.textContent = `Salesperson: ${first.salesperson}`;
+    const spNameEl = document.getElementById("spName");
+    if (spNameEl) spNameEl.textContent = `Salesperson: ${first.salesperson}`;
+
     // expenses not implemented — leave placeholders
-    document.getElementById("spExpensesList")?.textContent = "No expenses";
-    document.getElementById("spTotal")?.textContent = "0";
-    document.getElementById("spNet")?.textContent = ( (first.totals.revenue||0) - (first.totals.cost||0) ).toLocaleString();
+    const spExpensesEl = document.getElementById("spExpensesList");
+    if (spExpensesEl) spExpensesEl.textContent = "No expenses";
+
+    const spTotalEl = document.getElementById("spTotal");
+    if (spTotalEl) spTotalEl.textContent = "0";
+
+    const spNetEl = document.getElementById("spNet");
+    if (spNetEl) spNetEl.textContent = (((first.totals.revenue||0) - (first.totals.cost||0))).toLocaleString();
   }
 }
+
 
 
 function showPurchaseReport() {
