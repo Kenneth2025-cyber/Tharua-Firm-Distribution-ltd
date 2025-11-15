@@ -9314,13 +9314,240 @@ function toggleReports() {
 }
 
 // Placeholder report functions
-function showSalesReport() {
+
+// ---------- Page Entrypoint: Sales Report (clean with working date + location filters + exports) ----------
+async function showSalesReport() {
   saveLastPage("showSalesReport");
-  document.getElementById("content").innerHTML = `
-    <h2>Sales Report</h2>
-    <p>Section Under Development</p>
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <style data-sales-clean>
+      .sr-wrap{background:#fff;border-radius:8px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+      .sr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+      .sr-head h2{margin:0}
+      .sr-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+      .sr-controls .input, .sr-controls select{padding:8px 10px;border:1px solid #d0d7de;border-radius:6px}
+      .sr-presets{position:relative}
+      .sr-presets select{min-width:160px}
+      .sr-custom-dates{display:flex;gap:8px;align-items:center}
+      .sr-export{display:flex;gap:8px}
+      .btn{border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+      .btn-sm{padding:6px 10px;font-size:13px}
+      .btn-csv{background:#0d6efd;color:#fff}
+      .btn-excel{background:#198754;color:#fff}
+      .btn-pdf{background:#6b7280;color:#fff}
+      .sr-table-placeholder{padding:28px;border:1px dashed #e6e6e6;border-radius:6px;color:#666;margin-top:8px}
+    </style>
+
+    <div class="sr-wrap">
+      <div class="sr-head">
+        <h2>Sales Report</h2>
+        <div class="sr-export">
+          <button id="srExportCsv" class="btn btn-csv btn-sm">Export CSV</button>
+          <button id="srExportExcel" class="btn btn-excel btn-sm">Export Excel</button>
+          <button id="srExportPdf" class="btn btn-pdf btn-sm">Export PDF</button>
+        </div>
+      </div>
+
+      <div class="sr-controls">
+        <div class="sr-presets">
+          <label>
+            Date range:
+            <select id="srDatePreset" class="input">
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last7">Last 7 Days</option>
+              <option value="last30" selected>Last 30 Days</option>
+              <option value="thisMonth">This Month</option>
+              <option value="lastMonth">Last Month</option>
+              <option value="thisYear">This Year</option>
+              <option value="lastYear">Last Year</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="srCustomDates" style="display:none" class="sr-custom-dates">
+          <label>From: <input id="srFrom" type="date" class="input"></label>
+          <label>To:   <input id="srTo"   type="date" class="input"></label>
+        </div>
+
+        <label>
+          Business Location:
+          <select id="srLocation" class="input">
+            <option value="">All locations</option>
+          </select>
+        </label>
+
+        <div style="margin-left:auto;color:#666">Choose date range and location, then export.</div>
+      </div>
+
+      <div id="srResults" class="sr-table-placeholder">
+        No data aggregated yet. Use the filters above and then ask me to wire the aggregation (sales -> grouped data) — exports will export the current rows when present.
+      </div>
+    </div>
   `;
+
+  // state for the page (rows should be filled by aggregation when you ask)
+  const salesState = {
+    rows: [],        // aggregated rows: [{ product, salesperson, location, qtySold, revenue, cost, unitShort, ... }]
+    filtered: []     // filtered subset based on date+location
+  };
+
+  // helper: set date inputs
+  function setPresetRange(preset) {
+    const today = new Date();
+    const to = new Date(today);
+    let from = new Date(today);
+
+    switch(preset) {
+      case "today":
+        from = new Date(today); break;
+      case "yesterday":
+        from = new Date(today); from.setDate(from.getDate()-1); to.setDate(to.getDate()-1); break;
+      case "last7":
+        from.setDate(from.getDate()-6); break;
+      case "last30":
+        from.setDate(from.getDate()-29); break;
+      case "thisMonth":
+        from = new Date(today.getFullYear(), today.getMonth(), 1); break;
+      case "lastMonth":
+        from = new Date(today.getFullYear(), today.getMonth()-1, 1);
+        to = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case "thisYear":
+        from = new Date(today.getFullYear(), 0, 1); break;
+      case "lastYear":
+        from = new Date(today.getFullYear()-1, 0, 1);
+        to = new Date(today.getFullYear()-1, 11, 31);
+        break;
+      case "custom":
+        // show custom inputs without changing values
+        document.getElementById("srCustomDates").style.display = "";
+        return;
+      default:
+        from.setDate(from.getDate()-29);
+    }
+    // set inputs
+    const f = document.getElementById("srFrom");
+    const t = document.getElementById("srTo");
+    f.valueAsDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    t.valueAsDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    document.getElementById("srCustomDates").style.display = "none";
+  }
+
+  // populate locations from Firestore
+  async function loadLocations() {
+    try {
+      const db = firebase.firestore();
+      const snap = await db.collection("businessLocations").get();
+      const sel = document.getElementById("srLocation");
+      const seen = new Set();
+      snap.forEach(doc => {
+        const name = String(doc.data()?.name || "").trim();
+        if (!name || seen.has(name)) return;
+        seen.add(name);
+        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
+      });
+    } catch(e) {
+      // silent fail (user may not have collection)
+      console.warn("loadLocations() failed", e);
+    }
+  }
+
+  // apply filters to salesState.rows -> salesState.filtered
+  function applyFilters() {
+    const preset = document.getElementById("srDatePreset").value;
+    const fromVal = document.getElementById("srFrom").value;
+    const toVal = document.getElementById("srTo").value;
+    const loc = document.getElementById("srLocation").value;
+
+    // convert to Date for comparisons (if present)
+    const fromDate = fromVal ? new Date(fromVal + "T00:00:00") : null;
+    const toDate = toVal ? new Date(toVal + "T23:59:59") : null;
+
+    salesState.filtered = salesState.rows.filter(r => {
+      // r.saleDate is expected to be ISO-ish or Date; if you aggregate later ensure saleDate exists
+      if (fromDate && toDate && r.saleDate) {
+        const d = (r.saleDate instanceof Date) ? r.saleDate : new Date(r.saleDate);
+        if (isNaN(d)) return false;
+        if (d < fromDate || d > toDate) return false;
+      }
+      if (loc && String(r.location||"") !== String(loc)) return false;
+      return true;
+    });
+
+    renderResultsPlaceholder(); // placeholder will show count when rows are present
+  }
+
+  // simple render for placeholder / count (you'll replace with full table later)
+  function renderResultsPlaceholder() {
+    const container = document.getElementById("srResults");
+    if (!salesState.rows.length) {
+      container.innerHTML = `<div class="sr-table-placeholder">No aggregated sales yet. Filters are working — when you ask, I'll wire aggregation and the table will show results.<br><br>Current filters: From <strong>${document.getElementById("srFrom").value}</strong> To <strong>${document.getElementById("srTo").value}</strong> Location <strong>${document.getElementById("srLocation").value || 'All'}</strong></div>`;
+      return;
+    }
+    // show a small summary and a simple table (lightweight)
+    const count = salesState.filtered.length;
+    container.innerHTML = `<div><strong>${count}</strong> aggregated rows match the filters.</div>
+      <div style="margin-top:10px;color:#666;font-size:13px">When you confirm the aggregation schema I will render the full grouped table here (per salesperson or per product) and enable exports of the real data.</div>`;
+  }
+
+  // Export helpers (export current filtered rows)
+  function exportCSV() {
+    const rows = salesState.filtered || [];
+    if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
+    // build CSV from row keys (simple generic exporter)
+    const keys = Object.keys(rows[0]);
+    const header = keys.join(",");
+    const data = rows.map(r => keys.map(k => `"${String(r[k] ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
+    downloadBlob([header, data].join("\n"), "sales-report.csv", "text/csv;charset=utf-8;");
+  }
+  function exportExcel() {
+    const rows = salesState.filtered || [];
+    if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
+    const keys = Object.keys(rows[0]);
+    const head = keys.map(k=>`<th><strong>${escapeHTML(k)}</strong></th>`).join("");
+    const body = rows.map(r => `<tr>${keys.map(k=>`<td>${escapeHTML(String(r[k] ?? ""))}</td>`).join("")}</tr>`).join("");
+    const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
+  }
+  function exportPDF() {
+    const rows = salesState.filtered || [];
+    if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
+    const w = window.open("", "_blank");
+    const keys = Object.keys(rows[0]);
+    const head = keys.map(k=>`<th>${escapeHTML(k)}</th>`).join("");
+    const body = rows.map(r => `<tr>${keys.map(k=>`<td>${escapeHTML(String(r[k] ?? ""))}</td>`).join("")}</tr>`).join("");
+    w.document.write(`<html><head><meta charset="utf-8"><style>table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:6px}</style></head><body><h3>Sales Report</h3><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`);
+    w.document.close();
+  }
+
+  // wire UI events
+  document.getElementById("srDatePreset").addEventListener("change", (e) => {
+    setPresetRange(e.target.value);
+    applyFilters();
+  });
+  document.getElementById("srFrom").addEventListener("change", applyFilters);
+  document.getElementById("srTo").addEventListener("change", applyFilters);
+  document.getElementById("srLocation").addEventListener("change", applyFilters);
+
+  document.getElementById("srExportCsv").addEventListener("click", exportCSV);
+  document.getElementById("srExportExcel").addEventListener("click", exportExcel);
+  document.getElementById("srExportPdf").addEventListener("click", exportPDF);
+
+  // initial setup
+  setPresetRange(document.getElementById("srDatePreset").value);
+  await loadLocations();
+  applyFilters();
+  renderResultsPlaceholder();
+
+  // NOTE: aggregation of sales into salesState.rows is intentionally left out
+  // so we keep this page minimal and focused on the filters & exports.
+  // When you confirm the aggregation details (group by product / by salesperson,
+  // which sales fields to use for qty/revenue/cost, and any conversions),
+  // I will implement the aggregation and replace the placeholder with the real table.
 }
+
 
 function showPurchaseReport() {
   saveLastPage("showPurchaseReport");
