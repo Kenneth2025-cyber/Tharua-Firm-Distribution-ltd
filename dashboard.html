@@ -9505,6 +9505,23 @@ async function showInventoryReport() {
 async function loadInventoryProducts() {
   const db = firebase.firestore();
 
+  // 0) load units so we can show short name (e.g., "Ctns")
+  const unitsMapById = {};   // id -> shortName
+  const unitsMapByName = {}; // normalized name -> shortName
+  try {
+    const unitsSnap = await db.collection("units").get();
+    unitsSnap.forEach(d => {
+      const u = d.data() || {};
+      const id = d.id;
+      const name = String(u.name || "").trim();
+      const shortName = String(u.shortName || u.short || u.short_name || "").trim();
+      if (id && shortName) unitsMapById[id] = shortName;
+      if (name && shortName) unitsMapByName[name.toLowerCase()] = shortName;
+    });
+  } catch (e) {
+    console.warn("units load failed", e);
+  }
+
   // 1) get products
   const productsSnap = await db.collection("products").get();
   const products = {};
@@ -9588,7 +9605,6 @@ async function loadInventoryProducts() {
       const sd = doc.data() || {};
       const loc = (sd.location || sd.businessLocation || sd.locationName || sd.store || "").toString();
 
-      // sales may store items in an array or as single-line fields
       const items = sd.items || sd.products || sd.saleItems || sd.lineItems || sd.itemsSold || [];
       if (Array.isArray(items) && items.length) {
         items.forEach(it => {
@@ -9606,7 +9622,6 @@ async function loadInventoryProducts() {
           soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
         });
       } else {
-        // fallback: root-level fields
         const qty = Number(sd.quantity || sd.qty || sd.totalQty || sd.qtySold || 0) || 0;
         const pname = String(sd.prodName || sd.productName || sd.product || sd.name || "").trim();
         if (qty && pname) {
@@ -9626,7 +9641,7 @@ async function loadInventoryProducts() {
     console.warn("sales read failed", e);
   }
 
-  // 5) (optional) include PURCHASE-type stockMovements into purchaseMap and SALE-type into soldMap
+  // 5) include PURCHASE/SALE-type stockMovements as extra safety
   try {
     const movesAll = await db.collection("stockMovements").get();
     movesAll.forEach(doc => {
@@ -9643,14 +9658,14 @@ async function loadInventoryProducts() {
         if (!soldMap[pid]) soldMap[pid] = {};
         soldMap[pid][loc] = (soldMap[pid][loc] || 0) + qty;
       } else if (t.includes("OPENING")) {
-        // already handled earlier
+        // handled earlier
       }
     });
   } catch (e) {
-    // ignore if not accessible
+    // ignore
   }
 
-  // 6) build rows (combine openingMap + purchaseMap + soldMap). adjusted ignored unless you add it.
+  // 6) build rows (combine openingMap + purchaseMap + soldMap) and append unit short name to product label
   const rows = [];
   Object.values(products).forEach(p => {
     const pid = p.id;
@@ -9661,15 +9676,42 @@ async function loadInventoryProducts() {
     ]);
     if (locSet.size === 0) locSet.add("");
 
+    // determine unit short for this product (try multiple product fields)
+    let unitShort = "";
+    try {
+      // common product fields that may reference unit: unit (name or id), unitId, unitName, unit_short, unitShort
+      const uField = p.unit || p.unitId || p.unitName || p.unit_id || "";
+      if (uField) {
+        const uStr = String(uField).trim();
+        // check by id first
+        if (unitsMapById[uStr]) unitShort = unitsMapById[uStr];
+        else if (unitsMapByName[uStr.toLowerCase()]) unitShort = unitsMapByName[uStr.toLowerCase()];
+        else {
+          // sometimes product stores the full unit object
+          if (typeof uField === "object" && uField !== null) {
+            unitShort = String(uField.shortName || uField.short || uField.short_name || "").trim();
+          }
+        }
+      }
+      // fallback: product may contain 'unitShort' or 'unit_short'
+      if (!unitShort) unitShort = String(p.unitShort || p.unit_short || p.unitShortName || "").trim();
+    } catch (e) {
+      unitShort = "";
+    }
+
+    // final display name builder
+    const baseName = String(p.name || "").trim();
+    const displayName = unitShort ? `${baseName} ${unitShort}` : baseName;
+
     locSet.forEach(loc => {
       const opening = openingMap[pid]?.[loc] || 0;
       const purchasedTotal = purchaseMap[pid]?.[loc] || 0;
       const soldTotal = soldMap[pid]?.[loc] || 0;
-      const currentStock = opening + purchasedTotal - soldTotal; // adjusted not included
+      const currentStock = opening + purchasedTotal - soldTotal;
 
       rows.push({
         id: pid,
-        product: p.name || "",
+        product: displayName,
         category: p.category || "",
         brand: p.brand || "",
         location: loc,
