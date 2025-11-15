@@ -9315,7 +9315,7 @@ function toggleReports() {
 
 // Placeholder report functions
 
-// ---------- Page Entrypoint: Sales Report (clean with working date + location filters + exports + Filter-by-date dropdown + Apply button) ----------
+// ---------- Page Entrypoint: Sales Report (with mode buttons + working date + location filters + exports + Filter-by-date dropdown + Apply button) ----------
 async function showSalesReport() {
   saveLastPage("showSalesReport");
   const el = document.getElementById("content");
@@ -9335,7 +9335,10 @@ async function showSalesReport() {
       .btn-csv{background:#0d6efd;color:#fff}
       .btn-excel{background:#198754;color:#fff}
       .btn-pdf{background:#6b7280;color:#fff}
-      .sr-table-placeholder{padding:28px;border:1px dashed #e6e6e6;border-radius:6px;color:#666;margin-top:8px}
+      .mode-bar{display:flex;gap:8px;align-items:center;margin:12px 0}
+      .mode-btn{padding:8px 12px;border-radius:6px;border:1px solid #d0d7de;background:#f5f7fb;cursor:pointer;font-weight:600}
+      .mode-btn.active{background:#6f2cc1;color:#fff;border-color:#5a229f}
+      .sr-table-placeholder{padding:18px;border:1px dashed #e6e6e6;border-radius:6px;color:#666;margin-top:8px;min-height:140px}
       /* Filter-by-date dropdown on the right (purple button + menu) */
       .date-filter-wrap{position:relative;display:inline-block}
       .date-filter-btn{background:#6f2cc1;color:#fff;padding:10px 12px;border-radius:6px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center}
@@ -9344,6 +9347,7 @@ async function showSalesReport() {
       .date-filter-menu .preset-list{max-height:240px;overflow:auto;border-top:1px solid #eee;padding-top:8px;margin-top:8px}
       .apply-filters{background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;border:none;cursor:pointer;width:100%}
       .small-link{font-size:12px;color:#6f2cc1;cursor:pointer;text-decoration:underline;margin-top:8px;display:inline-block}
+      .muted { color:#666; font-size:13px }
     </style>
 
     <div class="sr-wrap">
@@ -9407,8 +9411,17 @@ async function showSalesReport() {
         <div style="margin-left:auto;color:#666">Choose date range and location, then export.</div>
       </div>
 
+      <!-- MODE BUTTONS -->
+      <div class="mode-bar" id="srModeBar" aria-label="Report modes">
+        <button class="mode-btn" data-mode="detailed" id="modeDetailed">Detailed Sales Report (per Salesperson)</button>
+        <button class="mode-btn" data-mode="byDate" id="modeByDate">Sales By Date</button>
+        <button class="mode-btn active" data-mode="product" id="modeProduct">Sales By Product</button>
+        <button class="mode-btn" data-mode="customer" id="modeCustomer">Sales By Customer</button>
+        <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">Sales By Customer Group</button>
+      </div>
+
       <div id="srResults" class="sr-table-placeholder">
-        No data aggregated yet. Use the filters (top-right) and then click Apply filters to load aggregated data — exports will export current filtered rows when present.
+        <!-- placeholder content rendered by JS -->
       </div>
     </div>
   `;
@@ -9419,7 +9432,8 @@ async function showSalesReport() {
     filtered: [],    // filtered subset
     from: null,
     to: null,
-    location: ""
+    location: "",
+    reportMode: "product" // default mode
   };
 
   /************ helpers: presets & dates ************/
@@ -9484,7 +9498,6 @@ async function showSalesReport() {
 
   /************ apply filters (called when user clicks Apply) ************/
   function applyFilters() {
-    const preset = document.getElementById("srDatePreset").value;
     const fromVal = document.getElementById("srFrom")?.value || "";
     const toVal = document.getElementById("srTo")?.value || "";
     const loc = document.getElementById("srLocationSmall")?.value || "";
@@ -9505,24 +9518,71 @@ async function showSalesReport() {
       return true;
     });
 
-    renderResultsPlaceholder();
+    renderModePlaceholder();
     // hide menu after apply
     closeDateMenu();
   }
 
-  /************ render placeholder / summary ************/
-  function renderResultsPlaceholder() {
+  /************ render per-mode placeholder (real aggregation to be added later) ************/
+  function renderModePlaceholder() {
     const container = document.getElementById("srResults");
-    if (!salesState.rows.length) {
-      container.innerHTML = `<div class="sr-table-placeholder">No aggregated sales yet. Apply filters to process data when aggregation is implemented.<br><br>Selected range: <strong>${document.getElementById("srFrom")?.value || 'N/A'}</strong> — <strong>${document.getElementById("srTo")?.value || 'N/A'}</strong>; Location: <strong>${document.getElementById("srLocationSmall")?.value || 'All'}</strong></div>`;
+    const mode = salesState.reportMode;
+    const fromStr = document.getElementById("srFrom")?.value || 'N/A';
+    const toStr = document.getElementById("srTo")?.value || 'N/A';
+    const locStr = document.getElementById("srLocationSmall")?.value || 'All';
+
+    // if there are rows, show count + mode info
+    if (salesState.rows && salesState.rows.length) {
+      container.innerHTML = `<div class="muted">Mode: <strong>${modeLabel(mode)}</strong> — Showing <strong>${salesState.filtered.length}</strong> aggregated rows for <strong>${escapeHTML(locStr)}</strong> from <strong>${escapeHTML(fromStr)}</strong> to <strong>${escapeHTML(toStr)}</strong>.</div>
+        <div style="margin-top:10px;color:#666">Aggregation is implemented: replace this area with the full table for the selected mode (grouped/summarized). Exports will download the currently filtered rows.</div>`;
       return;
     }
-    const count = salesState.filtered.length;
-    container.innerHTML = `<div><strong>${count}</strong> aggregated rows match the filters.</div>
-      <div style="margin-top:10px;color:#666;font-size:13px">When you confirm aggregation details I will render the full grouped table here and enable exports of the real data.</div>`;
+
+    // no rows yet — friendly instruction + button list explanation
+    let html = `<div style="font-weight:700;margin-bottom:8px">Mode: ${modeLabel(mode)}</div>`;
+    html += `<div class="muted">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>`;
+    html += `<div style="margin-top:12px;color:#444">What this mode will show once aggregation is implemented:</div>`;
+
+    if (mode === "detailed") {
+      html += `<ul style="margin-top:8px;color:#666">
+        <li>Grouped by salesperson. Each salesperson header will list products sold, qty (with unit and carton-bracket conversions), sales value, cost and gross profit.</li>
+        <li>Subtotals per salesperson and overall totals at the bottom.</li>
+      </ul>`;
+    } else if (mode === "byDate") {
+      html += `<ul style="margin-top:8px;color:#666">
+        <li>Aggregated rows per day (or period) with Qty Sold, Sales, Cost, Gross Profit and #Invoices.</li>
+        <li>Option to change aggregation granularity (daily/weekly/monthly) later.</li>
+      </ul>`;
+    } else if (mode === "product") {
+      html += `<ul style="margin-top:8px;color:#666">
+        <li>Rows per product showing Qty Sold (with units + conversions), Sales (revenue), Cost and Gross Profit. Sortable by qty or sales.</li>
+      </ul>`;
+    } else if (mode === "customer") {
+      html += `<ul style="margin-top:8px;color:#666">
+        <li>Rows per customer showing Qty Sold, Sales, #Invoices and Avg Invoice value.</li>
+      </ul>`;
+    } else if (mode === "custGroup") {
+      html += `<ul style="margin-top:8px;color:#666">
+        <li>Rows per customer group showing aggregated sales metrics for the group.</li>
+      </ul>`;
+    }
+
+    html += `<div style="margin-top:14px;color:#666">Click <strong>Apply filters</strong> after choosing a date range & location to run aggregation. When you confirm the aggregation rules I will implement the actual grouped tables for the selected mode.</div>`;
+    container.innerHTML = html;
   }
 
-  /************ exports (same as before) ************/
+  function modeLabel(mode) {
+    switch(mode) {
+      case "detailed": return "Detailed Sales Report (per Salesperson)";
+      case "byDate": return "Sales By Date";
+      case "product": return "Sales By Product";
+      case "customer": return "Sales By Customer";
+      case "custGroup": return "Sales By Customer Group";
+      default: return mode;
+    }
+  }
+
+  /************ exports (unchanged) ************/
   function exportCSV() {
     const rows = salesState.filtered || [];
     if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
@@ -9586,16 +9646,25 @@ async function showSalesReport() {
   document.getElementById("srExportExcel").addEventListener("click", exportExcel);
   document.getElementById("srExportPdf").addEventListener("click", exportPDF);
 
+  // mode buttons wiring
+  const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
+  function setReportMode(mode) {
+    salesState.reportMode = mode;
+    // toggle active class
+    modeButtons.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    // re-render placeholder for the selected mode
+    renderModePlaceholder();
+  }
+  modeButtons.forEach(btn => btn.addEventListener("click", () => {
+    setReportMode(btn.dataset.mode);
+  }));
+
   /************ initial setup ************/
   setPresetRange(document.getElementById("srDatePreset").value);
   await loadLocations();
-  applyFilters();
-  renderResultsPlaceholder();
-
-  // NOTE: aggregation of sales into salesState.rows still intentionally left out.
-  // When you confirm aggregation details (group by product / by salesperson,
-  // which sales fields to use for qty/revenue/cost, and any conversions),
-  // I will implement aggregation and render the full table here.
+  // default render for the chosen mode
+  setReportMode(salesState.reportMode);
+  applyFilters(); // populate salesState.filtered based on default dates (rows empty until aggregation is implemented)
 }
 
 
