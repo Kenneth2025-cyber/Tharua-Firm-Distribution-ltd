@@ -9795,8 +9795,7 @@ function renderModePlaceholder() {
   applyFilters(); // populate salesState.filtered based on default dates (rows empty until aggregation is implemented)
 }
 
-
-// ----------------- Wire report mode buttons -----------------
+ // ----------------- Wire report mode buttons -----------------
 function setReportModeButtons() {
   // ensures there's a default mode
   if (!salesState.reportMode) salesState.reportMode = "detailed";
@@ -9835,7 +9834,7 @@ function setReportModeButtons() {
   // other buttons are placeholders (disabled) — future hook here
   setActive("detailed");
 }
-setReportModeButtons();
+
 
 // ---------- aggregateSalesDetailed(): query Firestore and group sales by salesperson -> product ----------
 async function aggregateSalesDetailed() {
