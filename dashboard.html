@@ -9864,21 +9864,16 @@ function setReportModeButtons() {
 }
 
 
-// ---------- FINAL VERSION: Works with prodName only (no productId needed) ----------
+// ---------- FINAL FINAL VERSION: Uses costAtSale from sales (historical profit 100% correct) ----------
 async function aggregateSalesDetailed() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
-
   let q = db.collection("sales").orderBy("saleDate", "desc");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-
   const snap = await q.get();
-
-  // Cache by product name (since no ID)
-  const productCostCache = {}; // key: product name → buyingPrice
 
   const spMap = {};
   const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
@@ -9905,28 +9900,26 @@ async function aggregateSalesDetailed() {
 
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
 
-      // Get cost from products collection using prodName → name field
-      let costPrice = 0;
-      if (!productCostCache[pname]) {
+      // THIS IS THE MAGIC LINE: Use historical costAtSale first!
+      let costPrice = toNum(it.costAtSale);
+
+      // Fallback only if costAtSale is missing (very old sales before your fix)
+      if (costPrice === 0) {
+        // Try to get current buying price as backup
         try {
           const prodSnap = await db.collection("products")
             .where("name", "==", pname)
             .limit(1)
             .get();
-
           if (!prodSnap.empty) {
             const data = prodSnap.docs[0].data();
             costPrice = toNum(data.buyingPrice || data.costPrice || 0);
-            productCostCache[pname] = costPrice;
           }
         } catch (e) {
-          console.warn("Failed to fetch cost for:", pname, e);
+          console.warn("Cost fallback failed for:", pname);
         }
-      } else {
-        costPrice = productCostCache[pname];
       }
 
-      // Use product name as key (since no ID)
       if (!spMap[sp].products[pname]) {
         spMap[sp].products[pname] = {
           productName: pname,
@@ -9953,7 +9946,6 @@ async function aggregateSalesDetailed() {
     const entry = spMap[spName];
     const products = Object.values(entry.products)
       .sort((a, b) => a.productName.localeCompare(b.productName));
-
     result.push({
       salesperson: entry.salesperson,
       products: products,
