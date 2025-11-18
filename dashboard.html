@@ -9421,9 +9421,9 @@ async function showSalesReport() {
 
       <!-- MODE BUTTONS -->
       <div class="mode-bar" id="srModeBar" aria-label="Report modes">
-        <button class="mode-btn" data-mode="detailed" id="modeDetailed">Detailed Sales Report (per Salesperson)</button>
-        <button class="mode-btn" data-mode="byDate" id="modeByDate">Sales By Date</button>
         <button class="mode-btn active" data-mode="detailed" id="modeDetailed">Detailed Sales Report (per Salesperson)</button>
+        <button class="mode-btn" data-mode="byDate" id="modeByDate">Sales By Date</button>
+        <button class="mode-btn" data-mode="product" id="modeProduct">Sales By Product</button>
         <button class="mode-btn" data-mode="customer" id="modeCustomer">Sales By Customer</button>
         <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">Sales By Customer Group</button>
       </div>
@@ -9953,7 +9953,7 @@ async function aggregateSalesDetailed() {
   salesState.filtered = result.slice();
 }
 
-// ---------- renderDetailedTable(): renders repeated per-salesperson tables into srResults ----------
+// ---------- renderDetailedTable(): NOW KEEPS THE EXPENSES BOX ----------
 function renderDetailedTable() {
   const container = document.getElementById("srResults");
   if (!salesState.rows || !salesState.rows.length) {
@@ -9961,16 +9961,15 @@ function renderDetailedTable() {
     return;
   }
 
-  // build HTML for each salesperson
+  // Build only the LEFT part (sales tables)
   const htmlParts = [];
   salesState.rows.forEach(spEntry => {
     const spName = escapeHTML(spEntry.salesperson || "Unknown");
     const prodRows = spEntry.products.map(p => {
-      // show qty plus unit if present
       const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
       const revenueText = Number(p.revenue || 0).toLocaleString();
       const costText = Number(p.cost || 0).toLocaleString();
-      const gp = (Number(p.revenue || 0) - Number(p.cost || 0)) || 0;
+      const gp = (Number(p.revenue || 0) - paperwork(p.cost || 0)) || 0;
       const gpText = gp.toLocaleString();
       return `<tr>
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${escapeHTML(p.productName)}</td>
@@ -9981,77 +9980,93 @@ function renderDetailedTable() {
       </tr>`;
     }).join("");
 
-    // Subtotal row
     const subQty = Number(spEntry.totals.qty || 0).toLocaleString();
     const subRev = Number(spEntry.totals.revenue || 0).toLocaleString();
     const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
     const subGp = Number((spEntry.totals.revenue || 0) - (spEntry.totals.cost || 0)).toLocaleString();
 
     const block = `
-      <div style="margin-bottom:20px">
-        <div style="font-weight:700;margin-bottom:8px">Sales Person: ${spName}</div>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:6px">
-          <thead>
+      <div style="margin-bottom:30px">
+        <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:#333">Sales Person: ${spName}</div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead style="background:#f8f9fa">
             <tr>
-              <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Product</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost of sales</th>
-              <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
+              <th style="text-align:left;padding:8px;border-bottom:2px solid #222">Product</th>
+              <th style="text-align:right;padding:8px;border-bottom:2px solid #222">Qty Sold</th>
+              <th style="text-align:right;padding:8px;border-bottom:2px solid #222">Sales</th>
+              <th style="text-align:right;padding:8px;border-bottom:2px solid #222">Cost</th>
+              <th style="text-align:right;padding:8px;border-bottom:2px solid #222">Gross Profit</th>
             </tr>
           </thead>
-          <tbody>
-            ${prodRows || `<tr><td colspan="5" style="padding:8px;color:#666">No products sold by this salesperson in the selected range.</td></tr>`}
-          </tbody>
-          <tfoot>
+          <tbody>${prodRows}</tbody>
+          <tfoot style="background:#e9ecef">
             <tr>
-              <td style="padding:8px;font-weight:700">Sub total: ${spName}</td>
-              <td style="padding:8px;text-align:right;font-weight:700">${subQty}</td>
-              <td style="padding:8px;text-align:right;font-weight:700">${subRev}</td>
-              <td style="padding:8px;text-align:right;font-weight:700">${subCost}</td>
-              <td style="padding:8px;text-align:right;font-weight:700">${subGp}</td>
+              <td style="padding:10px;font-weight:700">Subtotal - ${spName}</td>
+              <td style="padding:10px;text-align:right;font-weight:700">${subQty}</td>
+              <td style="padding:10px;text-align:right;font-weight:700">${subRev}</td>
+              <td style="padding:10px;text-align:right;font-weight:700">${subCost}</td>
+              <td style="padding:10px;text-align:right;font-weight:700">${subGp}</td>
             </tr>
           </tfoot>
         </table>
-      </div>
-    `;
+      </div>`;
     htmlParts.push(block);
   });
 
-  // overall footer totals
-  const grand = salesState.rows.reduce((acc, sp) => {
-    acc.qty += Number(sp.totals.qty || 0);
-    acc.revenue += Number(sp.totals.revenue || 0);
-    acc.cost += Number(sp.totals.cost || 0);
-    return acc;
+  // Grand total
+  const grand = salesState.rows.reduce((a, sp) => {
+    a.qty += Number(sp.totals.qty || 0);
+    a.revenue += Number(sp.totals.revenue || 0);
+    a.cost += Number(sp.totals.cost || 0);
+    return a;
   }, { qty:0, revenue:0, cost:0 });
 
   const overall = `
-    <div style="border-top:2px solid #ddd;padding-top:10px;margin-top:8px;font-weight:700">
-      Overall totals - Qty: ${grand.qty.toLocaleString()} | Sales: ${grand.revenue.toLocaleString()} | Cost: ${grand.cost.toLocaleString()} | GP: ${(grand.revenue - grand.cost).toLocaleString()}
-    </div>
-  `;
+    <div style="border-top:3px double #333;padding-top:12px;margin-top:20px;font-size:17px;font-weight:700;text-align:right">
+      GRAND TOTAL → Qty: ${grand.qty.toLocaleString()} | Sales: ${grand.revenue.toLocaleString()} | 
+      Cost: ${grand.cost.toLocaleString()} | Gross Profit: ${(grand.revenue - grand.cost).toLocaleString()}
+    </div>`;
 
-  container.innerHTML = htmlParts.join("") + overall;
+  // Keep the expenses box + put the tables on the left
+  container.innerHTML = `
+    <div style="display:flex;gap:20px">
+      <div style="flex:1">
+        <div style="text-align:center;font-weight:700;font-size:18px;margin-bottom:15px;color:#333">
+          Detailed Sales Report (per Salesperson)
+        </div>
+        ${htmlParts.join("")}
+        ${overall}
+      </div>
+      <!-- Expenses box – now stays forever -->
+      <aside style="width:320px;flex-shrink:0;position:sticky;top:20px;align-self:start">
+        <div style="border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:8px;text-align:center;font-weight:600;font-size:15px">
+          Salesperson Expenses
+        </div>
+        <div style="background:#fafafa;border:1px solid #eee;padding:15px;border-radius:8px;min-height:200px">
+          <div style="font-weight:600;margin-bottom:8px" id="spName">Salesperson: —</div>
+          <div style="font-size:13px;color:#666;margin-bottom:12px">Expense Category & Amount</div>
+          <div id="spExpensesList" style="min-height:100px;color:#555">No expenses recorded</div>
+          <div style="margin-top:15px;border-top:1px solid #ddd;padding-top:10px;font-size:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <span class="muted">Total Expenses</span>
+              <span id="spTotal" class="muted">0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span class="muted">Net Revenue</span>
+              <strong id="spNet" style="background:#ffd7b2;padding:5px 10px;border-radius:5px">0</strong>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>`;
 
-  // Optionally update the right-hand expenses box (first salesperson shown)
-  const first = salesState.rows[0];
-  if (first) {
-    const spNameEl = document.getElementById("spName");
-    if (spNameEl) spNameEl.textContent = `Salesperson: ${first.salesperson}`;
-
-    // expenses not implemented — leave placeholders
-    const spExpensesEl = document.getElementById("spExpensesList");
-    if (spExpensesEl) spExpensesEl.textContent = "No expenses";
-
-    const spTotalEl = document.getElementById("spTotal");
-    if (spTotalEl) spTotalEl.textContent = "0";
-
-    const spNetEl = document.getElementById("spNet");
-    if (spNetEl) spNetEl.textContent = (((first.totals.revenue||0) - (first.totals.cost||0))).toLocaleString();
+  // Update the name of the first salesperson in the box
+  if (salesState.rows[0]) {
+    document.getElementById("spName").textContent = "Salesperson: " + salesState.rows[0].salesperson;
+    document.getElementById("spNet").textContent = 
+      (salesState.rows[0].totals.revenue - salesState.rows[0].totals.cost).toLocaleString();
   }
 }
-
 
 
 function showPurchaseReport() {
