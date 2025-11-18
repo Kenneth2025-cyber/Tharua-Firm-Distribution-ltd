@@ -9314,7 +9314,15 @@ function toggleReports() {
 }
 
 // Placeholder report functions
-
+// FIX: This must be outside the function so buttons can see it
+let salesState = {
+  rows: [],
+  filtered: [],
+  from: null,
+  to: null,
+  location: "",
+  reportMode: "detailed"   // we want Detailed to be default
+};
 // ---------- Page Entrypoint: Sales Report (with mode buttons + working date + location filters + exports + Filter-by-date dropdown + Apply button) ----------
 async function showSalesReport() {
   saveLastPage("showSalesReport");
@@ -9415,7 +9423,7 @@ async function showSalesReport() {
       <div class="mode-bar" id="srModeBar" aria-label="Report modes">
         <button class="mode-btn" data-mode="detailed" id="modeDetailed">Detailed Sales Report (per Salesperson)</button>
         <button class="mode-btn" data-mode="byDate" id="modeByDate">Sales By Date</button>
-        <button class="mode-btn active" data-mode="product" id="modeProduct">Sales By Product</button>
+        <button class="mode-btn active" data-mode="detailed" id="modeDetailed">Detailed Sales Report (per Salesperson)</button>
         <button class="mode-btn" data-mode="customer" id="modeCustomer">Sales By Customer</button>
         <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">Sales By Customer Group</button>
       </div>
@@ -9425,16 +9433,6 @@ async function showSalesReport() {
       </div>
     </div>
   `;
-
-  /************ state ************/
-  const salesState = {
-    rows: [],        // aggregated rows: you will define aggregation later
-    filtered: [],    // filtered subset
-    from: null,
-    to: null,
-    location: "",
-    reportMode: "product" // default mode
-  };
 
   /************ helpers: presets & dates ************/
   function setPresetRange(preset) {
@@ -9791,7 +9789,7 @@ function renderModePlaceholder() {
   setPresetRange(document.getElementById("srDatePreset").value);
   await loadLocations();
   // default render for the chosen mode
-  setReportMode(salesState.reportMode);
+ setReportMode("detailed");  // force Detailed mode on start
   applyFilters(); // populate salesState.filtered based on default dates (rows empty until aggregation is implemented)
 }
 
