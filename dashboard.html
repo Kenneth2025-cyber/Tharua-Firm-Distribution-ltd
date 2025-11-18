@@ -7243,7 +7243,37 @@ async function saveSale() {
     console.warn("Could not fetch salesperson name:", err);
   }
 
-  // Assemble sale object (saves payments array on the sale doc)
+  // Assemble sale object with HISTORICAL COST (costAtSale) locked forever
+  const itemsWithCost = await Promise.all(
+    (saleItems || []).map(async (item) => {
+      let costAtSale = 0;
+
+      // Find product by name and get current buyingPrice
+      try {
+        const prodSnap = await firebase.firestore()
+          .collection("products")
+          .where("name", "==", item.prodName.trim())
+          .limit(1)
+          .get();
+
+        if (!prodSnap.empty) {
+          const data = prodSnap.docs[0].data();
+          costAtSale = Number(data.buyingPrice || data.costPrice || 0);
+        }
+      } catch (e) {
+        console.warn("Could not get cost for:", item.prodName, e);
+      }
+
+      return {
+        prodName: item.prodName,
+        qty: item.qty,
+        price: item.price,
+        subtotal: item.subtotal,
+        costAtSale: costAtSale   // THIS SAVES THE CORRECT PROFIT FOREVER
+      };
+    })
+  );
+
   const saleData = {
     location,
     customer,
@@ -7255,8 +7285,8 @@ async function saveSale() {
     net,
     paid,
     balance,
-    payments,       // important: saved with the sale
-    items: saleItems || [],
+    payments,
+    items: itemsWithCost,        // NOW WITH costAtSale
     saleDate: chosenDate,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
