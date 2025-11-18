@@ -9834,121 +9834,106 @@ function setReportModeButtons() {
 }
 
 
-// ---------- aggregateSalesDetailed(): query Firestore and group sales by salesperson -> product ----------
+// ---------- NEW & IMPROVED aggregateSalesDetailed() with cost from products collection ----------
 async function aggregateSalesDetailed() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
 
-  // Build Firestore query with date + location filters (saleDate assumed stored as Firestore Timestamp or ISO)
   let q = db.collection("sales").orderBy("saleDate", "desc");
   if (from && to) {
-    // Firestore expects Timestamp objects if saleDate is Timestamp; using Date works with .where('saleDate', '>=', from)
     q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   }
   if (loc) {
-    // try a few candidate location field names
     q = q.where("location", "==", loc);
-    // If your sales collection uses another field name for location, adjust the above to the correct field.
   }
 
   const snap = await q.get();
 
-  // temporary map: salesperson -> productName -> aggregated data
-  const spMap = {}; // { spName: { products: { prodKey: { qty, revenue, cost, unitShort } }, totals: {...} } }
-  const nameToId = {}; // fallback mapping if needed (not strictly necessary here)
+  // Cache for product costs so we don't query the same product 1000 times
+  const productCostCache = {};
 
-  // helper: read numeric
-  const toNum = (v) => (typeof v === "number" ? v : (Number(v) || 0));
+  const spMap = {};
 
-  snap.forEach(doc => {
-    const sd = doc.data() || {};
-    // sale date
-    const saleDate = sd.saleDate ? (sd.saleDate.toDate ? sd.saleDate.toDate() : new Date(sd.saleDate)) : null;
-    // salesperson name
+  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+
+  for (const doc of snap.docs) {
+    const sd = doc.data();
     const sp = String(sd.salesperson || sd.salespersonName || sd.saleperson || "").trim() || "Unknown";
-    // location
-    const sLoc = String(sd.location || sd.businessLocation || sd.locationName || sd.store || "").trim() || "";
+    const sLoc = String(sd.location || sd.businessLocation || sd.locationName || sd.store || "").trim();
+    if (salesState.location && sLoc !== salesState.location) continue;
 
-    // if page-level location filter exists and this sale is different, skip it
-    if (salesState.location && sLoc !== salesState.location) return;
-
-    // items array candidates
     const items = sd.items || sd.products || sd.saleItems || sd.lineItems || sd.itemsSold || [];
-    if (!Array.isArray(items) || !items.length) {
-      // sometimes the sale is single-line with qty at root - skip those unless you want to handle
-      return;
+    if (!Array.isArray(items) || items.length === 0) continue;
+
+    if (!spMap[sp]) {
+      spMap[sp] = { salesperson: sp, products: {}, totals: { qty: 0, revenue: 0, cost: 0 } };
     }
 
-    // ensure salesperson entry exists
-    if (!spMap[sp]) spMap[sp] = { salesperson: sp, products: {}, totals: { qty:0, revenue:0, cost:0 } };
+    for (const it of items) {
+      const pname = String(it.productName || it.prodName || it.product || it.name || "").trim() || "Unknown Product";
+      const pid = it.productId || it.product_id || it.pid || null;
+      const qty = toNum(it.quantity || it.qty || it.QtySold || 0);
+      if (qty === 0) continue;
 
-    items.forEach(it => {
-      // attempt to extract product name/id, qty, price, cost, unitShort
-      const pname = String(it.productName || it.prodName || it.product || it.name || "").trim();
-      const pid = it.productId || it.product_id || null;
-      const qty = toNum(it.quantity || it.qty || it.Qty || it.qtySold || it.amount || it.qty_sold || 0);
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || it.sellPrice || it.rate || 0);
-      const cost = toNum(it.cost || it.costPrice || it.purchasePrice || 0);
-      // some items may provide unit (e.g. "pcs" or "Ctns") or the product doc defines units - check for it.unit or it.unitShort
-      const unitShort = String(it.unit || it.unitShort || it.u || "").trim();
 
-      const prodKey = pname || pid || ("_prod_" + Math.random().toString(36).slice(2,7));
+      // Get cost from products collection (cached)
+      let costPrice = 0;
+      if (pid && pid !== "") {
+        if (productCostCache[pid] !== undefined) {
+          costPrice = productCostCache[pid];
+        } else {
+          try {
+            const prodSnap = await db.collection("products").doc(pid).get();
+            if (prodSnap.exists) {
+              costPrice = toNum(prodSnap.data().buyingPrice || prodSnap.data().costPrice || prodSnap.data().purchasePrice || 0);
+              productCostCache[pid] = costPrice;
+            }
+          } catch (e) {
+            console.warn("Failed to fetch product cost for ID:", pid, e);
+          }
+        }
+      }
+
+      const prodKey = pid || pname; // prefer ID as key so same product always groups together
 
       if (!spMap[sp].products[prodKey]) {
         spMap[sp].products[prodKey] = {
-          productName: pname || pid || "Unknown Product",
+          productName: pname,
           qty: 0,
           revenue: 0,
           cost: 0,
-          unitShort: unitShort || ""
+          unitShort: String(it.unit || it.unitShort || "").trim()
         };
       }
 
       spMap[sp].products[prodKey].qty += qty;
-      spMap[sp].products[prodKey].revenue += (qty * price);
-      spMap[sp].products[prodKey].cost += (qty * cost);
+      spMap[sp].products[prodKey].revenue += qty * price;
+      spMap[sp].products[prodKey].cost += qty * costPrice;
 
-      // accumulate totals per salesperson
+      // Totals per salesperson
       spMap[sp].totals.qty += qty;
-      spMap[sp].totals.revenue = (spMap[sp].totals.revenue || 0) + (qty * price);
-      spMap[sp].totals.cost = (spMap[sp].totals.cost || 0) + (qty * cost);
-    });
-  });
+      spMap[sp].totals.revenue += qty * price;
+      spMap[sp].totals.cost += qty * costPrice;
+    }
+  }
 
-  // convert spMap into an ordered array. Each entry contains salesperson + array of products.
+  // Convert to final array (same as before)
   const result = [];
-  Object.keys(spMap).forEach(spName => {
+  Object.keys(spMap).sort().forEach(spName => {
     const entry = spMap[spName];
-    const products = Object.keys(entry.products).map(k => {
-      const p = entry.products[k];
-      return {
-        productKey: k,
-        productName: p.productName,
-        qty: p.qty,
-        revenue: p.revenue,
-        cost: p.cost,
-        unitShort: p.unitShort || ""
-      };
-    });
-
-    // optionally sort products by name
-    products.sort((a,b) => String(a.productName).localeCompare(String(b.productName)));
+    const products = Object.values(entry.products)
+      .sort((a, b) => a.productName.localeCompare(b.productName));
 
     result.push({
       salesperson: entry.salesperson,
-      salespersonId: null, // not tracked here, could be added if you choose
-      location: salesState.location || "",
-      totals: entry.totals,
-      products: products
+      products: products,
+      totals: entry.totals
     });
   });
 
-  // sort salespeople alphabetically
-  result.sort((a,b) => String(a.salesperson).localeCompare(String(b.salesperson)));
-
-  // store aggregated result
   salesState.rows = result;
   salesState.filtered = result.slice();
 }
