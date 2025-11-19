@@ -11013,56 +11013,56 @@ function showExpenseReport() {
 }
 
   // Handle adding and removing payment method rows
-  document.addEventListener("click", function (e) {
-    // Add new row
-    if (e.target && e.target.id === "addPaymentMethod") {
-      const table = document.getElementById("paymentSummaryTable");
-      const lastRow = e.target.closest("tr");
-      const newRow = lastRow.cloneNode(true);
+document.addEventListener("click", function (e) {
+  // ➕ Add new row
+  if (e.target && e.target.id === "addPaymentMethod") {
+    const table = document.getElementById("paymentSummaryTable");
+    const lastRow = e.target.closest("tr");
+    const newRow = lastRow.cloneNode(true);
 
-      const select = newRow.querySelector("select.paymentMethodSelect");
-      const amount = newRow.querySelector("input");
-      if (select) select.value = "";
-      if (amount) {
-        amount.value = "";
-        amount.classList.remove("paymentAmount");
-        amount.classList.add("paymentAmountInput");
-        amount.setAttribute("oninput", "calculateTotals()");
-      }
-
-      const btn = newRow.querySelector("button");
-      if (btn) {
-        btn.textContent = "Remove";
-        btn.removeAttribute("id");
-        btn.classList.remove("btn-sm");
-        btn.classList.add("removePaymentMethod");
-      }
-      table.appendChild(newRow);
-      calculateTotals();
+    // reset select + amount
+    const select = newRow.querySelector("select.paymentMethodSelect");
+    const amount = newRow.querySelector("input");
+    if (select) select.value = "";
+    if (amount) {
+      amount.value = "";
+      // ✅ ensure correct class + oninput handler
+      amount.classList.remove("paymentAmount");
+      amount.classList.add("paymentAmountInput");
+      amount.setAttribute("oninput", "calculateTotals()");
     }
 
-    // Remove row
-    if (e.target && e.target.classList.contains("removePaymentMethod")) {
-      const row = e.target.closest("tr");
-      if (row) {
-        row.remove();
-        calculateTotals();
-      }
+    // change ➕ button → 🗑 button
+    const btn = newRow.querySelector("button");
+    if (btn) {
+      btn.textContent = "🗑";
+      btn.removeAttribute("id");
+      btn.classList.remove("btn-sm");
+      btn.classList.add("removePaymentMethod");
     }
-  });
 
-  // Helper: pretty date format (needed for Sales By Date)
-  function formatDate(iso) {
-    const d = new Date(iso);
-    return d.toLocaleDateString("en-KE", { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    table.appendChild(newRow);
+    calculateTotals(); // update after adding
   }
 
+  // 🗑 Remove row
+  if (e.target && e.target.classList.contains("removePaymentMethod")) {
+    const row = e.target.closest("tr");
+    if (row) {
+      row.remove();
+      calculateTotals(); // update after removing
+    }
+  }
+});
+
+  
 </script>
 
 <!-- External libraries -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
+
 
 </body>
 </html>
