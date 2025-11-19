@@ -11019,7 +11019,6 @@ document.addEventListener("click", function (e) {
     const table = document.getElementById("paymentSummaryTable");
     const lastRow = e.target.closest("tr");
     const newRow = lastRow.cloneNode(true);
-    // reset select + amount
     const select = newRow.querySelector("select.paymentMethodSelect");
     const amount = newRow.querySelector("input");
     if (select) select.value = "";
@@ -11029,7 +11028,6 @@ document.addEventListener("click", function (e) {
       amount.classList.add("paymentAmountInput");
       amount.setAttribute("oninput", "calculateTotals()");
     }
-    // change add button to remove button
     const btn = newRow.querySelector("button");
     if (btn) {
       btn.textContent = "Remove";
@@ -11038,22 +11036,30 @@ document.addEventListener("click", function (e) {
       btn.classList.add("removePaymentMethod");
     }
     table.appendChild(newRow);
-    calculateTotals(); // update after adding
+    calculateTotals();
   }
   // Remove row
   if (e.target && e.target.classList.contains("removePaymentMethod")) {
     const row = e.target.closest("tr");
     if (row) {
       row.remove();
-      calculateTotals(); // update after removing
+      calculateTotals();
     }
   }
 });
 
+// Helper: pretty date format (must be here so renderByDateTable can use it)
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-KE", { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 </script>
+
 <!-- External libraries -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
+
 </body>
 </html>
