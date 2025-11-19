@@ -9864,25 +9864,27 @@ function setReportModeButtons() {
 }
 
 
-// ---------- FINAL FINAL VERSION: Uses costAtSale from sales (historical profit 100% correct) ----------
+// ULTRA-FAST VERSION – No more slow product lookups! (2025 Edition)
 async function aggregateSalesDetailed() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
+
   let q = db.collection("sales").orderBy("saleDate", "desc");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
+
+  const snap = await q.get();  // One single fast query → all your sales
 
   const spMap = {};
-  const toNum = (v) => (typeof v === "number" ? v : Number(v) || 0);
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
 
   for (const doc of snap.docs) {
     const sd = doc.data();
     const sp = String(sd.salesperson || sd.salespersonName || "").trim() || "Unknown";
     const sLoc = String(sd.location || sd.businessLocation || "").trim();
-    if (salesState.location && sLoc !== salesState.location) continue;
+    if (loc && sLoc !== loc) continue;
 
     const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
     if (!Array.isArray(items) || items.length === 0) continue;
@@ -9895,30 +9897,13 @@ async function aggregateSalesDetailed() {
       const pname = String(it.prodName || it.productName || it.name || "").trim();
       if (!pname) continue;
 
-      const qty = toNum(it.quantity || it.qty || 0);
+      const qty   = toNum(it.quantity || it.qty || 0);
       if (qty === 0) continue;
 
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
 
-      // THIS IS THE MAGIC LINE: Use historical costAtSale first!
-      let costPrice = toNum(it.costAtSale);
-
-      // Fallback only if costAtSale is missing (very old sales before your fix)
-      if (costPrice === 0) {
-        // Try to get current buying price as backup
-        try {
-          const prodSnap = await db.collection("products")
-            .where("name", "==", pname)
-            .limit(1)
-            .get();
-          if (!prodSnap.empty) {
-            const data = prodSnap.docs[0].data();
-            costPrice = toNum(data.buyingPrice || data.costPrice || 0);
-          }
-        } catch (e) {
-          console.warn("Cost fallback failed for:", pname);
-        }
-      }
+      // SUPER FAST: we now have costAtSale on EVERY sale (you already fixed them!)
+      const costPrice = toNum(it.costAtSale || 0);
 
       if (!spMap[sp].products[pname]) {
         spMap[sp].products[pname] = {
@@ -9930,28 +9915,25 @@ async function aggregateSalesDetailed() {
         };
       }
 
-      spMap[sp].products[pname].qty += qty;
-      spMap[sp].products[pname].revenue += qty * price;
-      spMap[sp].products[pname].cost += qty * costPrice;
+      spMap[sp].products[pname].qty      += qty;
+      spMap[sp].products[pname].revenue  += qty * price;
+      spMap[sp].products[pname].cost     += qty * costPrice;
 
-      spMap[sp].totals.qty += qty;
+      spMap[sp].totals.qty      += qty;
       spMap[sp].totals.revenue += qty * price;
-      spMap[sp].totals.cost += qty * costPrice;
+      spMap[sp].totals.cost     += qty * costPrice;
     }
   }
 
-  // Build final result
-  const result = [];
-  Object.keys(spMap).sort().forEach(spName => {
-    const entry = spMap[spName];
-    const products = Object.values(entry.products)
-      .sort((a, b) => a.productName.localeCompare(b.productName));
-    result.push({
-      salesperson: entry.salesperson,
-      products: products,
-      totals: entry.totals
+  // Build final array (sorted by salesperson name)
+  const result = Object.keys(spMap)
+    .sort()
+    .map(spName => {
+      const entry = spMap[spName];
+      const products = Object.values(entry.products)
+        .sort((a, b) => a.productName.localeCompare(b.productName));
+      return { salesperson: entry.salesperson, products, totals: entry.totals };
     });
-  });
 
   salesState.rows = result;
   salesState.filtered = result.slice();
