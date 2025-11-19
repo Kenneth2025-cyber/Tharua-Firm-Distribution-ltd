@@ -9540,55 +9540,39 @@ async function applyFilters() {
   salesState.rows = [];
   salesState.filtered = [];
 
-// ---------- apply filters (FULLY UPGRADED: Detailed + Sales By Date working perfectly) ----------
-async function applyFilters() {
-  const preset = document.getElementById("srDatePreset").value;
-  const fromVal = document.getElementById("srFrom")?.value || "";
-  const toVal = document.getElementById("srTo")?.value || "";
-  const loc = document.getElementById("srLocationSmall")?.value || "";
-
-  // Update global state
-  salesState.location = loc;
-  salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
-  salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
-
-  // Clear previous data
-  salesState.rows = [];
-  salesState.filtered = [];
-
-  const container = document.getElementById("srResults");
-
-  // === DETAILED MODE (unchanged – works perfectly as before) ===
+  // If the selected mode is detailed, run aggregation and render the repeated salesperson tables
   if (salesState.reportMode === "detailed") {
+    // show a loading placeholder
+    const container = document.getElementById("srResults");
     container.innerHTML = `<div class="sr-table-placeholder">Aggregating sales... please wait.</div>`;
+
     try {
-      await aggregateSalesDetailed();
+      // aggregate from Firestore and populate salesState.rows as grouped structure
+      await aggregateSalesDetailed(); // populates salesState.rows with grouped sales
+      // Apply the same filters to the aggregated rows (should already be filtered by date/location by the query)
       salesState.filtered = salesState.rows.slice();
+      // Render the detailed repeated tables
       renderDetailedTable();
     } catch (err) {
       console.error("Aggregation failed", err);
-      container.innerHTML = `<div class="sr-table-placeholder">Aggregation error: ${escapeHTML(String(err?.message || err))}</div>`;
+      document.getElementById("srResults").innerHTML = `<div class="sr-table-placeholder">Aggregation error: ${escapeHTML(String(err?.message || err))}</div>`;
     }
+    // close menu
     closeDateMenu();
     return;
   }
 
-  // === SALES BY DATE MODE (NEW & FULLY FUNCTIONAL) ===
-  if (salesState.reportMode === "byDate") {
-    container.innerHTML = `<div class="sr-table-placeholder">Aggregating by date... please wait.</div>`;
-    try {
-      await aggregateSalesByDate();
-      salesState.filtered = salesState.rows.slice();
-      renderByDateTable();
-    } catch (err) {
-      console.error("By Date aggregation failed", err);
-      container.innerHTML = `<div class="sr-table-placeholder">Error loading data.</div>`;
+  // For other modes (not implemented) simply filter raw rows if any
+  salesState.filtered = (salesState.rows || []).filter(r => {
+    if (salesState.from && salesState.to && r.saleDate) {
+      const d = (r.saleDate instanceof Date) ? r.saleDate : new Date(r.saleDate);
+      if (isNaN(d)) return false;
+      if (d < salesState.from || d > salesState.to) return false;
     }
-    closeDateMenu();
-    return;
-  }
+    if (loc && String(r.location||"") !== String(loc)) return false;
+    return true;
+  });
 
-  // === ALL OTHER MODES (Product, Customer, etc.) – still show placeholder ===
   renderModePlaceholder();
   closeDateMenu();
 }
@@ -10126,112 +10110,6 @@ async function renderDetailedTable() {
     ${htmlParts.join("")}
     ${overall}
   `;
-}
-
-// NEW: Aggregate Sales By Date (lightning fast + uses costAtSale)
-async function aggregateSalesByDate() {
-  const db = firebase.firestore();
-  let q = db.collection("sales");
-  if (salesState.from && salesState.to) {
-    q = q.where("saleDate", ">=", salesState.from).where("saleDate", "<=", salesState.to);
-  }
-  if (salesState.location) {
-    q = q.where("location", "==", salesState.location);
-  }
-  const snap = await q.get();
-
-  const dateMap = {};
-  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
-
-  for (const doc of snap.docs) {
-    const sd = doc.data();
-    const date = sd.saleDate?.toDate();
-    if (!date) continue;
-    const dateKey = date.toISOString().split("T")[0]; // YYYY-MM-DD
-
-    if (!dateMap[dateKey]) {
-      dateMap[dateKey] = { date: dateKey, qty: 0, revenue: 0, cost: 0 };
-    }
-
-    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
-    for (const it of items) {
-      const qty = toNum(it.quantity || it.qty || 0);
-      if (qty === 0) continue;
-      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
-      const costPrice = toNum(it.costAtSale || 0);
-
-      dateMap[dateKey].qty += qty;
-      dateMap[dateKey].revenue += qty * price;
-      dateMap[dateKey].cost += qty * costPrice;
-    }
-  }
-
-  const result = Object.values(dateMap)
-    .sort((a, b) => b.date.localeCompare(a.date)); // newest first
-
-  salesState.rows = result;
-  salesState.filtered = result.slice();
-}
-
-// NEW: Render Sales By Date table
-function renderByDateTable() {
-  const container = document.getElementById("srResults");
-  if (!salesState.rows || salesState.rows.length === 0) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales found for the selected date range.</div>`;
-    return;
-  }
-
-  const rows = salesState.rows.map(d => {
-    const gross = d.revenue - d.cost;
-    return `
-      <tr>
-        <td style="padding:12px; border-bottom:1px solid #eee">${formatDate(d.date)}</td>
-        <td style="padding:12px; text-align:right; border-bottom:1px solid #eee">${d.qty.toLocaleString()}</td>
-        <td style="padding:12px; text-align:right; border-bottom:1px solid #eee">${d.revenue.toLocaleString()}</td>
-        <td style="padding:12px; text-align:right; border-bottom:1px solid #eee">${d.cost.toLocaleString()}</td>
-        <td style="padding:12px; text-align:right; font-weight:600; color:#2e8b57; border-bottom:1px solid #eee">${gross.toLocaleString()}</td>
-      </tr>`;
-  }).join("");
-
-  const grand = salesState.rows.reduce((a, b) => ({
-    qty: a.qty + b.qty,
-    revenue: a.revenue + b.revenue,
-    cost: a.cost + b.cost
-  }), { qty: 0, revenue: 0, cost: 0 });
-  const grandGP = grand.revenue - grand.cost;
-
-  container.innerHTML = `
-    <div style="background:#6f2cc1;color:#fff;padding:15px;border-radius:8px;margin-bottom:20px;text-align:center;font-size:18px;font-weight:700">
-      Sales By Date Report
-    </div>
-    <table style="width:100%;border-collapse:collapse;background:#fff">
-      <thead style="background:#f8f9fa">
-        <tr>
-          <th style="text-align:left;padding:12px">Date</th>
-          <th style="text-align:right;padding:12px">Qty Sold</th>
-          <th style="text-align:right;padding:12px">Sales (KES)</th>
-          <th style="text-align:right;padding:12px">Cost (KES)</th>
-          <th style="text-align:right;padding:12px">Gross Profit</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-      <tfoot style="background:#222;color:#fff;font-weight:700">
-        <tr>
-          <td style="padding:14px">TOTAL</td>
-          <td style="padding:14px;text-align:right">${grand.qty.toLocaleString()}</td>
-          <td style="padding:14px;text-align:right">${grand.revenue.toLocaleString()}</td>
-          <td style="padding:14px;text-align:right">${grand.cost.toLocaleString()}</td>
-          <td style="padding:14px;text-align:right;color:#27ae60">${grandGP.toLocaleString()}</td>
-        </tr>
-      </tfoot>
-    </table>
-  `;
-}
-
-// Helper: pretty date format
-function formatDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-KE", { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function showPurchaseReport() {
@@ -11011,6 +10889,7 @@ function showExpenseReport() {
     <p>Section Under Development</p>
   `;
 }
+
 
   // Handle adding and removing payment method rows
 document.addEventListener("click", function (e) {
