@@ -9760,7 +9760,7 @@ if (mode === "byDate") {
     const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
   }
-/************ FINAL FIXED – EXPENSES NOW SHOW 100% CORRECTLY ************/
+/************ FINAL – EXPENSES NOW SHOW 100% FROM expenseCategories ************/
 function exportPDF() {
   if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
     alert("Please run the Detailed Sales Report first!");
@@ -9801,19 +9801,14 @@ function exportPDF() {
         </tr>`;
     });
 
-    // === EXPENSES – FIXED TO WORK 100% ===
+    // === EXPENSES – THIS IS THE CORRECT ONE FOR YOUR SYSTEM! ===
     let expensesRows = "";
     let totalExpenses = 0;
 
-    // Check ALL possible places where expenses might be
-    const expensesObj = spEntry.expenses || 
-                        spEntry.expenseBreakdown || 
-                        spEntry.expenseCategories || 
-                        (spEntry.totalExpenses ? { "Recorded Expenses": spEntry.totalExpenses } : null);
-
-    if (expensesObj && typeof expensesObj === "object" && Object.keys(expensesObj).length > 0) {
-      Object.keys(expensesObj).forEach(cat => {
-        const amt = Number(expensesObj[cat]) || 0;
+    // YOUR SYSTEM USES expenseCategories – THIS IS WHERE EXPENSES ARE!
+    if (spEntry.expenseCategories && typeof spEntry.expenseCategories === "object") {
+      Object.keys(spEntry.expenseCategories).forEach(cat => {
+        const amt = Number(spEntry.expenseCategories[cat]) || 0;
         if (amt > 0) {
           totalExpenses += amt;
           expensesRows += `
@@ -9825,10 +9820,9 @@ function exportPDF() {
       });
     }
 
-    // If no expenses found at all
+    // Fallback: if no expenses at all
     if (expensesRows === "") {
       expensesRows = `<tr><td colspan="2" style="text-align:center; color:#999; font-style:italic; padding:15px;">No expenses recorded</td></tr>`;
-      totalExpenses = 0;
     }
 
     const netProfit = subProfit - totalExpenses;
@@ -9836,7 +9830,6 @@ function exportPDF() {
     allSections += `
       <div style="margin:35px 0; padding:20px; border:3px solid #6f2cc1; border-radius:15px; background:#f8fdff;">
         <h2 style="margin:0 0 18px 0; color:#6f2cc1; font-size:18px; text-align:center; font-weight:bold;">${spName}</h2>
-
         <div style="display:flex; gap:30px; flex-wrap:nowrap; align-items:flex-start;">
           <!-- SALES TABLE LEFT -->
           <div style="flex:2.3;">
@@ -9862,8 +9855,7 @@ function exportPDF() {
               </tfoot>
             </table>
           </div>
-
-          <!-- EXPENSES RIGHT – NOW 100% ACCURATE -->
+          <!-- EXPENSES RIGHT – NOW SHOWS REAL DATA! -->
           <div style="flex:1; min-width:300px; background:#e3f2fd; border-radius:12px; padding:18px; border:3px solid #3498db;">
             <h3 style="margin:0 0 15px 0; color:#1976d2; font-size:16px; text-align:center; font-weight:bold;">EXPENSES</h3>
             <table style="width:100%; border-collapse:collapse; background:white;">
@@ -9914,18 +9906,17 @@ function exportPDF() {
     <p style="font-size:20px; color:#6f2cc1; margin:10px 0;">Detailed Sales & Performance Report</p>
   </div>
   <div class="info">
-    <strong>Period:</strong> ${period}  |  <strong>Location:</strong> ${escapeHTML(locStr)}  |  <strong>Generated:</strong> ${new Date().toLocaleString("en-KE")}
+    <strong>Period:</strong> ${period}    |    <strong>Location:</strong> ${escapeHTML(locStr)}    |    <strong>Generated:</strong> ${new Date().toLocaleString("en-KE")}
   </div>
   ${allSections}
   <div class="grand">
-    GRAND TOTAL → Qty: ${grand.qty.toLocaleString()} | Sales: KES ${grand.sales.toLocaleString()} | Cost: KES ${grand.cost.toLocaleString()} | GROSS PROFIT: KES ${(grand.sales - grand.cost).toLocaleString()}
+    GRAND TOTAL → Qty: ${grand.qty.toLocaleString()}    |    Sales: KES ${grand.sales.toLocaleString()}    |    Cost: KES ${grand.cost.toLocaleString()}    |    GROSS PROFIT: KES ${(grand.sales - grand.cost).toLocaleString()}
   </div>
 </body></html>`;
 
   win.document.open();
   win.document.write(finalHTML);
   win.document.close();
-  
   win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 1000);
 }
 
