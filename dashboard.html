@@ -10311,7 +10311,7 @@ function renderSalesByProduct() {
   `;
 }
 
-// 1. Collect sales for each customer
+// 1. Collect sales + convert customer ID → real name
 async function aggregateSalesByCustomer() {
   const db = firebase.firestore();
   const from = salesState.from;
@@ -10324,40 +10324,83 @@ async function aggregateSalesByCustomer() {
 
   const snap = await q.get();
   const customerMap = {};
+  const customerPromises = [];
 
+  // First pass: collect all customer refs/IDs we need to look up
   for (const doc of snap.docs) {
     const s = doc.data();
-    const customerName = String(s.customerName || s.customer || "Walk-in Customer").trim();
-    const items = s.items || s.products || [];
+    let customerRef = s.customer; // this is usually a DocumentReference or string ID
+    let customerName = "Walk-in Customer";
 
-    if (!customerMap[customerName]) {
-      customerMap[customerName] = {
-        customer: customerName,
+    if (customerRef) {
+      // If it's a Firestore reference (has .get), or just a string ID
+      const ref = typeof customerRef.get === "function" ? customerRef : db.collection("customers").doc(customerRef);
+      customerPromises.push(
+        ref.get().then(custSnap => {
+          if (custSnap.exists) {
+            return { id: custSnap.id, name: String(custSnap.data()?.name || "Unknown Customer").trim() };
+          } else {
+            return { id: custSnap.id, name: "Deleted Customer" };
+          }
+        }).catch(() => ({ id: "error", name: "Name Not Found" }))
+      );
+    }
+
+    const items = s.items || s.products || [];
+    const key = customerRef ? (typeof customerRef.get === "function" ? customerRef.path : customerRef) : "walkin";
+
+    if (!customerMap[key]) {
+      customerMap[key] = {
+        customerRef: key,
+        customerName: customerName,
         qty: 0,
         sales: 0,
         invoices: 0
       };
     }
 
-    customerMap[customerName].invoices += 1;
-
+    customerMap[key].invoices += 1;
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      customerMap[key].qty += qty;
+      customerMap[key].sales += qty * price;
+    }
+  }
 
-      customerMap[customerName].qty += qty;
-      customerMap[customerName].sales += qty * price;
+  // Wait for all customer names to load
+  const customerResults = await Promise.all(customerPromises);
+
+  // Replace temporary names with real ones
+  const nameMap = {};
+  customerResults.forEach(c => { nameMap[c.id] = c.name; });
+
+  for (const key in customerMap) {
+    if (key === "walkin") {
+      customerMap[key].customerName = "Walk-in Customer";
+    } else if (typeof key === "string" && key.includes("/")) {
+      // it's a full path like customers/QmDs2b...
+      const id = key.split("/").pop();
+      customerMap[key].customerName = nameMap[id] || "Unknown Customer";
+    } else {
+      customerMap[key].customerName = nameMap[key] || "Unknown Customer";
     }
   }
 
   const rows = Object.values(customerMap)
-    .sort((a, b) => b.sales - a.sales); // richest customers first!
+    .map(c => ({
+      customer: c.customerName,
+      qty: c.qty,
+      sales: c.sales,
+      invoices: c.invoices
+    }))
+    .sort((a, b) => b.sales - a.sales);
 
   salesState.rows = rows;
   salesState.filtered = rows.slice();
 }
 
-// 2. Show beautiful customer table
+// 2. Show beautiful table with REAL customer names!
 function renderSalesByCustomer() {
   const container = document.getElementById("srResults");
 
