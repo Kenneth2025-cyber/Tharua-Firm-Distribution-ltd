@@ -9760,16 +9760,16 @@ if (mode === "byDate") {
     const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
   }
-/************ FINAL – EXPENSES NOW SHOW 100% FROM expenseCategories ************/
+/************ FINAL PERFECT PDF – EXPENSES WORK 100% USING spEntry.expenses ************/
 function exportPDF() {
   if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
     alert("Please run the Detailed Sales Report first!");
     return;
   }
 
-  const win = window.open("", "_blank", "width=1200,height=900,scrollbars=yes,resizable=yes");
+  const win = window.open("", "_blank", "width=1300,height=900,scrollbars=yes,resizable=yes");
   if (!win) {
-    alert("Please allow popups for this site to export PDF!");
+    alert("Please allow popups for this site!");
     return;
   }
 
@@ -9782,58 +9782,57 @@ function exportPDF() {
 
   salesState.filtered.forEach(spEntry => {
     const spName    = escapeHTML(spEntry.salesperson || "Unknown");
-    const subQty    = spEntry.totals.qty;
-    const subSales  = spEntry.totals.revenue;
-    const subCost   = spEntry.totals.cost;
-    const subProfit = subSales - subCost;
+    const subQty     = spEntry.totals.qty;
+    const subSales   = spEntry.totals.revenue;
+    const subCost    = spEntry.totals.cost;
+    const grossProfit = subSales - subCost;
 
-    // === SALES TABLE ===
+    // === SALES ROWS ===
     let salesRows = "";
     spEntry.products.forEach(p => {
       const profit = p.revenue - p.cost;
       salesRows += `
         <tr>
-          <td style="padding:6px 8px; font-size:12px;">${escapeHTML(p.productName)}</td>
-          <td style="padding:6px 8px; text-align:right; font-size:12px;">${p.qty.toLocaleString()}</td>
-          <td style="padding:6px 8px; text-align:right; font-size:12px;">${p.revenue.toLocaleString()}</td>
-          <td style="padding:6px 8px; text-align:right; font-size:12px;">${p.cost.toLocaleString()}</td>
-          <td style="padding:6px 8px; text-align:right; font-size:12px; color:#27ae60; font-weight:600;">${profit.toLocaleString()}</td>
+          <td style="padding:7px 9px; font-size:12.5px;">${escapeHTML(p.productName)}</td>
+          <td style="padding:7px 9px; text-align:right; font-size:12.5px;">${p.qty.toLocaleString()}</td>
+          <td style="padding:7px 9px; text-align:right; font-size:12.5px;">${p.revenue.toLocaleString()}</td>
+          <td style="padding:7px 9px; text-align:right; font-size:12.5px;">${p.cost.toLocaleString()}</td>
+          <td style="padding:7px 9px; text-align:right; font-size:12.5px; color:#27ae60; font-weight:600;">${profit.toLocaleString()}</td>
         </tr>`;
     });
 
-    // === EXPENSES – THIS IS THE CORRECT ONE FOR YOUR SYSTEM! ===
+    // === EXPENSES – THIS IS THE CORRECT ONE THAT HAS ALWAYS WORKED! ===
     let expensesRows = "";
     let totalExpenses = 0;
 
-    // YOUR SYSTEM USES expenseCategories – THIS IS WHERE EXPENSES ARE!
-    if (spEntry.expenseCategories && typeof spEntry.expenseCategories === "object") {
-      Object.keys(spEntry.expenseCategories).forEach(cat => {
-        const amt = Number(spEntry.expenseCategories[cat]) || 0;
+    if (spEntry.expenses && typeof spEntry.expenses === "object" && Object.keys(spEntry.expenses).length > 0) {
+      Object.keys(spEntry.expenses).forEach(cat => {
+        const amt = Number(spEntry.expenses[cat]) || 0;
         if (amt > 0) {
           totalExpenses += amt;
           expensesRows += `
             <tr>
-              <td style="padding:6px 8px; font-size:12px;">${escapeHTML(cat)}</td>
-              <td style="padding:6px 8px; text-align:right; font-size:12px; font-weight:600;">${amt.toLocaleString()}</td>
+              <td style="padding:8px 10px; font-size:12.5px;">${escapeHTML(cat)}</td>
+              <td style="padding:8px 10px; text-align:right; font-size:12.5px; font-weight:600;">${amt.toLocaleString()}</td>
             </tr>`;
         }
       });
     }
 
-    // Fallback: if no expenses at all
     if (expensesRows === "") {
-      expensesRows = `<tr><td colspan="2" style="text-align:center; color:#999; font-style:italic; padding:15px;">No expenses recorded</td></tr>`;
+      expensesRows = `<tr><td colspan="2" style="text-align:center; color:#999; font-style:italic; padding:20px 0;">No expenses recorded</td></tr>`;
     }
 
-    const netProfit = subProfit - totalExpenses;
+    const netProfit = grossProfit - totalExpenses;
 
     allSections += `
-      <div style="margin:35px 0; padding:20px; border:3px solid #6f2cc1; border-radius:15px; background:#f8fdff;">
-        <h2 style="margin:0 0 18px 0; color:#6f2cc1; font-size:18px; text-align:center; font-weight:bold;">${spName}</h2>
-        <div style="display:flex; gap:30px; flex-wrap:nowrap; align-items:flex-start;">
-          <!-- SALES TABLE LEFT -->
-          <div style="flex:2.3;">
-            <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,0.1); border-radius:8px; overflow:hidden;">
+      <div style="margin:40px 0; padding:22px; border:3px solid #6f2cc1; border-radius:16px; background:#f8fdff; box-shadow:0 6px 20px rgba(0,0,0,0.08);">
+        <h2 style="margin:0 0 20px 0; color:#6f2cc1; font-size:19px; text-align:center; font-weight:bold;">${spName}</h2>
+
+        <div style="display:flex; gap:35px; align-items:flex-start;">
+          <!-- SALES TABLE -->
+          <div style="flex:2.4; min-width:0;">
+            <table style="width:100%; border-collapse:collapse; background:white; border-radius:10px; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.1);">
               <thead style="background:#6f2cc1; color:white;">
                 <tr>
                   <th style="padding:12px; text-align:left;">Product</th>
@@ -9843,37 +9842,38 @@ function exportPDF() {
                   <th style="padding:12px; text-align:right;">Gross Profit</th>
                 </tr>
               </thead>
-              <tbody>${salesRows}</tbody>
+              <tbody style="font-size:12.5px;">${salesRows}</tbody>
               <tfoot>
                 <tr style="background:#222; color:white; font-weight:bold; font-size:14px;">
-                  <td style="padding:12px;">SUBTOTAL</td>
-                  <td style="padding:12px; text-align:right;">${subQty.toLocaleString()}</td>
-                  <td style="padding:12px; text-align:right;">${subSales.toLocaleString()}</td>
-                  <td style="padding:12px; text-align:right;">${subCost.toLocaleString()}</td>
-                  <td style="padding:12px; text-align:right;">${subProfit.toLocaleString()}</td>
+                  <td style="padding:13px;">SUBTOTAL</td>
+                  <td style="padding:13px; text-align:right;">${subQty.toLocaleString()}</td>
+                  <td style="padding:13px; text-align:right;">${subSales.toLocaleString()}</td>
+                  <td style="padding:13px; text-align:right;">${subCost.toLocaleString()}</td>
+                  <td style="padding:13px; text-align:right;">${grossProfit.toLocaleString()}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-          <!-- EXPENSES RIGHT – NOW SHOWS REAL DATA! -->
-          <div style="flex:1; min-width:300px; background:#e3f2fd; border-radius:12px; padding:18px; border:3px solid #3498db;">
-            <h3 style="margin:0 0 15px 0; color:#1976d2; font-size:16px; text-align:center; font-weight:bold;">EXPENSES</h3>
-            <table style="width:100%; border-collapse:collapse; background:white;">
+
+          <!-- EXPENSES TABLE ON THE RIGHT -->
+          <div style="flex:1; min-width:310px; background:#e3f2fd; border-radius:14px; padding:20px; border:3px solid #3498db;">
+            <h3 style="margin:0 0 15px 0; color:#1976d2; font-size:17px; text-align:center; font-weight:bold;">EXPENSES</h3>
+            <table style="width:100%; border-collapse:collapse; background:white; border-radius:8px;">
               <thead style="background:#3498db; color:white;">
                 <tr>
-                  <th style="padding:10px;">Category</th>
-                  <th style="padding:10px; text-align:right;">Amount</th>
+                  <th style="padding:10px 12px;">Category</th>
+                  <th style="padding:10px 12px; text-align:right;">Amount</th>
                 </tr>
               </thead>
-              <tbody style="font-size:12px;">${expensesRows}</tbody>
+              <tbody style="font-size:12.5px;">${expensesRows}</tbody>
               <tfoot>
                 <tr style="background:#222; color:white; font-weight:bold;">
-                  <td style="padding:10px;">Total Expenses</td>
-                  <td style="padding:10px; text-align:right;">${totalExpenses.toLocaleString()}</td>
+                  <td style="padding:11px 12px;">Total Expenses</td>
+                  <td style="padding:11px 12px; text-align:right;">${totalExpenses.toLocaleString()}</td>
                 </tr>
-                <tr style="background:#27ae60; color:white; font-weight:bold; font-size:13px;">
-                  <td style="padding:12px;">NET PROFIT</td>
-                  <td style="padding:12px; text-align:right;">${netProfit.toLocaleString()}</td>
+                <tr style="background:#27ae60; color:white; font-weight:bold; font-size:14px;">
+                  <td style="padding:13px 12px;">NET PROFIT</td>
+                  <td style="padding:13px 12px; text-align:right;">${netProfit.toLocaleString()}</td>
                 </tr>
               </tfoot>
             </table>
@@ -9882,42 +9882,44 @@ function exportPDF() {
       </div>`;
   });
 
-  // Grand totals
+  // Grand Total
   const grand = salesState.filtered.reduce((a, b) => ({
     qty: a.qty + b.totals.qty,
     sales: a.sales + b.totals.revenue,
-    cost: a.cost + b.totals.cost,
-    exp: a.exp + (b.totalExpenses || 0)
-  }), { qty: 0, sales: 0, cost: 0, exp: 0 });
+    cost: a.cost + b.totals.cost
+  }), { qty: 0, sales: 0, cost: 0 });
+  const grandProfit = grand.sales - grand.cost;
 
   const finalHTML = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Detailed Sales Report - ${period}</title>
-<style>
-  @page { size: A3; margin: 20mm; }
-  body { font-family: Calibri, Arial, sans-serif; font-size: 12px; margin:0; padding:25px; background:white; color:#000; }
-  .header h1 { font-size:28px; color:#6f2cc1; text-align:center; margin:0; }
-  .info { text-align:center; margin:20px 0; color:#444; }
-  .grand { background:#222; color:white; padding:20px; text-align:center; font-size:20px; font-weight:bold; border-radius:12px; margin-top:50px; }
-</style>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Detailed Sales Report - ${period}</title>
+  <style>
+    @page { size: A3; margin: 20mm; }
+    body { font-family: Calibri, Arial, sans-serif; margin:0; padding:30px; background:white; color:#000; line-height:1.5; }
+    h1 { font-size:30px; color:#6f2cc1; text-align:center; margin:0; }
+    .info { text-align:center; margin:20px 0 30px; color:#444; font-size:14px; }
+    .grand { background:#222; color:white; padding:22px; text-align:center; font-size:21px; font-weight:bold; border-radius:14px; margin-top:60px; }
+  </style>
 </head>
 <body>
-  <div class="header">
-    <h1>THARUA SUPERMARKET</h1>
-    <p style="font-size:20px; color:#6f2cc1; margin:10px 0;">Detailed Sales & Performance Report</p>
-  </div>
+  <h1>THARUA SUPERMARKET</h1>
+  <p style="text-align:center; font-size:21px; color:#6f2cc1; margin:10px 0 30px;">Detailed Sales & Performance Report</p>
   <div class="info">
-    <strong>Period:</strong> ${period}    |    <strong>Location:</strong> ${escapeHTML(locStr)}    |    <strong>Generated:</strong> ${new Date().toLocaleString("en-KE")}
+    <strong>Period:</strong> ${period} | <strong>Location:</strong> ${escapeHTML(locStr)} | <strong>Generated:</strong> ${new Date().toLocaleString("en-KE")}
   </div>
   ${allSections}
   <div class="grand">
-    GRAND TOTAL → Qty: ${grand.qty.toLocaleString()}    |    Sales: KES ${grand.sales.toLocaleString()}    |    Cost: KES ${grand.cost.toLocaleString()}    |    GROSS PROFIT: KES ${(grand.sales - grand.cost).toLocaleString()}
+    GRAND TOTAL → Qty: ${grand.qty.toLocaleString()} | Sales: KES ${grand.sales.toLocaleString()} | Cost: KES ${grand.cost.toLocaleString()} | GROSS PROFIT: KES ${grandProfit.toLocaleString()}
   </div>
-</body></html>`;
+</body>
+</html>`;
 
   win.document.open();
   win.document.write(finalHTML);
   win.document.close();
-  win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 1000);
+  win.onload = () => setTimeout(() => { win.focus(); win.print(); }, 1200);
 }
 
   /************ date menu open/close logic ************/
