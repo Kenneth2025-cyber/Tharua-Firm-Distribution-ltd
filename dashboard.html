@@ -9506,31 +9506,31 @@ async function showSalesReport() {
     }
   }
 
-  /************ load locations ************/
-  async function loadLocations() {
-    try {
-      const db = firebase.firestore();
-      const snap = await db.collection("businessLocations").get();
-      const selSmall = document.getElementById("srLocationSmall");
-      const seen = new Set();
-      snap.forEach(doc => {
-        const name = String(doc.data()?.name || "").trim();
-        if (!name || seen.has(name)) return;
-        seen.add(name);
-        selSmall.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
-      });
-    } catch(e) {
-      console.warn("loadLocations() failed", e);
-    }
+/************ load locations ************/
+async function loadLocations() {
+  try {
+    const db = firebase.firestore();
+    const snap = await db.collection("businessLocations").get();
+    const selSmall = document.getElementById("srLocationSmall");
+    const seen = new Set();
+    snap.forEach(doc => {
+      const name = String(doc.data()?.name || "").trim();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      selSmall.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
+    });
+  } catch(e) {
+    console.warn("loadLocations() failed", e);
   }
+}
 
-// NEW SUPER applyFilters() – works for BOTH Detailed AND Sales By Date!
+// FINAL SUPER applyFilters() – now works for Detailed + By Date + By Product !
 async function applyFilters() {
   const fromVal = document.getElementById("srFrom")?.value || "";
   const toVal = document.getElementById("srTo")?.value || "";
   const loc = document.getElementById("srLocationSmall")?.value || "";
 
-  // Save the dates and location
+  // Save dates and location
   salesState.location = loc;
   salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
   salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
@@ -9539,9 +9539,9 @@ async function applyFilters() {
   salesState.rows = [];
   salesState.filtered = [];
 
-  // Show "loading..." message
+  // Show loading message
   const container = document.getElementById("srResults");
-  container.innerHTML = `<div class="sr-table-placeholder">Loading report... please wait</div>`;
+  container.innerHTML = `<div class="sr-table-placeholder">Loading report... please wait ♡</div>`;
 
   try {
     if (salesState.reportMode === "detailed") {
@@ -9549,12 +9549,15 @@ async function applyFilters() {
       renderDetailedTable();
     }
     else if (salesState.reportMode === "byDate") {
-      await aggregateSalesByDate();        // ← collects daily totals
-      renderModePlaceholder();             // ← draws the empty pretty table
-      renderSalesByDate();                 // ← puts the numbers inside
+      await aggregateSalesByDate();
+      renderSalesByDate();           // ← now draws the full pretty table
+    }
+    else if (salesState.reportMode === "product") {
+      await aggregateSalesByProduct();
+      renderSalesByProduct();        // ← new! shows top selling products
     }
     else {
-      // future modes (product, customer, etc.)
+      // future modes will come here
       renderModePlaceholder();
     }
   } catch (err) {
@@ -9562,7 +9565,7 @@ async function applyFilters() {
     container.innerHTML = `<div class="sr-table-placeholder">Oops! Something went wrong: ${escapeHTML(err.message)}</div>`;
   }
 
-  closeDateMenu(); // close the purple date menu
+  closeDateMenu(); // close the purple menu
 }
 
 /************ render per-mode placeholder (clean report skeleton) ************/
@@ -10194,6 +10197,105 @@ function renderSalesByDate() {
       <tfoot>
         <tr style="background:#222; color:white; font-weight:700; font-size:16px">
           <td style="padding:18px">TOTAL (${salesState.filtered.length} days)</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${(totalSales - totalCost).toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+// 1. Collect sales for each product
+async function aggregateSalesByProduct() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+
+  const snap = await q.get();
+  const productMap = {};
+
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    const items = s.items || s.products || [];
+
+    for (const it of items) {
+      const name = String(it.prodName || it.productName || it.name || "Unknown").trim();
+      if (!name || name === "Unknown") continue;
+
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      const cost = Number(it.costAtSale || 0);
+
+      if (!productMap[name]) {
+        productMap[name] = { product: name, qty: 0, sales: 0, cost: 0 };
+      }
+
+      productMap[name].qty += qty;
+      productMap[name].sales += qty * price;
+      productMap[name].cost += qty * cost;
+    }
+  }
+
+  const rows = Object.values(productMap)
+    .sort((a, b) => b.sales - a.sales); // best sellers first!
+
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+
+// 2. Show the beautiful product table
+function renderSalesByProduct() {
+  const container = document.getElementById("srResults");
+
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalCost = 0;
+
+  salesState.filtered.forEach((p, index) => {
+    const profit = p.sales - p.cost;
+    totalQty += p.qty;
+    totalSales += p.sales;
+    totalCost += p.cost;
+
+    const rank = index < 3 ? ["", "", ""][index] : "";
+
+    rowsHtml += `
+      <tr style="${index < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
+        <td style="padding:14px">${index + 1}. ${escapeHTML(p.product)}</td>
+        <td style="padding:14px; text-align:right">${p.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${p.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right">${p.cost.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
+      </tr>`;
+  });
+
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">Sales By Product (Top Sellers First)</div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Product</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Sales (KES)</th>
+          <th style="padding:16px; text-align:right">Cost</th>
+          <th style="padding:16px; text-align:right">Gross Profit</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">GRAND TOTAL</td>
           <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
           <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
           <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
