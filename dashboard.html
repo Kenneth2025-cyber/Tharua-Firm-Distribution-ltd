@@ -9556,7 +9556,12 @@ async function applyFilters() {
       await aggregateSalesByProduct();
       renderSalesByProduct();        // ← new! shows top selling products
     }
-    else {
+       else if (salesState.reportMode === "customer") {
+      await aggregateSalesByCustomer();
+      renderSalesByCustomer();
+    }
+
+   else {
       // future modes will come here
       renderModePlaceholder();
     }
@@ -10300,6 +10305,109 @@ function renderSalesByProduct() {
           <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
           <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
           <td style="padding:18px; text-align:right">${(totalSales - totalCost).toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+// 1. Collect sales for each customer
+async function aggregateSalesByCustomer() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+
+  const snap = await q.get();
+  const customerMap = {};
+
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    const customerName = String(s.customerName || s.customer || "Walk-in Customer").trim();
+    const items = s.items || s.products || [];
+
+    if (!customerMap[customerName]) {
+      customerMap[customerName] = {
+        customer: customerName,
+        qty: 0,
+        sales: 0,
+        invoices: 0
+      };
+    }
+
+    customerMap[customerName].invoices += 1;
+
+    for (const it of items) {
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+
+      customerMap[customerName].qty += qty;
+      customerMap[customerName].sales += qty * price;
+    }
+  }
+
+  const rows = Object.values(customerMap)
+    .sort((a, b) => b.sales - a.sales); // richest customers first!
+
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+
+// 2. Show beautiful customer table
+function renderSalesByCustomer() {
+  const container = document.getElementById("srResults");
+
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalInvoices = 0;
+
+  salesState.filtered.forEach((c, i) => {
+    totalQty += c.qty;
+    totalSales += c.sales;
+    totalInvoices += c.invoices;
+
+    const avgInvoice = c.invoices > 0 ? Math.round(c.sales / c.invoices) : 0;
+
+    rowsHtml += `
+      <tr style="${i < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
+        <td style="padding:14px">${i + 1}. ${escapeHTML(c.customer)}</td>
+        <td style="padding:14px; text-align:right">${c.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${c.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:center">${c.invoices}</td>
+        <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
+      </tr>`;
+  });
+
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">
+      Sales By Customer (Top Spenders First)
+    </div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Customer</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Total Sales (KES)</th>
+          <th style="padding:16px; text-align:center"># Invoices</th>
+          <th style="padding:16px; text-align:right">Avg Invoice</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">GRAND TOTAL</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:center">${totalInvoices}</td>
+          <td style="padding:18px; text-align:right">${totalInvoices > 0 ? Math.round(totalSales / totalInvoices).toLocaleString() : 0}</td>
         </tr>
       </tfoot>
     </table>
