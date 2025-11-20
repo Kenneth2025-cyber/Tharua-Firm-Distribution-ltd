@@ -9760,92 +9760,93 @@ if (mode === "byDate") {
     const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
   }
-/************ PROFESSIONAL PDF EXPORT FOR DETAILED REPORT ONLY ************/
+/************ FINAL A3 COMPACT PROFESSIONAL PDF – JUST LIKE YOUR EXCEL! ************/
 function exportPDF() {
   if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
     alert("Please run the Detailed Sales Report first!");
     return;
   }
 
-  // Open new window
   const win = window.open("", "_blank");
-  
-  // Get current filters for header
+
   const fromStr = document.getElementById("srFrom")?.value || "Start";
   const toStr = document.getElementById("srTo")?.value || "End";
   const locStr = salesState.location || "All Locations";
   const period = fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`;
 
-  // Build full HTML for PDF
-  let salespersonHTML = "";
-  
+  let allHTML = "";
+
   salesState.filtered.forEach(spEntry => {
     const spName = escapeHTML(spEntry.salesperson || "Unknown");
-    const grossProfit = (spEntry.totals.revenue - spEntry.totals.cost).toLocaleString();
-    const subRev = spEntry.totals.revenue.toLocaleString();
-    const subCost = spEntry.totals.cost.toLocaleString();
-    const subQty = spEntry.totals.qty.toLocaleString();
+    const subQty = spEntry.totals.qty;
+    const subSales = spEntry.totals.revenue;
+    const subCost = spEntry.totals.cost;
+    const subProfit = subSales - subCost;
 
-    // Products table
-    let prodRows = "";
+    let rows = "";
     spEntry.products.forEach(p => {
-      const profit = (p.revenue - p.cost);
-      prodRows += `
+      const profit = p.revenue - p.cost;
+      rows += `
         <tr>
-          <td style="padding:8px; border-bottom:1px solid #eee;">${escapeHTML(p.productName)}</td>
-          <td style="padding:8px; text-align:right; border-bottom:1px solid #eee;">${p.qty.toLocaleString()}</td>
-          <td style="padding:8px; text-align:right; border-bottom:1px solid #eee;">${p.revenue.toLocaleString()}</td>
-          <td style="padding:8px; text-align:right; border-bottom:1px solid #eee;">${p.cost.toLocaleString()}</td>
-          <td style="padding:8px; text-align:right; color:#27ae60; font-weight:600; border-bottom:1px solid #eee;">${profit.toLocaleString()}</td>
+          <td style="padding:3px 6px; font-size:10px;">${escapeHTML(p.productName)}</td>
+          <td style="padding:3px 6px; text-align:right; font-size:10px;">${p.qty.toLocaleString()}</td>
+          <td style="padding:3px 6px; text-align:right; font-size:10px;">${p.revenue.toLocaleString()}</td>
+          <td style="padding:3px 6px; text-align:right; font-size:10px;">${p.cost.toLocaleString()}</td>
+          <td style="padding:3px 6px; text-align:right; font-size:10px; color:#27ae60; font-weight:600;">${profit.toLocaleString()}</td>
         </tr>`;
     });
 
-    // Simple expenses (we don't have them here, but we'll show placeholder)
-    const expensesNote = spEntry.expenses ? 
-      Object.keys(spEntry.expenses).map(cat => `${cat}: ${spEntry.expenses[cat].toLocaleString()}`).join("<br>") : 
-      "No expenses recorded";
+    // Expenses box (right side, small)
+    let expensesLines = "No expenses recorded";
+    if (spEntry.expenses && Object.keys(spEntry.expenses).length > 0) {
+      expensesLines = Object.keys(spEntry.expenses)
+        .map(cat => `${cat}: ${spEntry.expenses[cat].toLocaleString()}`)
+        .join("<br>");
+    }
 
-    salespersonHTML += `
-      <div style="page-break-inside:avoid; margin:40px 0;">
-        <div style="background:#6f2cc1; color:white; padding:15px; font-size:18px; font-weight:bold; border-radius:8px 8px 0 0;">
-          Salesperson: ${spName}
+    allHTML += `
+      <div style="margin-bottom:18px; border:1px solid #ccc; border-radius:6px; overflow:hidden;">
+        <div style="background:#6f2cc1; color:white; padding:6px 10px; font-weight:bold; font-size:13px;">
+          ${spName}
         </div>
-        <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
-          <thead style="background:#f8f9fa;">
-            <tr>
-              <th style="text-align:left; padding:12px;">Product</th>
-              <th style="text-align:right; padding:12px;">Qty</th>
-              <th style="text-align:right; padding:12px;">Sales</th>
-              <th style="text-align:right; padding:12px;">Cost</th>
-              <th style="text-align:right; padding:12px;">Profit</th>
+        <table style="width:100%; border-collapse:collapse; font-size:10px;">
+          <thead>
+            <tr style="background:#f0f0f0;">
+              <th style="padding:4px 6px; text-align:left; font-weight:bold;">Product</th>
+              <th style="padding:4px 6px; text-align:right; font-weight:bold;">Qty Sold</th>
+              <th style="padding:4px 6px; text-align:right; font-weight:bold;">Sales</th>
+              <th style="padding:4px 6px; text-align:right; font-weight:bold;">Cost</th>
+              <th style="padding:4px 6px; text-align:right; font-weight:bold;">Gross Profit</th>
             </tr>
           </thead>
-          <tbody>${prodRows}</tbody>
-          <tfoot style="background:#222; color:white; font-weight:bold;">
-            <tr>
-              <td style="padding:12px;">SUBTOTAL</td>
-              <td style="padding:12px; text-align:right;">${subQty}</td>
-              <td style="padding:12px; text-align:right;">${subRev}</td>
-              <td style="padding:12px; text-align:right;">${subCost}</td>
-              <td style="padding:12px; text-align:right;">${grossProfit}</td>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr style="background:#222; color:white; font-weight:bold; font-size:11px;">
+              <td style="padding:5px 6px;">SUBTOTAL - ${spName}</td>
+              <td style="padding:5px 6px; text-align:right;">${subQty.toLocaleString()}</td>
+              <td style="padding:5px 6px; text-align:right;">${subSales.toLocaleString()}</td>
+              <td style="padding:5px 6px; text-align:right;">${subCost.toLocaleString()}</td>
+              <td style="padding:5px 6px; text-align:right;">${subProfit.toLocaleString()}</td>
             </tr>
           </tfoot>
         </table>
-        
-        <div style="background:#f8f9fa; padding:15px; border-radius:8px; float:right; width:300px;">
-          <strong>Expenses:</strong><br>${expensesNote.replace(/\n/g, "<br>")}
+
+        <div style="background:#e8f4fc; padding:8px 12px; font-size:10px; float:right; width:260px; margin:8px; border-left:4px solid #6f2cc1;">
+          <strong>Expenses - ${spName}</strong><br>
+          <span style="color:#e74c3c;">${expensesLines}</span><br>
+          <strong style="color:#2c3e50;">Net Revenue (after expenses): ${(subProfit - (spEntry.totalExpenses || 0)).toLocaleString()}</strong>
         </div>
         <div style="clear:both;"></div>
       </div>`;
   });
 
-  // Grand totals
+  // Grand total at bottom
   const grand = salesState.filtered.reduce((a, b) => ({
     qty: a.qty + b.totals.qty,
     revenue: a.revenue + b.totals.revenue,
-    cost: a.cost + b.totals.cost
-  }), { qty: 0, revenue: 0, cost: 0 });
-  const grandProfit = grand.revenue - grand.cost;
+    cost: a.cost + b.totals.cost,
+    expenses: a.expenses + (b.totalExpenses || 0)
+  }), { qty: 0, revenue: 0, cost: 0, expenses: 0 });
 
   const finalHTML = `
 <!DOCTYPE html>
@@ -9854,39 +9855,61 @@ function exportPDF() {
   <meta charset="utf-8">
   <title>Detailed Sales Report - ${period}</title>
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; margin:40px; background:#f9f9f9; color:#333; }
-    .header { text-align:center; margin-bottom:40px; padding:20px; background:#6f2cc1; color:white; border-radius:12px; }
-    .header h1 { margin:0; font-size:28px; }
-    .info { text-align:center; margin:20px 0; font-size:16px; color:#555; }
-    table { width:100%; border-collapse:collapse; margin:20px 0; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
-    th { background:#6f2cc1; color:white; }
-    .grand-total { background:#222; color:white; text-align:center; padding:30px; font-size:24px; font-weight:bold; border-radius:12px; }
-    @media print { body { margin:10px; } .no-print { display:none; } }
+    @page { size: A3 landscape; margin: 12mm; }
+    body {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 10px;
+      margin: 0;
+      padding: 15px;
+      background: white;
+      color: #000;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 12px;
+      padding: 10px;
+      background: #6f2cc1;
+      color: white;
+    }
+    .header h1 { margin:0; font-size:18px; }
+    .info {
+      text-align: center;
+      font-size: 11px;
+      margin-bottom: 15px;
+      color: #444;
+    }
+    table { width:100%; border-collapse: collapse; margin-bottom:6px; }
+    th, td { border: 1px solid #ddd; }
+    .grand {
+      background: #222;
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      padding: 12px;
+      font-size: 16px;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>YOUR BUSINESS NAME</h1>
-    <p style="margin:10px 0 0; font-size:18px;">Detailed Sales & Performance Report</p>
+    <h1>THARUA SUPERMARKET</h1>
+    <div style="font-size:14px; margin-top:5px;">Detailed Sales & Performance Report</div>
   </div>
-  
+
   <div class="info">
-    <strong>Period:</strong> ${period} &nbsp;|&nbsp; 
-    <strong>Location:</strong> ${escapeHTML(locStr)} &nbsp;|&nbsp; 
-    <strong>Generated:</strong> ${new Date().toLocaleString("en-KE")}
+    <strong>Period:</strong> ${period} | 
+    <strong>Location:</strong> ${escapeHTML(locStr)} | 
+    <strong>Printed:</strong> ${new Date().toLocaleDateString("en-KE")}
   </div>
 
-  ${salespersonHTML}
+  ${allHTML}
 
-  <div class="grand-total">
-    FINAL SUMMARY → 
-    Total Sales: KES ${grand.revenue.toLocaleString()} | 
-    Cost: KES ${grand.cost.toLocaleString()} | 
-    GROSS PROFIT: KES ${grandProfit.toLocaleString()}
-  </div>
-
-  <div style="text-align:center; margin-top:50px; color:#888; font-size:12px;">
-    Report generated by Tharua POS • Professional Edition
+  <div class="grand">
+    GRAND TOTAL → Qty: ${grand.qty.toLocaleString()} | 
+    Sales: KES ${grand.revenue.toLocaleString()} | 
+    Cost: KES ${grand.cost.toLocaleString()} | 
+    GROSS PROFIT: KES ${(grand.revenue - grand.cost).toLocaleString()}
   </div>
 </body>
 </html>`;
@@ -9894,7 +9917,7 @@ function exportPDF() {
   win.document.write(finalHTML);
   win.document.close();
   win.focus();
-  setTimeout(() => win.print(), 1000);
+  setTimeout(() => win.print(), 800);
 }
 
   /************ date menu open/close logic ************/
