@@ -9560,6 +9560,10 @@ async function applyFilters() {
       await aggregateSalesByCustomer();
       renderSalesByCustomer();
     }
+    else if (salesState.reportMode === "custGroup") {
+      await aggregateSalesByCustGroup();
+      renderSalesByCustGroup();
+    }
 
    else {
       // future modes will come here
@@ -10437,6 +10441,126 @@ function renderSalesByCustomer() {
       <thead style="background:#6f2cc1; color:white">
         <tr>
           <th style="padding:16px; text-align:left">Customer</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Total Sales (KES)</th>
+          <th style="padding:16px; text-align:center"># Invoices</th>
+          <th style="padding:16px; text-align:right">Avg Invoice</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">GRAND TOTAL</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:center">${totalInvoices}</td>
+          <td style="padding:18px; text-align:right">${totalInvoices > 0 ? Math.round(totalSales / totalInvoices).toLocaleString() : 0}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+// 1. Collect sales by Customer Group
+async function aggregateSalesByCustGroup() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+
+  const snap = await q.get();
+  const groupMap = {};
+
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    let group = "Unknown Group";
+
+    // Try to get group from customer reference first
+    if (s.customer) {
+      const custRef = typeof s.customer.get === "function" ? s.customer : db.collection("customers").doc(s.customer);
+      try {
+        const custSnap = await custRef.get();
+        if (custSnap.exists) {
+          group = String(custSnap.data()?.customerGroup || "Retail").trim();
+        }
+      } catch (e) {
+        // if can't load, fallback
+      }
+    }
+
+    // Fallback: check if sale has customerGroup directly (some systems save it)
+    if (s.customerGroup) {
+      group = String(s.customerGroup).trim();
+    }
+
+    const items = s.items || s.products || [];
+
+    if (!groupMap[group]) {
+      groupMap[group] = {
+        group: group,
+        qty: 0,
+        sales: 0,
+        invoices: 0
+      };
+    }
+
+    groupMap[group].invoices += 1;
+    for (const it of items) {
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      groupMap[group].qty += qty;
+      groupMap[group].sales += qty * price;
+    }
+  }
+
+  const rows = Object.values(groupMap)
+    .sort((a, b) => b.sales - a.sales);
+
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+
+// 2. Show beautiful Customer Group table
+function renderSalesByCustGroup() {
+  const container = document.getElementById("srResults");
+
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalInvoices = 0;
+
+  salesState.filtered.forEach((g, i) => {
+    totalQty += g.qty;
+    totalSales += g.sales;
+    totalInvoices += g.invoices;
+
+    const avgInvoice = g.invoices > 0 ? Math.round(g.sales / g.invoices) : 0;
+
+    rowsHtml += `
+      <tr style="${i < 2 ? 'background:#fff8e1; font-weight:600' : ''}">
+        <td style="padding:14px; font-weight:600">${i + 1}. ${escapeHTML(g.group)}</td>
+        <td style="padding:14px; text-align:right">${g.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${g.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:center">${g.invoices}</td>
+        <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
+      </tr>`;
+  });
+
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">
+      Sales By Customer Group (Highest Revenue First)
+    </div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Customer Group</th>
           <th style="padding:16px; text-align:right">Qty Sold</th>
           <th style="padding:16px; text-align:right">Total Sales (KES)</th>
           <th style="padding:16px; text-align:center"># Invoices</th>
