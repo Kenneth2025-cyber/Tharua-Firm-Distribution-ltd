@@ -9760,7 +9760,7 @@ if (mode === "byDate") {
     const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
   }
-/************ FINAL PDF – FINAL SUMMARY RIGHT AFTER TABLES – CHARTS AFTER – PERFECT ************/
+/************ FINAL PDF – FINAL SUMMARY AFTER TABLES – CHARTS AFTER – 100% FIXED ************/
 function exportPDF() {
   if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
     alert("Please run the Detailed Sales Report first!");
@@ -9798,7 +9798,6 @@ function exportPDF() {
     let allSections = "";
     let grandTotalExpenses = 0;
 
-    // Chart data
     const salesPersonData = [];
     const productData = [];
     const categoryExpenses = {};
@@ -9809,7 +9808,6 @@ function exportPDF() {
       const cost = spEntry.totals.cost;
       const gross = sales - cost;
 
-      // Chart data
       salesPersonData.push({ name: spName, sales, gross });
       spEntry.products.forEach(p => {
         const found = productData.find(x => x.name === p.productName);
@@ -9825,17 +9823,11 @@ function exportPDF() {
       });
       grandTotalExpenses += spExpTotal;
 
-      // Your ORIGINAL beautiful table
+      // Your exact original beautiful card
       let salesRows = "";
       spEntry.products.forEach(p => {
         const profit = p.revenue - p.cost;
-        salesRows += `<tr>
-          <td style="padding:7px 9px;font-size:12.5px;">${escapeHTML(p.productName)}</td>
-          <td style="padding:7px 9px;text-align:right;font-size:12.5px;">${p.qty.toLocaleString()}</td>
-          <td style="padding:7px 9px;text-align:right;font-size:12.5px;">${p.revenue.toLocaleString()}</td>
-          <td style="padding:7px 9px;text-align:right;font-size:12.5px;">${p.cost.toLocaleString()}</td>
-          <td style="padding:7px 9px;text-align:right;color:#27ae60;font-weight:600;">${profit.toLocaleString()}</td>
-        </tr>`;
+        salesRows += `<tr><td style="padding:7px 9px;font-size:12.5px;">${escapeHTML(p.productName)}</td><td style="padding:7px 9px;text-align:right;font-size:12.5px;">${p.qty.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-size:12.5px;">${p.revenue.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-size:12.5px;">${p.cost.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;color:#27ae60;font-weight:600;">${profit.toLocaleString()}</td></tr>`;
       });
 
       let expensesRows = "";
@@ -9885,27 +9877,29 @@ function exportPDF() {
         </div>`;
     });
 
-    // FINAL SUMMARY BAR — RIGHT AFTER TABLES
+    // FINAL SUMMARY BAR — RIGHT AFTER ALL TABLES
     const grandSales = salesState.filtered.reduce((a,b) => a + b.totals.revenue, 0);
     const grandCost = salesState.filtered.reduce((a,b) => a + b.totals.cost, 0);
     const grossAll = grandSales - grandCost;
     const netAll = grossAll - grandTotalExpenses;
 
     const finalSummaryHTML = `
-      <div style="margin:80px auto 60px;max-width:1450px;padding:28px 40px;background:#111;color:white;text-align:center;font-size:27px;font-weight:700;border-radius:35px;box-shadow:0 12px 40px rgba(0,0,0,0.5);">
+      <div style="margin:90px auto 70px;max-width:1450px;padding:30px 45px;background:#111;color:white;text-align:center;font-size:28px;font-weight:700;border-radius:40px;box-shadow:0 15px 50px rgba(0,0,0,0.6);">
         FINAL SUMMARY → Sales: ${grandSales.toLocaleString()} | 
-        Cost: ${grandCost.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:3})} | 
-        Gross Profit: ${grossAll.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:3})} | 
+        Cost: ${grandCost.toLocaleString()} | 
+        Gross Profit: ${grossAll.toLocaleString()} | 
         <span style="color:#e74c3c;">Expenses: ${grandTotalExpenses.toLocaleString()}</span> | 
-        <span style="color:#27ae60;font-size:34px;font-weight:800;">NET REVENUE: ${netAll.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:3})} KES</span>
+        <span style="color:#27ae60;font-size:36px;font-weight:800;">NET REVENUE: ${netAll.toLocaleString()} KES</span>
       </div>`;
 
-    // CHARTS PAGE — AFTER FINAL SUMMARY
+    // CHARTS PAGE (after final summary)
     const topProducts = productData.sort((a,b) => b.sales - a.sales).slice(0, 10);
-    const chartsHTML = Object.keys(categoryExpenses).length || topProducts.length ? `
-      <div style="page-break-before:always;padding:70px 40px;background:#f9f9f9;">
-        <h2 style="text-align:center;color:#6f2cc1;font-size:34px;margin-bottom:70px;">Performance Summary Charts</h2>
-        <div style="display:flex;flex-wrap:wrap;gap:60px;justify-content:center;">
+    const hasChartData = salesPersonData.length > 1 || topProducts.length > 0 || Object.keys(categoryExpenses).length > 0;
+
+    const chartsHTML = hasChartData ? `
+      <div style="page-break-before:always;padding:80px 50px;background:#f8f9fa;">
+        <h2 style="text-align:center;color:#6f2cc1;font-size:36px;margin-bottom:80px;">Performance Summary Charts</h2>
+        <div style="display:flex;flex-wrap:wrap;gap:70px;justify-content:center;">
           ${makePieChart(salesPersonData.map(p => ({label: p.name, value: p.sales})), "Sales % by Salesperson")}
           ${makeBarChart(topProducts.map(p => ({label: p.name, value: p.sales})), "Top 10 Products by Sales", "#6f2cc1")}
           ${makeBarChart(salesPersonData.map(p => ({label: p.name, value: p.gross - (expensesBySp[p.name] ? Object.values(expensesBySp[p.name]).reduce((a,b)=>a+b,0) : 0)})), "Net Revenue per Salesperson", "#27ae60")}
@@ -9932,14 +9926,17 @@ function exportPDF() {
     win.document.open();
     win.document.write(finalHTML);
     win.document.close();
-    setTimeout(() => win.print(), 2800);
+    setTimeout(() => win.print(), 3000);
+  }).catch(err => {
+    console.error(err);
+    alert("Error loading expenses for report");
   });
 }
 
-// Pure SVG Charts (100% working)
+// Pure SVG Charts — 100% working
 function makePieChart(data, title) {
   if (!data.length) return "";
-  const total = data.reduce((s, i) => s + i.value, 0);
+  const total = data.reduce((a, b) => a + b.value, 0);
   let offset = 0;
   let paths = "";
   const colors = ["#6f2cc1","#3498db","#27ae60","#e74c3c","#f1c40f","#9b59b6","#e67e22"];
@@ -9955,7 +9952,32 @@ function makePieChart(data, title) {
     const y2 = Math.sin(rad2) * 90;
     const large = pct > 50 ? 1 : 0;
     paths += `<path d="M0,0 L${x1},${y1} A90,90 0 ${large},1 ${x2},${y2} Z" fill="${colors[i % colors.length]}" />
-      <text x="${((…
+      <text x="${((x1+x2)/2)*1.25}" y="${((y1+y2)/2)*1.25}" font-size="11" text-anchor="middle" fill="#000">${d.label}<tspan x="${((x1+x2)/2)*1.25}" dy="14">${pct.toFixed(1)}%</tspan></text>`;
+    offset += pct;
+  });
+  return `<div style="margin:40px auto;width:500px;">
+    <h3 style="text-align:center;color:#222;margin-bottom:20px;">${title}</h3>
+    <svg viewBox="-120 -120 240 240" width="100%" height="450"><g transform="translate(0,0)">${paths}</g></svg>
+  </div>`;
+}
+
+function makeBarChart(data, title, color) {
+  if (!data.length) return "";
+  const max = Math.max(...data.map(d => d.value));
+  const spacing = 100;
+  const bars = data.map((d, i) => {
+    const height = (d.value / max) * 340;
+    return `<g transform="translate(${i * spacing},0)">
+      <rect x="20" y="${400 - height}" width="60" height="${height}" fill="${color}" rx="12"/>
+      <text x="50" y="${390 - height}" font-size="13" text-anchor="middle" fill="#000">${d.value.toLocaleString()}</text>
+      <text x="50" y="415" font-size="11" text-anchor="middle" fill="#333">${d.label.length > 12 ? d.label.slice(0,10)+'..' : d.label}</text>
+    </g>`;
+  }).join("");
+  return `<div style="margin:60px auto;width:95%;">
+    <h3 style="text-align:center;color:#222;margin-bottom:20px;">${title}</h3>
+    <svg viewBox="0 0 ${data.length * spacing} 440" width="100%" height="440">${bars}</svg>
+  </div>`;
+}
 
   /************ date menu open/close logic ************/
   const dateBtn = document.getElementById("srDateFilterBtn");
