@@ -9933,7 +9933,7 @@ function exportPDF() {
   });
 }
 
-// 100% MICROSOFT EXCEL 3D PIE CHART — EXACT MATCH (UPDATED LOOK ONLY)
+// FINAL — 100% EXCEL 3D PIE CHART (EXACT LOOK YOU SHOWED)
 function makePieChart(data, title) {
   if (!data.length) return "";
 
@@ -9943,87 +9943,76 @@ function makePieChart(data, title) {
   let labels = "";
   let offset = 0;
 
-  const colors = ["#5B9BD5", "#ED7D31", "#A5A5A5", "#FFC000", "#4472C4", "#70AD47", "#264478", "#9E480E"];
+  const excelColors = ["#5B9BD5","#ED7D31","#A5A5A5","#FFC000","#4472C4","#70AD47","#264478","#9E480E","#8CA148","#9966FF"];
 
-  // small helper to safely darken a hex color (works for #RGB and #RRGGBB)
-  function darkenHex(hex, amt = 0.32) {
-    hex = String(hex).replace("#", "");
-    if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
-    const r = Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(0, 2), 16) * (1 - amt))));
-    const g = Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(2, 4), 16) * (1 - amt))));
-    const b = Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(4, 6), 16) * (1 - amt))));
-    return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
-  }
+  // Darken helper
+  const darken = (hex, amt = 0.4) => {
+    let [r,g,b] = hex.match(/\w\w/g).map(x => parseInt(x,16));
+    return `#${[(r*(1-amt)|0),(g*(1-amt)|0),(b*(1-amt)|0)].map(x=>x.toString(16).padStart(2,'0')).join('')}`;
+  };
 
-  // Legend with colored lines (exactly like Excel)
+  // Find largest slice for explosion
+  const maxVal = Math.max(...data.map(d => d.value));
+  const explodeSlice = data.findIndex(d => d.value === maxVal);
+
+  // Legend with colored lines (Excel style)
   const legendHTML = data.map((d, i) => {
     const pct = ((d.value / total) * 100).toFixed(1);
     return `
-      <div style="display:flex;align-items:center;margin:16px 0;font-size:15px;font-family:Calibri,sans-serif;">
-        <div style="width:30px;height:6px;background:${colors[i % colors.length]};margin-right:12px;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.12);"></div>
+      <div style="display:flex;align-items:center;margin:15px 0;font-size:15px;font-family:Calibri,sans-serif;">
+        <div style="width:36px;height:6px;background:${excelColors[i%excelColors.length]};margin-right:14px;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.2);"></div>
         <span style="flex:1;font-weight:600;color:#222;">${d.label}</span>
-        <span style="color:#333;font-weight:700;margin-left:12px;">${pct}%</span>
+        <strong style="color:#333;margin-left:10px;">${pct}%</strong>
         <span style="margin-left:12px;color:#666;font-size:14px;">(${d.value.toLocaleString()} KES)</span>
       </div>`;
   }).join("");
 
   data.forEach((d, i) => {
     const pct = (d.value / total) * 100;
-    const startAngle = (offset / 100) * 360;
-    const endAngle = ((offset + pct) / 100) * 360;
+    const startAngle = offset;
+    const endAngle = offset + pct;
     const largeArc = pct > 50 ? 1 : 0;
 
-    const startRad = (startAngle - 90) * Math.PI / 180;
-    const endRad = (endAngle - 90) * Math.PI / 180;
+    const isExploded = i === explodeSlice && pct > 15;
+    const explodeDist = isExploded ? 15 : 0;
+    const explodeAngle = isExploded ? (startAngle + pct/2 - 90) * Math.PI / 180 : 0;
+    const ex = isExploded ? Math.cos(explodeAngle) * explodeDist : 0;
+    const ey = isExploded ? Math.sin(explodeAngle) * explodeDist : 0;
 
-    // Top face (using elliptical top to mimic Excel's perspective)
-    const rx = 100;               // horizontal radius
-    const ry = 50;                // vertical radius (ellipse)
-    const tx1 = Math.cos(startRad) * rx;
-    const ty1 = Math.sin(startRad) * ry;
-    const tx2 = Math.cos(endRad) * rx;
-    const ty2 = Math.sin(endRad) * ry;
+    const sRad = (startAngle - 90) * Math.PI / 180;
+    const eRad = (endAngle - 90) * Math.PI / 180;
 
-    // Bottom (3D depth)
-    const depth = 36;             // depth to match Excel thickness
-    const bx1 = tx1;
-    const by1 = ty1 + depth;
-    const bx2 = tx2;
-    const by2 = ty2 + depth;
+    const rx = 100, ry = 52;
+    const tx1 = Math.cos(sRad) * rx + ex;
+    const ty1 = Math.sin(sRad) * ry + ey;
+    const tx2 = Math.cos(eRad) * rx + ex;
+    const ty2 = Math.sin(eRad) * ry + ey;
 
-    const color = colors[i % colors.length];
-    const dark = darkenHex(color, 0.36); // stronger darkening for realistic side faces
+    const depth = 38;
+    const bx1 = tx1, by1 = ty1 + depth;
+    const bx2 = tx2, by2 = ty2 + depth;
 
-    // Slightly explode the largest slice for that Excel "separated" look
-    let ex = 0, ey = 0;
-    // determine largest index dynamically (works because offset accumulates)
-    // We approximate by checking if this slice is the largest in the input set
-    const largestValue = Math.max(...data.map(x => x.value));
-    if (d.value === largestValue && largestValue > (total * 0.18)) {
-      const midAngle = ((startAngle + endAngle) / 2 - 90) * Math.PI / 180;
-      const explodeDist = 12;
-      ex = Math.cos(midAngle) * explodeDist;
-      ey = Math.sin(midAngle) * explodeDist;
-    }
+    const color = excelColors[i % excelColors.length];
+    const dark = darken(color, 0.42);
 
-    // Top slice (ellipse arc)
-    topPaths += `<path d="M ${ (ex).toFixed(3) },${ (ey).toFixed(3) } L ${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } A ${rx},${ry} 0 ${largeArc},1 ${ (tx2+ex).toFixed(3) },${ (ty2+ey).toFixed(3) } Z" 
-                 fill="${color}" stroke="white" stroke-width="3"/>`;
+    // Top face
+    topPaths += `<path d="M${ex},${ey} L${tx1},${ty1} A${rx},${ry} 0 ${largeArc},1 ${tx2},${ty2} Z"
+                 fill="${color}" stroke="white" stroke-width="3.5"/>`;
 
-    // Side face (visible depth)
-    sidePaths += `<path d="M${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } L${ (bx2+ex).toFixed(3) },${ (by2+ey).toFixed(3) } A${rx},${ry} 0 ${largeArc},1 ${ (bx1+ex).toFixed(3) },${ (by1+ey).toFixed(3) } L${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } Z" 
-                  fill="${dark}" opacity="0.96"/>`;
+    // Side face
+    sidePaths += `<path d="M${tx1},${ty1} L${bx2},${by2} A${rx},${ry} 0 ${largeArc},1 ${bx1},${by1} L${tx1},${ty1} Z"
+                  fill="${dark}" opacity="0.95"/>`;
 
-    // Connecting vertical face for crisp edge
-    sidePaths += `<path d="M${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } L${ (tx2+ex).toFixed(3) },${ (ty2+ey).toFixed(3) } L${ (bx2+ex).toFixed(3) },${ (by2+ey).toFixed(3) } L${ (bx1+ex).toFixed(3) },${ (by1+ey).toFixed(3) } Z" 
-                  fill="${dark}" opacity="0.90"/>`;
+    // Vertical connecting face
+    sidePaths += `<path d="M${tx1},${ty1} L${tx2},${ty2} L${bx2},${by2} L${bx1},${by1} Z"
+                  fill="${dark}" opacity="0.92"/>`;
 
-    // Percentage label - slightly adjusted positions for ellipse perspective
-    if (pct > 7) {
-      const midRad = ((startAngle + endAngle) / 2 - 90) * Math.PI / 180;
-      const lx = Math.cos(midRad) * (rx * 0.62) + ex;
-      const ly = Math.sin(midRad) * (ry * 0.62) + ey;
-      labels += `<text x="${lx}" y="${ly + 6}" font-size="14" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri">
+    // Label
+    if (pct > 6) {
+      const midRad = ((startAngle + endAngle)/2 - 90) * Math.PI / 180;
+      const lx = Math.cos(midRad) * 64 + ex;
+      const ly = Math.sin(midRad) * 33 + ey;
+      labels += `<text x="${lx}" y="${ly+7}" font-size="14.5" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri,sans-serif">
         ${pct.toFixed(1)}%
       </text>`;
     }
@@ -10032,50 +10021,39 @@ function makePieChart(data, title) {
   });
 
   return `
-    <div style="margin:90px auto;width:1150px;display:flex;gap:100px;align-items:flex-start;justify-content:center;background:white;padding:60px 50px;border-radius:20px;box-shadow:0 15px 45px rgba(0,0,0,0.2);">
-      <div>
-        <h3 style="text-align:center;color:#222;font-size:24px;margin-bottom:40px;font-weight:700;font-family:Calibri;">${title}</h3>
-        <svg viewBox="-160 -140 320 380" width="500" height="500">
+    <div style="margin:100px auto;width:1200px;display:flex;gap:100px;align-items:flex-start;justify-content:center;background:white;padding:70px 60px;border-radius:28px;box-shadow:0 20px 60px rgba(0,0,0,0.22);">
+      <div style="text-align:center;">
+        <h3 style="color:#222;font-size:26px;margin-bottom:45px;font-weight:700;font-family:Calibri,sans-serif;">${title}</h3>
+        <svg viewBox="-170 -150 340 400" width="520" height="520">
           <defs>
-            <filter id="shadow">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
-              <feOffset dx="0" dy="16" result="off"/>
-              <feFlood flood-color="#000" flood-opacity="0.28"/>
-              <feComposite in2="off" operator="in" result="shadow"/>
-              <feMerge>
-                <feMergeNode in="shadow"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
+            <filter id="pieShadow">
+              <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#000" flood-opacity="0.32"/>
             </filter>
           </defs>
-          
-          <g filter="url(#shadow)">
+          <g filter="url(#pieShadow)">
             ${sidePaths}
             ${topPaths}
             ${labels}
           </g>
-
-          <!-- subtle glossy highlight on top to mimic Excel -->
-          <ellipse cx="0" cy="-18" rx="44" ry="18" fill="rgba(255,255,255,0.65)"/>
-          <ellipse cx="0" cy="-24" rx="30" ry="10" fill="rgba(255,255,255,0.85)"/>
-
+          <!-- Excel-style glossy highlights -->
+          <ellipse cx="0" cy="-20" rx="48" ry="20" fill="rgba(255,255,255,0.7)"/>
+          <ellipse cx="0" cy="-28" rx="32" ry="12" fill="rgba(255,255,255,0.9)"/>
         </svg>
       </div>
 
-      <div style="flex:1;padding-top:60px;">
-        <h4 style="font-size:20px;color:#5B9BD5;margin-bottom:25px;font-weight:bold;padding-bottom:8px;border-bottom:2px solid #5B9BD5;">
-          Salesperson Ranking
+      <div style="flex:1;padding-top:70px;">
+        <h4 style="font-size:21px;color:#5B9BD5;margin-bottom:28px;font-weight:bold;padding-bottom:10px;border-bottom:3px solid #5B9BD5;">
+          Salesperson Performance Ranking
         </h4>
-        <div style="background:#f8f9fa;padding:30px 25px;border-radius:15px;">
+        <div style="background:#f9f9f9;padding:35px 30px;border-radius:18px;box-shadow:inset 0 4px 12px rgba(0,0,0,0.08);">
           ${legendHTML}
         </div>
-        <div style="margin-top:30px;padding:20px;background:#1A1A1A;color:white;text-align:center;border-radius:12px;font-size:18px;font-weight:bold;">
+        <div style="margin-top:30px;padding:22px;background:#1a1a1a;color:white;text-align:center;border-radius:16px;font-size:19px;font-weight:bold;box-shadow:0 10px 30px rgba(0,0,0,0.4);">
           TOTAL SALES: ${total.toLocaleString()} KES
         </div>
       </div>
     </div>`;
 }
-
 
 function makeBarChart(data, title, color) {
   if (!data.length) return "";
