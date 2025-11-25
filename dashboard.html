@@ -9933,86 +9933,68 @@ function exportPDF() {
   });
 }
 
-// FINAL — 100% EXCEL 3D PIE CHART (EXACT LOOK YOU SHOWED)
+// FINAL — MODERN DOUGHNUT CHART (EXACTLY LIKE NAIVAS/CARREFOUR REPORTS)
 function makePieChart(data, title) {
   if (!data.length) return "";
 
   const total = data.reduce((a, b) => a + b.value, 0);
-  let topPaths = "";
-  let sidePaths = "";
+  let paths = "";
   let labels = "";
   let offset = 0;
 
-  const excelColors = ["#5B9BD5","#ED7D31","#A5A5A5","#FFC000","#4472C4","#70AD47","#264478","#9E480E","#8CA148","#9966FF"];
+  // Modern corporate colors (Naivas/Quickmart style)
+  const colors = ["#1e88e5","#fb8c00","#43a047","#e53935","#8e24aa","#il3949","#0097a7","#7b1fa2"];
 
-  // Darken helper
-  const darken = (hex, amt = 0.4) => {
-    let [r,g,b] = hex.match(/\w\w/g).map(x => parseInt(x,16));
-    return `#${[(r*(1-amt)|0),(g*(1-amt)|0),(b*(1-amt)|0)].map(x=>x.toString(16).padStart(2,'0')).join('')}`;
-  };
+  // Find largest slice to explode it
+  const maxIdx = data.reduce((iMax, x, i, arr) => x.value > arr[iMax].value ? i : iMax, 0);
 
-  // Find largest slice for explosion
-  const maxVal = Math.max(...data.map(d => d.value));
-  const explodeSlice = data.findIndex(d => d.value === maxVal);
-
-  // Legend with colored lines (Excel style)
-  const legendHTML = data.map((d, i) => {
+  // Legend with colored lines (exactly like your screenshot)
+  const legend = data.map((d, i) => {
     const pct = ((d.value / total) * 100).toFixed(1);
     return `
-      <div style="display:flex;align-items:center;margin:15px 0;font-size:15px;font-family:Calibri,sans-serif;">
-        <div style="width:36px;height:6px;background:${excelColors[i%excelColors.length]};margin-right:14px;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.2);"></div>
+      <div style="display:flex;align-items:center;margin:18px 0;font-size:16px;font-family:Calibri,sans-serif;">
+        <div style="width:40px;height:7px;background:${colors[i%colors.length]};margin-right:16px;border-radius:4px;"></div>
         <span style="flex:1;font-weight:600;color:#222;">${d.label}</span>
-        <strong style="color:#333;margin-left:10px;">${pct}%</strong>
-        <span style="margin-left:12px;color:#666;font-size:14px;">(${d.value.toLocaleString()} KES)</span>
+        <strong style="color:#000;">${pct}%</strong>
+        <span style="margin-left:14px;color:#555;">(${d.value.toLocaleString()} KES)</span>
       </div>`;
   }).join("");
 
   data.forEach((d, i) => {
     const pct = (d.value / total) * 100;
-    const startAngle = offset;
-    const endAngle = offset + pct;
-    const largeArc = pct > 50 ? 1 : 0;
+    const isBiggest = i === maxIdx;
+    const explode = isBiggest ? 18 : 0;
+    const midAngle = (offset + pct/2) * Math.PI / 180;
+    const ex = Math.cos(midAngle) * explode;
+    const ey = Math.sin(midAngle) * explode;
 
-    const isExploded = i === explodeSlice && pct > 15;
-    const explodeDist = isExploded ? 15 : 0;
-    const explodeAngle = isExploded ? (startAngle + pct/2 - 90) * Math.PI / 180 : 0;
-    const ex = isExploded ? Math.cos(explodeAngle) * explodeDist : 0;
-    const ey = isExploded ? Math.sin(explodeAngle) * explodeDist : 0;
+    const start = offset * Math.PI / 180;
+    const end = (offset + pct) * Math.PI / 180;
+    const large = pct > 50 ? 1 : 0;
 
-    const sRad = (startAngle - 90) * Math.PI / 180;
-    const eRad = (endAngle - 90) * Math.PI / 180;
+    const x1 = Math.cos(start) * 100 + ex;
+    const y1 = Math.sin(start) * 100 + ey;
+    const x2 = Math.cos(end) * 100 + ex;
+    const y2 = Math.sin(end) * 100 + ey;
 
-    const rx = 100, ry = 52;
-    const tx1 = Math.cos(sRad) * rx + ex;
-    const ty1 = Math.sin(sRad) * ry + ey;
-    const tx2 = Math.cos(eRad) * rx + ex;
-    const ty2 = Math.sin(eRad) * ry + ey;
+    // Inner circle (for donut hole)
+    const ix1 = Math.cos(start) * 58 + ex;
+    const iy1 = Math.sin(start) * 58 + ey;
+    const ix2 = Math.cos(end) * 58 + ex;
+    const iy2 = Math.sin(end) * 58 + ey;
 
-    const depth = 38;
-    const bx1 = tx1, by1 = ty1 + depth;
-    const bx2 = tx2, by2 = ty2 + depth;
+    paths += `<path d="M${x1},${y1} 
+                     A100,100 0 ${large},1 ${x2},${y2} 
+                     L${ix2},${iy2} 
+                     A58,58 0 ${large},0 ${ix1},${iy1} Z"
+              fill="${colors[i%colors.length]}" stroke="white" stroke-width="4"/>`;
 
-    const color = excelColors[i % excelColors.length];
-    const dark = darken(color, 0.42);
-
-    // Top face
-    topPaths += `<path d="M${ex},${ey} L${tx1},${ty1} A${rx},${ry} 0 ${largeArc},1 ${tx2},${ty2} Z"
-                 fill="${color}" stroke="white" stroke-width="3.5"/>`;
-
-    // Side face
-    sidePaths += `<path d="M${tx1},${ty1} L${bx2},${by2} A${rx},${ry} 0 ${largeArc},1 ${bx1},${by1} L${tx1},${ty1} Z"
-                  fill="${dark}" opacity="0.95"/>`;
-
-    // Vertical connecting face
-    sidePaths += `<path d="M${tx1},${ty1} L${tx2},${ty2} L${bx2},${by2} L${bx1},${by1} Z"
-                  fill="${dark}" opacity="0.92"/>`;
-
-    // Label
-    if (pct > 6) {
-      const midRad = ((startAngle + endAngle)/2 - 90) * Math.PI / 180;
-      const lx = Math.cos(midRad) * 64 + ex;
-      const ly = Math.sin(midRad) * 33 + ey;
-      labels += `<text x="${lx}" y="${ly+7}" font-size="14.5" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri,sans-serif">
+    // Percentage inside
+    if (pct > 8) {
+      const labelAngle = (offset + pct/2) * Math.PI / 180;
+      const lx = Math.cos(labelAngle) * 75 + ex;
+      const ly = Math.sin(labelAngle) * 75 + ey;
+      labels += `<text x="${lx}" y="${ly+6}" font-size="19" text-anchor="middle" fill="white" font-weight="bold">
         ${pct.toFixed(1)}%
       </text>`;
     }
@@ -10021,34 +10003,32 @@ function makePieChart(data, title) {
   });
 
   return `
-    <div style="margin:100px auto;width:1200px;display:flex;gap:100px;align-items:flex-start;justify-content:center;background:white;padding:70px 60px;border-radius:28px;box-shadow:0 20px 60px rgba(0,0,0,0.22);">
+    <div style="margin:100px auto;width:1180px;display:flex;gap:120px;align-items:center;justify-content:center;background:white;padding:70px 60px;border-radius:32px;box-shadow:0 25px 70px rgba(0,0,0,0.18);">
       <div style="text-align:center;">
-        <h3 style="color:#222;font-size:26px;margin-bottom:45px;font-weight:700;font-family:Calibri,sans-serif;">${title}</h3>
-        <svg viewBox="-170 -150 340 400" width="520" height="520">
+        <h3 style="color:#1e88e5;font-size:28px;margin-bottom:50px;font-weight:800;letter-spacing:0.5px;">${title}</h3>
+        <svg viewBox="-160 -160 320 320" width="500" height="500">
           <defs>
-            <filter id="pieShadow">
-              <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#000" flood-opacity="0.32"/>
+            <filter id="softShadow">
+              <feDropShadow dx="0" dy="12" stdDeviation="20" flood-opacity="0.25"/>
             </filter>
           </defs>
-          <g filter="url(#pieShadow)">
-            ${sidePaths}
-            ${topPaths}
+          <g filter="url(#softShadow)">
+            ${paths}
             ${labels}
           </g>
-          <!-- Excel-style glossy highlights -->
-          <ellipse cx="0" cy="-20" rx="48" ry="20" fill="rgba(255,255,255,0.7)"/>
-          <ellipse cx="0" cy="-28" rx="32" ry="12" fill="rgba(255,255,255,0.9)"/>
+          <!-- Inner white circle for clean donut look -->
+          <circle cx="0" cy="0" r="56" fill="white"/>
         </svg>
       </div>
 
-      <div style="flex:1;padding-top:70px;">
-        <h4 style="font-size:21px;color:#5B9BD5;margin-bottom:28px;font-weight:bold;padding-bottom:10px;border-bottom:3px solid #5B9BD5;">
+      <div style="flex:1;">
+        <h4 style="font-size:22px;color:#1e88e5;margin-bottom:30px;font-weight:bold;padding-bottom:12px;border-bottom:3px solid #1e88e5;">
           Salesperson Performance Ranking
         </h4>
-        <div style="background:#f9f9f9;padding:35px 30px;border-radius:18px;box-shadow:inset 0 4px 12px rgba(0,0,0,0.08);">
-          ${legendHTML}
+        <div style="background:#f8fbff;padding:40px 35px;border-radius:20px;">
+          ${legend}
         </div>
-        <div style="margin-top:30px;padding:22px;background:#1a1a1a;color:white;text-align:center;border-radius:16px;font-size:19px;font-weight:bold;box-shadow:0 10px 30px rgba(0,0,0,0.4);">
+        <div style="margin-top:35px;padding:24px;background:#000;color:white;text-align:center;border-radius:20px;font-size:20px;font-weight:bold;">
           TOTAL SALES: ${total.toLocaleString()} KES
         </div>
       </div>
