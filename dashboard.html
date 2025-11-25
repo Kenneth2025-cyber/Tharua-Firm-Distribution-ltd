@@ -9933,7 +9933,7 @@ function exportPDF() {
   });
 }
 
-// 100% MICROSOFT EXCEL 3D PIE CHART — EXACT MATCH
+// 100% MICROSOFT EXCEL 3D PIE CHART — EXACT MATCH (UPDATED LOOK ONLY)
 function makePieChart(data, title) {
   if (!data.length) return "";
 
@@ -9945,14 +9945,24 @@ function makePieChart(data, title) {
 
   const colors = ["#5B9BD5", "#ED7D31", "#A5A5A5", "#FFC000", "#4472C4", "#70AD47", "#264478", "#9E480E"];
 
+  // small helper to safely darken a hex color (works for #RGB and #RRGGBB)
+  function darkenHex(hex, amt = 0.32) {
+    hex = String(hex).replace("#", "");
+    if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+    const r = Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(0, 2), 16) * (1 - amt))));
+    const g = Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(2, 4), 16) * (1 - amt))));
+    const b = Math.max(0, Math.min(255, Math.round(parseInt(hex.slice(4, 6), 16) * (1 - amt))));
+    return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+  }
+
   // Legend with colored lines (exactly like Excel)
   const legendHTML = data.map((d, i) => {
     const pct = ((d.value / total) * 100).toFixed(1);
     return `
       <div style="display:flex;align-items:center;margin:16px 0;font-size:15px;font-family:Calibri,sans-serif;">
-        <div style="width:30px;height:3px;background:${colors[i % colors.length]};margin-right:12px;"></div>
+        <div style="width:30px;height:6px;background:${colors[i % colors.length]};margin-right:12px;border-radius:3px;box-shadow:0 2px 6px rgba(0,0,0,0.12);"></div>
         <span style="flex:1;font-weight:600;color:#222;">${d.label}</span>
-        <span style="color:#333;">${pct}%</span>
+        <span style="color:#333;font-weight:700;margin-left:12px;">${pct}%</span>
         <span style="margin-left:12px;color:#666;font-size:14px;">(${d.value.toLocaleString()} KES)</span>
       </div>`;
   }).join("");
@@ -9963,44 +9973,57 @@ function makePieChart(data, title) {
     const endAngle = ((offset + pct) / 100) * 360;
     const largeArc = pct > 50 ? 1 : 0;
 
-    const startRad = startAngle * Math.PI / 180;
-    const endRad = endAngle * Math.PI / 180;
+    const startRad = (startAngle - 90) * Math.PI / 180;
+    const endRad = (endAngle - 90) * Math.PI / 180;
 
-    // Top face
-    const tx1 = Math.cos(startRad) * 100;
-    const ty1 = Math.sin(startRad) * 90;
-    const tx2 = Math.cos(endRad) * 100;
-    const ty2 = Math.sin(endRad) * 90;
+    // Top face (using elliptical top to mimic Excel's perspective)
+    const rx = 100;               // horizontal radius
+    const ry = 50;                // vertical radius (ellipse)
+    const tx1 = Math.cos(startRad) * rx;
+    const ty1 = Math.sin(startRad) * ry;
+    const tx2 = Math.cos(endRad) * rx;
+    const ty2 = Math.sin(endRad) * ry;
 
     // Bottom (3D depth)
-    const depth = 35;
+    const depth = 36;             // depth to match Excel thickness
     const bx1 = tx1;
     const by1 = ty1 + depth;
     const bx2 = tx2;
     const by2 = ty2 + depth;
 
     const color = colors[i % colors.length];
-    const darker = color.replace('#', '').match(/.{2}/g).map(h => Math.max(0, parseInt(h,16)-70).toString(16).padStart(2,'0')).join('');
-    const dark = '#' + darker;
+    const dark = darkenHex(color, 0.36); // stronger darkening for realistic side faces
 
-    // Top slice
-    topPaths += `<path d="M0,0 L${tx1},${ty1} A100,90 0 ${largeArc},1 ${tx2},${ty2} Z" 
-                 fill="${color}" stroke="white" stroke-width="2"/>`;
+    // Slightly explode the largest slice for that Excel "separated" look
+    let ex = 0, ey = 0;
+    // determine largest index dynamically (works because offset accumulates)
+    // We approximate by checking if this slice is the largest in the input set
+    const largestValue = Math.max(...data.map(x => x.value));
+    if (d.value === largestValue && largestValue > (total * 0.18)) {
+      const midAngle = ((startAngle + endAngle) / 2 - 90) * Math.PI / 180;
+      const explodeDist = 12;
+      ex = Math.cos(midAngle) * explodeDist;
+      ey = Math.sin(midAngle) * explodeDist;
+    }
+
+    // Top slice (ellipse arc)
+    topPaths += `<path d="M ${ (ex).toFixed(3) },${ (ey).toFixed(3) } L ${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } A ${rx},${ry} 0 ${largeArc},1 ${ (tx2+ex).toFixed(3) },${ (ty2+ey).toFixed(3) } Z" 
+                 fill="${color}" stroke="white" stroke-width="3"/>`;
 
     // Side face (visible depth)
-    sidePaths += `<path d="M${tx1},${ty1} L${bx2},${by2} A100,90 0 ${largeArc},1 ${bx1},${by1} L${tx1},${ty1} Z" 
-                  fill="${dark}" opacity="0.95"/>`;
+    sidePaths += `<path d="M${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } L${ (bx2+ex).toFixed(3) },${ (by2+ey).toFixed(3) } A${rx},${ry} 0 ${largeArc},1 ${ (bx1+ex).toFixed(3) },${ (by1+ey).toFixed(3) } L${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } Z" 
+                  fill="${dark}" opacity="0.96"/>`;
 
-    // Connecting vertical sides
-    sidePaths += `<path d="M${tx1},${ty1} L${tx2},${ty2} L${bx2},${by2} L${bx1},${by1} Z" 
-                  fill="${dark}" opacity="0.9"/>`;
+    // Connecting vertical face for crisp edge
+    sidePaths += `<path d="M${ (tx1+ex).toFixed(3) },${ (ty1+ey).toFixed(3) } L${ (tx2+ex).toFixed(3) },${ (ty2+ey).toFixed(3) } L${ (bx2+ex).toFixed(3) },${ (by2+ey).toFixed(3) } L${ (bx1+ex).toFixed(3) },${ (by1+ey).toFixed(3) } Z" 
+                  fill="${dark}" opacity="0.90"/>`;
 
-    // Percentage label
+    // Percentage label - slightly adjusted positions for ellipse perspective
     if (pct > 7) {
-      const midRad = ((startAngle + endAngle) / 2) * Math.PI / 180;
-      const lx = Math.cos(midRad) * 65;
-      const ly = Math.sin(midRad) * 58;
-      labels += `<text x="${lx}" y="${ly}" font-size="14" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri">
+      const midRad = ((startAngle + endAngle) / 2 - 90) * Math.PI / 180;
+      const lx = Math.cos(midRad) * (rx * 0.62) + ex;
+      const ly = Math.sin(midRad) * (ry * 0.62) + ey;
+      labels += `<text x="${lx}" y="${ly + 6}" font-size="14" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri">
         ${pct.toFixed(1)}%
       </text>`;
     }
@@ -10015,7 +10038,14 @@ function makePieChart(data, title) {
         <svg viewBox="-160 -140 320 380" width="500" height="500">
           <defs>
             <filter id="shadow">
-              <feDropShadow dx="0" dy="15" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/>
+              <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur"/>
+              <feOffset dx="0" dy="16" result="off"/>
+              <feFlood flood-color="#000" flood-opacity="0.28"/>
+              <feComposite in2="off" operator="in" result="shadow"/>
+              <feMerge>
+                <feMergeNode in="shadow"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
             </filter>
           </defs>
           
@@ -10024,6 +10054,11 @@ function makePieChart(data, title) {
             ${topPaths}
             ${labels}
           </g>
+
+          <!-- subtle glossy highlight on top to mimic Excel -->
+          <ellipse cx="0" cy="-18" rx="44" ry="18" fill="rgba(255,255,255,0.65)"/>
+          <ellipse cx="0" cy="-24" rx="30" ry="10" fill="rgba(255,255,255,0.85)"/>
+
         </svg>
       </div>
 
@@ -10040,6 +10075,7 @@ function makePieChart(data, title) {
       </div>
     </div>`;
 }
+
 
 function makeBarChart(data, title, color) {
   if (!data.length) return "";
