@@ -9933,102 +9933,92 @@ function exportPDF() {
   });
 }
 
-// FINAL — MODERN DOUGHNUT CHART (EXACTLY LIKE NAIVAS/CARREFOUR REPORTS)
+// UPGRADED 3D-LOOKING PROFESSIONAL PIE CHART WITH NUMBERED LEGEND
 function makePieChart(data, title) {
   if (!data.length) return "";
 
   const total = data.reduce((a, b) => a + b.value, 0);
-  let paths = "";
-  let labels = "";
   let offset = 0;
+  let piePaths = "";
+  let sidePaths = "";  // For 3D effect
+  const colors = ["#6f2cc1","#3498db","#27ae60","#e74c3c","#f1c40f","#9b59b6","#e67e22","#34495e","#e91e63","#ff9800"];
 
-  // Modern corporate colors (Naivas/Quickmart style)
-  const colors = ["#1e88e5","#fb8c00","#43a047","#e53935","#8e24aa","#il3949","#0097a7","#7b1fa2"];
-
-  // Find largest slice to explode it
-  const maxIdx = data.reduce((iMax, x, i, arr) => x.value > arr[iMax].value ? i : iMax, 0);
-
-  // Legend with colored lines (exactly like your screenshot)
-  const legend = data.map((d, i) => {
+  // Generate legend items first (for numbering)
+  const legendItems = data.map((d, i) => {
     const pct = ((d.value / total) * 100).toFixed(1);
+    const amount = d.value.toLocaleString();
     return `
-      <div style="display:flex;align-items:center;margin:18px 0;font-size:16px;font-family:Calibri,sans-serif;">
-        <div style="width:40px;height:7px;background:${colors[i%colors.length]};margin-right:16px;border-radius:4px;"></div>
-        <span style="flex:1;font-weight:600;color:#222;">${d.label}</span>
-        <strong style="color:#000;">${pct}%</strong>
-        <span style="margin-left:14px;color:#555;">(${d.value.toLocaleString()} KES)</span>
+      <div style="display:flex;align-items:center;margin:8px 0;font-size:14px;">
+        <div style="width:20px;height:20px;background:${colors[i % colors.length]};border-radius:4px;margin-right:12px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>
+        <strong style="width:32px;color:#444;">${i + 1}.</strong>
+        <span style="min-width:140px;font-weight:600;color:#222;">${d.label}</span>
+        <span style="margin-left:auto;color:#27ae60;font-weight:bold;">${pct}%</span>
+        <span style="margin-left:15px;color:#444;">(${amount} KES)</span>
       </div>`;
   }).join("");
 
   data.forEach((d, i) => {
     const pct = (d.value / total) * 100;
-    const isBiggest = i === maxIdx;
-    const explode = isBiggest ? 18 : 0;
-    const midAngle = (offset + pct/2) * Math.PI / 180;
-    const ex = Math.cos(midAngle) * explode;
-    const ey = Math.sin(midAngle) * explode;
+    const angle1 = (offset / 100) * 360;
+    const angle2 = ((offset + pct) / 100) * 360;
+    const rad1 = angle1 * Math.PI / 180;
+    const rad2 = angle2 * Math.PI / 180;
 
-    const start = offset * Math.PI / 180;
-    const end = (offset + pct) * Math.PI / 180;
+    // Main top pie
+    const x1 = Math.cos(rad1) * 92;
+    const y1 = Math.sin(rad1) * 92;
+    const x2 = Math.cos(rad2) * 92;
+    const y2 = Math.sin(rad2) * 92;
     const large = pct > 50 ? 1 : 0;
 
-    const x1 = Math.cos(start) * 100 + ex;
-    const y1 = Math.sin(start) * 100 + ey;
-    const x2 = Math.cos(end) * 100 + ex;
-    const y2 = Math.sin(end) * 100 + ey;
+    piePaths += `<path d="M0,0 L${x1},${y1} A92,92 0 ${large},1 ${x2},${y2} Z" fill="${colors[i % colors.length]}" stroke="#fff" stroke-width="2"/>`;
 
-    // Inner circle (for donut hole)
-    const ix1 = Math.cos(start) * 58 + ex;
-    const iy1 = Math.sin(start) * 58 + ey;
-    const ix2 = Math.cos(end) * 58 + ex;
-    const iy2 = Math.sin(end) * 58 + ey;
+    // 3D side layer (darker shade)
+    const sideX1 = Math.cos(rad1) * 92;
+    const sideY1 = Math.sin(rad1) * 92 + 20;
+    const sideX2 = Math.cos(rad2) * 92;
+    const sideY2 = Math.sin(rad2) * 92 + 20;
+    const darkColor = colors[i % colors.length] + "dd";
+    sidePaths += `<path d="M${x1},${y1} L${sideX2},${sideY2} A92,92 0 ${large},1 ${sideX1},${sideY1} L${x1},${y1} Z" fill="#333" opacity="0.4"/>
+                  <path d="M${x1},${y1} L${x2},${y2} L${sideX2},${sideY2} L${sideX1},${sideY1} Z" fill="${darkColor}" opacity="0.7"/>`;
 
-    paths += `<path d="M${x1},${y1} 
-                     A100,100 0 ${large},1 ${x2},${y2} 
-                     L${ix2},${iy2} 
-                     A58,58 0 ${large},0 ${ix1},${iy1} Z"
-              fill="${colors[i%colors.length]}" stroke="white" stroke-width="4"/>`;
-
-    // Percentage inside
-    if (pct > 8) {
-      const labelAngle = (offset + pct/2) * Math.PI / 180;
-      const lx = Math.cos(labelAngle) * 75 + ex;
-      const ly = Math.sin(labelAngle) * 75 + ey;
-      labels += `<text x="${lx}" y="${ly+6}" font-size="19" text-anchor="middle" fill="white" font-weight="bold">
-        ${pct.toFixed(1)}%
-      </text>`;
+    // Percentage label on slice
+    const midAngle = (angle1 + angle2) / 2 * Math.PI / 180;
+    const labelX = Math.cos(midAngle) * 65;
+    const labelY = Math.sin(midAngle) * 65;
+    if (pct > 6) {
+      piePaths += `<text x="${labelX}" y="${labelY + 5}" font-size="12" text-anchor="middle" fill="white" font-weight="bold">${pct.toFixed(1)}%</text>`;
     }
 
     offset += pct;
   });
 
   return `
-    <div style="margin:100px auto;width:1180px;display:flex;gap:120px;align-items:center;justify-content:center;background:white;padding:70px 60px;border-radius:32px;box-shadow:0 25px 70px rgba(0,0,0,0.18);">
-      <div style="text-align:center;">
-        <h3 style="color:#1e88e5;font-size:28px;margin-bottom:50px;font-weight:800;letter-spacing:0.5px;">${title}</h3>
-        <svg viewBox="-160 -160 320 320" width="500" height="500">
+    <div style="margin:70px auto;width:980px;display:flex;gap:80px;align-items:flex-start;justify-content:center;background:white;padding:40px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,0.15);">
+      <!-- 3D Pie Chart -->
+      <div style="flex:1;text-align:center;">
+        <h3 style="color:#222;font-size:20px;margin-bottom:30px;font-weight:700;">${title}</h3>
+        <svg viewBox="-140 -160 280 320" width="420" height="420">
           <defs>
-            <filter id="softShadow">
-              <feDropShadow dx="0" dy="12" stdDeviation="20" flood-opacity="0.25"/>
-            </filter>
+            <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.3"/></filter>
           </defs>
-          <g filter="url(#softShadow)">
-            ${paths}
-            ${labels}
+          <g transform="translate(0, -20)" filter="url(#shadow)">
+            ${sidePaths}
+            ${piePaths}
           </g>
-          <!-- Inner white circle for clean donut look -->
-          <circle cx="0" cy="0" r="56" fill="white"/>
+          <!-- Center glow -->
+          <circle cx="0" cy="-20" r="40" fill="white" opacity="0.9"/>
+          <circle cx="0" cy="-22" r="30" fill="#f0f0f0" opacity="0.6"/>
         </svg>
       </div>
 
-      <div style="flex:1;">
-        <h4 style="font-size:22px;color:#1e88e5;margin-bottom:30px;font-weight:bold;padding-bottom:12px;border-bottom:3px solid #1e88e5;">
-          Salesperson Performance Ranking
-        </h4>
-        <div style="background:#f8fbff;padding:40px 35px;border-radius:20px;">
-          ${legend}
+      <!-- Professional Numbered Legend -->
+      <div style="flex:1;max-width:420px;">
+        <h4 style="font-size:18px;color:#6f2cc1;margin-bottom:20px;font-weight:bold;border-bottom:2px solid #6f2cc1;padding-bottom:8px;">Legend - Salesperson Ranking</h4>
+        <div style="background:#f8f9fa;padding:20px;border-radius:12px;box-shadow:inset 0 2px 8px rgba(0,0,0,0.08);">
+          ${legendItems}
         </div>
-        <div style="margin-top:35px;padding:24px;background:#000;color:white;text-align:center;border-radius:20px;font-size:20px;font-weight:bold;">
+        <div style="margin-top:20px;padding:15px;background:#111;color:white;text-align:center;border-radius:10px;font-size:16px;font-weight:bold;">
           TOTAL SALES: ${total.toLocaleString()} KES
         </div>
       </div>
