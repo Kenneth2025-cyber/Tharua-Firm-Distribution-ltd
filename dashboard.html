@@ -9933,27 +9933,27 @@ function exportPDF() {
   });
 }
 
-// EXACT EXCEL-STYLE 3D PIE CHART — YOUR DREAM LOOK ACHIEVED
+// 100% MICROSOFT EXCEL 3D PIE CHART — EXACT MATCH
 function makePieChart(data, title) {
   if (!data.length) return "";
 
   const total = data.reduce((a, b) => a + b.value, 0);
-  let offset = 0;
-  let topSlices = "";
-  let sideSlices = "";
+  let topPaths = "";
+  let sidePaths = "";
   let labels = "";
-  const colors = ["#6f2cc1","#3498db","#27ae60","#e74c3c","#f1c40f","#9b59b6","#e67e22","#34495e","#e91e63","#ff9800"];
+  let offset = 0;
 
-  // Legend first
+  const colors = ["#5B9BD5", "#ED7D31", "#A5A5A5", "#FFC000", "#4472C4", "#70AD47", "#264478", "#9E480E"];
+
+  // Legend with colored lines (exactly like Excel)
   const legendHTML = data.map((d, i) => {
     const pct = ((d.value / total) * 100).toFixed(1);
     return `
-      <div style="display:flex;align-items:center;margin:12px 0;font-size:15px;font-family:Calibri,sans-serif;">
-        <div style="width:22px;height:22px;background:${colors[i % colors.length]};border-radius:5px;margin-right:14px;box-shadow:0 3px 8px rgba(0,0,0,0.3);"></div>
-        <strong style="width:35px;color:#222;">${i + 1}.</strong>
-        <span style="width:160px;font-weight:600;color:#222;">${d.label}</span>
-        <span style="margin-left:auto;color:#27ae60;font-weight:bold;font-size:16px;">${pct}%</span>
-        <span style="margin-left:16px;color:#555;">(${d.value.toLocaleString()} KES)</span>
+      <div style="display:flex;align-items:center;margin:16px 0;font-size:15px;font-family:Calibri,sans-serif;">
+        <div style="width:30px;height:3px;background:${colors[i % colors.length]};margin-right:12px;"></div>
+        <span style="flex:1;font-weight:600;color:#222;">${d.label}</span>
+        <span style="color:#333;">${pct}%</span>
+        <span style="margin-left:12px;color:#666;font-size:14px;">(${d.value.toLocaleString()} KES)</span>
       </div>`;
   }).join("");
 
@@ -9963,45 +9963,44 @@ function makePieChart(data, title) {
     const endAngle = ((offset + pct) / 100) * 360;
     const largeArc = pct > 50 ? 1 : 0;
 
-    // Convert to radians
     const startRad = startAngle * Math.PI / 180;
     const endRad = endAngle * Math.PI / 180;
 
-    // Top slice coordinates
-    const x1 = Math.cos(startRad) * 100;
-    const y1 = Math.sin(startRad) * 100;
-    const x2 = Math.cos(endRad) * 100;
-    const y2 = Math.sin(endRad) * 100;
+    // Top face
+    const tx1 = Math.cos(startRad) * 100;
+    const ty1 = Math.sin(startRad) * 90;
+    const tx2 = Math.cos(endRad) * 100;
+    const ty2 = Math.sin(endRad) * 90;
 
-    // Side slice (3D depth)
-    const depth = 28;
-    const sx1 = x1;
-    const sy1 = y1 + depth;
-    const sx2 = x2;
-    const sy2 = y2 + depth;
+    // Bottom (3D depth)
+    const depth = 35;
+    const bx1 = tx1;
+    const by1 = ty1 + depth;
+    const bx2 = tx2;
+    const by2 = ty2 + depth;
 
     const color = colors[i % colors.length];
-    const darkColor = color.replace('#', '');
-    const darker = '#' + darkColor.split('').map(c => Math.max(0, parseInt(c, 16) - 50).toString(16).padStart(2,'0')).join('');
+    const darker = color.replace('#', '').match(/.{2}/g).map(h => Math.max(0, parseInt(h,16)-70).toString(16).padStart(2,'0')).join('');
+    const dark = '#' + darker;
 
     // Top slice
-    topSlices += `<path d="M0,0 L${x1},${y1} A100,100 0 ${largeArc},1 ${x2},${y2} Z" 
-      fill="${color}" stroke="white" stroke-width="3"/>`;
+    topPaths += `<path d="M0,0 L${tx1},${ty1} A100,90 0 ${largeArc},1 ${tx2},${ty2} Z" 
+                 fill="${color}" stroke="white" stroke-width="2"/>`;
 
-    // Side slice (3D body)
-    sideSlices += `<path d="M${x1},${y1} L${sx2},${sy2} A100,100 0 ${largeArc},1 ${sx1},${sy1} L${x1},${y1} Z" 
-      fill="${darker}" opacity="0.9"/>`;
+    // Side face (visible depth)
+    sidePaths += `<path d="M${tx1},${ty1} L${bx2},${by2} A100,90 0 ${largeArc},1 ${bx1},${by1} L${tx1},${ty1} Z" 
+                  fill="${dark}" opacity="0.95"/>`;
 
-    // Connecting sides
-    sideSlices += `<path d="M${x1},${y1} L${x2},${y2} L${sx2},${sy2} L${sx1},${sy1} Z" 
-      fill="${darker}" opacity="0.8"/>`;
+    // Connecting vertical sides
+    sidePaths += `<path d="M${tx1},${ty1} L${tx2},${ty2} L${bx2},${by2} L${bx1},${by1} Z" 
+                  fill="${dark}" opacity="0.9"/>`;
 
-    // Percentage label (only if >5%)
-    if (pct > 5) {
-      const midAngle = (startAngle + endAngle) / 2 * Math.PI / 180;
-      const lx = Math.cos(midAngle) * 70;
-      const ly = Math.sin(midAngle) * 70;
-      labels += `<text x="${lx}" y="${ly + 6}" font-size="13" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri">
+    // Percentage label
+    if (pct > 7) {
+      const midRad = ((startAngle + endAngle) / 2) * Math.PI / 180;
+      const lx = Math.cos(midRad) * 65;
+      const ly = Math.sin(midRad) * 58;
+      labels += `<text x="${lx}" y="${ly}" font-size="14" text-anchor="middle" fill="white" font-weight="bold" font-family="Calibri">
         ${pct.toFixed(1)}%
       </text>`;
     }
@@ -10010,45 +10009,32 @@ function makePieChart(data, title) {
   });
 
   return `
-    <div style="margin:80px auto;width:1100px;display:flex;gap:90px;align-items:flex-start;justify-content:center;background:#fff;padding:50px 40px;border-radius:25px;box-shadow:0 15px 40px rgba(0,0,0,0.18);border:1px solid #eee;">
-      <!-- 3D Pie Chart -->
-      <div style="text-align:center;">
-        <h3 style="color:#222;font-size:22px;margin-bottom:35px;font-weight:700;font-family:Calibri;">${title}</h3>
-        <svg viewBox="-150 -180 300 360" width="480" height="480">
+    <div style="margin:90px auto;width:1150px;display:flex;gap:100px;align-items:flex-start;justify-content:center;background:white;padding:60px 50px;border-radius:20px;box-shadow:0 15px 45px rgba(0,0,0,0.2);">
+      <div>
+        <h3 style="text-align:center;color:#222;font-size:24px;margin-bottom:40px;font-weight:700;font-family:Calibri;">${title}</h3>
+        <svg viewBox="-160 -140 320 380" width="500" height="500">
           <defs>
-            <filter id="dropshadow" height="200%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
-              <feOffset dx="0" dy="12" result="offsetblur"/>
-              <feFlood flood-color="#000000" flood-opacity="0.35"/>
-              <feComposite in2="offsetblur" operator="in"/>
-              <feMerge>
-                <feMergeNode/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
+            <filter id="shadow">
+              <feDropShadow dx="0" dy="15" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/>
             </filter>
           </defs>
           
-          <g transform="translate(0, -25)" filter="url(#dropshadow)">
-            ${sideSlices}
-            ${topSlices}
+          <g filter="url(#shadow)">
+            ${sidePaths}
+            ${topPaths}
             ${labels}
           </g>
-
-          <!-- Inner highlight -->
-          <ellipse cx="0" cy="-25" rx="45" ry="20" fill="white" opacity="0.7"/>
-          <ellipse cx="0" cy="-30" rx="30" ry="12" fill="white" opacity="0.9"/>
         </svg>
       </div>
 
-      <!-- Professional Legend -->
-      <div style="flex:1;padding-top:40px;">
-        <h4 style="font-size:19px;color:#6f2cc1;margin-bottom:25px;font-weight:bold;border-bottom:3px solid #6f2cc1;padding-bottom:10px;">
-          Salesperson Performance Ranking
+      <div style="flex:1;padding-top:60px;">
+        <h4 style="font-size:20px;color:#5B9BD5;margin-bottom:25px;font-weight:bold;padding-bottom:8px;border-bottom:2px solid #5B9BD5;">
+          Salesperson Ranking
         </h4>
-        <div style="background:#f8f9fa;padding:25px 20px;border-radius:15px;box-shadow:inset 0 3px 10px rgba(0,0,0,0.1);">
+        <div style="background:#f8f9fa;padding:30px 25px;border-radius:15px;">
           ${legendHTML}
         </div>
-        <div style="margin-top:25px;padding:18px;background:#111;color:white;text-align:center;border-radius:15px;font-size:18px;font-weight:bold;box-shadow:0 8px 20px rgba(0,0,0,0.4);">
+        <div style="margin-top:30px;padding:20px;background:#1A1A1A;color:white;text-align:center;border-radius:12px;font-size:18px;font-weight:bold;">
           TOTAL SALES: ${total.toLocaleString()} KES
         </div>
       </div>
