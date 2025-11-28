@@ -9672,7 +9672,7 @@ async function loadLocations() {
     salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
  
     const container = document.getElementById("srResults");
-    container.innerHTML = \`<div class="sr-table-placeholder">🔄 Loading \${modeLabel(salesState.reportMode)}... please wait ♡</div>\`;
+   container.innerHTML = `<div class="sr-table-placeholder">🔄 Loading ${modeLabel(salesState.reportMode)}... please wait ♡</div>`;
  
     try {
       if (salesState.reportMode === "detailed") {
