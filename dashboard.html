@@ -9693,7 +9693,8 @@ async function loadLocations() {
       }
     } catch (err) {
       console.error(err);
-      container.innerHTML = \`<div class="sr-table-placeholder">❌ Error: \${escapeHTML(err.message)}</div>\`;
+      container.innerHTML = `<div class="sr-table-placeholder">❌ Error: ${escapeHTML(err.message)}</div>`;
+
     }
     closeDateMenu();
   }
