@@ -9625,36 +9625,42 @@ async function showSalesReport() {
     }
     updateDateFilterText();
   }
-  // ========== 2️⃣ UPDATE BUTTON TEXT ==========
-  function updateDateFilterText() {
-    const from = document.getElementById("srFrom")?.value;
-    const to = document.getElementById("srTo")?.value;
-    const textEl = document.getElementById("dateFilterText");
-    if (!textEl) return;
- 
-    if (from && to && from === to) {
-      textEl.textContent = \`📅 \${from}\`;
-    } else if (from && to) {
-      textEl.textContent = \`\${from} → \${to}\`;
-    } else {
-      textEl.textContent = "Select Date Range";
-    }
+ // ========== 2️⃣ UPDATE BUTTON TEXT ==========
+function updateDateFilterText() {
+  const from = document.getElementById("srFrom")?.value;
+  const to = document.getElementById("srTo")?.value;
+  const textEl = document.getElementById("dateFilterText");
+  if (!textEl) return;
+
+  if (from && to && from === to) {
+    textEl.textContent = `📅 ${from}`;
+  } else if (from && to) {
+    textEl.textContent = `${from} → ${to}`;
+  } else {
+    textEl.textContent = "Select Date Range";
   }
-  // ========== 3️⃣ LOAD LOCATIONS ==========
-  async function loadLocations() {
-    try {
-      const db = firebase.firestore();
-      const snap = await db.collection("businessLocations").get();
-      const sel = document.getElementById("srLocationSmall");
-      const seen = new Set();
-      snap.forEach(doc => {
-        const name = String(doc.data()?.name || "").trim();
-        if (!name || seen.has(name)) return;
-        seen.add(name);
-        sel.insertAdjacentHTML("beforeend", \`<option value="\${escapeHTML(name)}">\${escapeHTML(name)}</option>\`);
-      });
-    } catch(e) { console.warn("loadLocations failed:", e); }
+}
+// ========== 3️⃣ LOAD LOCATIONS ==========
+async function loadLocations() {
+  try {
+    const db = firebase.firestore();
+    const snap = await db.collection("businessLocations").get();
+    const sel = document.getElementById("srLocationSmall");
+    const seen = new Set();
+    snap.forEach(doc => {
+      const name = String(doc.data()?.name || "").trim();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      sel.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`
+      );
+    });
+  } catch (e) {
+    console.warn("loadLocations failed:", e);
   }
+}
+
   // ========== 4️⃣ MAIN APPLY FILTERS ==========
   async function applyFilters() {
     const fromVal = document.getElementById("srFrom")?.value || "";
