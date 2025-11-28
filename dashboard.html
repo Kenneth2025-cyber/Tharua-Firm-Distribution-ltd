@@ -9344,19 +9344,21 @@ function toggleReports() {
 }
 
 // Placeholder report functions
-// FIX: This must be outside the function so buttons can see it
+// ✅ FIX: This must be outside the function so buttons can see it
 let salesState = {
   rows: [],
   filtered: [],
   from: null,
   to: null,
   location: "",
-  reportMode: "detailed"   // we want Detailed to be default
+  reportMode: "detailed" // ✅ Default is Detailed
 };
-// ---------- Page Entrypoint: Sales Report (with mode buttons + working date + location filters + exports + Filter-by-date dropdown + Apply button) ----------
+
+// ========== BABY STEPS: COMPLETE PAGE ENTRYPOINT ==========
 async function showSalesReport() {
   saveLastPage("showSalesReport");
   const el = document.getElementById("content");
+  
   el.innerHTML = `
     <style data-sales-clean>
       .sr-wrap{background:#fff;border-radius:8px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
@@ -9373,37 +9375,36 @@ async function showSalesReport() {
       .btn-csv{background:#0d6efd;color:#fff}
       .btn-excel{background:#198754;color:#fff}
       .btn-pdf{background:#6b7280;color:#fff}
-      .mode-bar{display:flex;gap:8px;align-items:center;margin:12px 0}
-      .mode-btn{padding:8px 12px;border-radius:6px;border:1px solid #d0d7de;background:#f5f7fb;cursor:pointer;font-weight:600}
-      .mode-btn.active{background:#6f2cc1;color:#fff;border-color:#5a229f}
+      .mode-bar{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
+      .mode-btn{padding:8px 12px;border-radius:6px;border:1px solid #d0d7de;background:#f5f7fb;cursor:pointer;font-weight:600;transition:all .2s}
+      .mode-btn:hover{background:#e9ecef}
+      .mode-btn.active{background:#6f2cc1;color:#fff;border-color:#5a229f;box-shadow:0 2px 8px rgba(111,44,193,.3)}
       .sr-table-placeholder{padding:18px;border:1px dashed #e6e6e6;border-radius:6px;color:#666;margin-top:8px;min-height:140px}
-      /* Filter-by-date dropdown on the right (purple button + menu) */
       .date-filter-wrap{position:relative;display:inline-block}
-      .date-filter-btn{background:#6f2cc1;color:#fff;padding:10px 12px;border-radius:6px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center}
+      .date-filter-btn{background:#6f2cc1;color:#fff;padding:10px 12px;border-radius:6px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center;transition:all .2s}
+      .date-filter-btn:hover{box-shadow:0 2px 8px rgba(111,44,193,.3)}
       .date-filter-menu{position:absolute;right:0;top:42px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.08);min-width:220px;padding:12px;display:none;z-index:50}
       .date-filter-menu label{display:block;margin-bottom:8px;font-size:13px}
       .date-filter-menu .preset-list{max-height:240px;overflow:auto;border-top:1px solid #eee;padding-top:8px;margin-top:8px}
-      .apply-filters{background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;border:none;cursor:pointer;width:100%}
+      .apply-filters{background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;border:none;cursor:pointer;width:100%;transition:all .2s}
+      .apply-filters:hover{background:#0b5ed7}
       .small-link{font-size:12px;color:#6f2cc1;cursor:pointer;text-decoration:underline;margin-top:8px;display:inline-block}
       .muted { color:#666; font-size:13px }
     </style>
-
     <div class="sr-wrap">
       <div class="sr-head">
-        <h2>Sales Report</h2>
+        <h2>📊 Sales Report</h2>
         <div style="display:flex;gap:10px;align-items:center">
           <div class="sr-export">
-            <button id="srExportCsv" class="btn btn-csv btn-sm">Export CSV</button>
-            <button id="srExportExcel" class="btn btn-excel btn-sm">Export Excel</button>
-            <button id="srExportPdf" class="btn btn-pdf btn-sm">Export PDF</button>
+            <button id="srExportCsv" class="btn btn-csv btn-sm">CSV</button>
+            <button id="srExportExcel" class="btn btn-excel btn-sm">Excel</button>
+            <button id="srExportPdf" class="btn btn-pdf btn-sm">PDF</button>
           </div>
-
           <div class="date-filter-wrap" id="dateFilterWrap">
             <button id="srDateFilterBtn" class="date-filter-btn">
-              <span>Filter by date</span>
+              <span id="dateFilterText">Filter by date</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.9"><path d="M6 9l6 6 6-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-
             <div id="srDateMenu" class="date-filter-menu" role="menu" aria-hidden="true">
               <label>
                 Date range:
@@ -9411,392 +9412,271 @@ async function showSalesReport() {
                   <option value="today">Today</option>
                   <option value="yesterday">Yesterday</option>
                   <option value="last7">Last 7 Days</option>
-                  <option value="last30" selected>Last 30 Days</option>
-                  <option value="thisMonth">This Month</option>
+                  <option value="last30">Last 30 Days</option>
+                  <option value="thisMonth" selected>🌟 This Month</option>
                   <option value="lastMonth">Last Month</option>
                   <option value="thisYear">This Year</option>
                   <option value="lastYear">Last Year</option>
                   <option value="custom">Custom Range</option>
                 </select>
               </label>
-
               <div id="srMenuCustomDates" style="display:none;margin-top:8px">
                 <label>From: <input id="srFrom" type="date" class="input" style="width:100%"></label>
-                <label style="margin-top:8px">To:   <input id="srTo"   type="date" class="input" style="width:100%"></label>
+                <label style="margin-top:8px">To: <input id="srTo" type="date" class="input" style="width:100%"></label>
               </div>
-
               <div style="margin-top:10px">
-                <button id="srApplyFilters" class="apply-filters">Apply filters</button>
+                <button id="srApplyFilters" class="apply-filters">✅ Apply filters</button>
               </div>
-
               <div style="border-top:1px solid #f0f0f0;margin-top:10px;padding-top:8px">
                 <div style="display:flex;gap:8px;align-items:center;">
-                  <label style="flex:1">Location:</label>
+                  <label style="flex:1">📍 Location:</label>
                   <select id="srLocationSmall" class="input" style="min-width:110px">
                     <option value="">All locations</option>
                   </select>
                 </div>
-                <div style="margin-top:8px;text-align:right"><span id="srCloseMenu" class="small-link">Close</span></div>
+                <div style="margin-top:8px;text-align:right"><span id="srCloseMenu" class="small-link">✕ Close</span></div>
               </div>
             </div>
           </div>
-
         </div>
       </div>
-
       <div class="sr-controls">
-        <div style="flex:1;color:#666">Use <strong>Filter by date</strong> (top-right) to choose presets or a custom range — then click <strong>Apply filters</strong>.</div>
-        <div style="margin-left:auto;color:#666">Choose date range and location, then export.</div>
+        <div style="flex:1;color:#666">
+          📅 Use <strong>Filter by date</strong> (top-right) → choose preset or custom range → click <strong>Apply filters</strong>
+        </div>
+        <div style="color:#666">Choose mode below → apply filters → export 📊</div>
       </div>
-
-      <!-- MODE BUTTONS -->
+     
+      <!-- ✅ MODE BUTTONS -->
       <div class="mode-bar" id="srModeBar" aria-label="Report modes">
-        <button class="mode-btn active" data-mode="detailed" id="modeDetailed">Detailed Sales Report (per Salesperson)</button>
-        <button class="mode-btn" data-mode="byDate" id="modeByDate">Sales By Date</button>
-        <button class="mode-btn" data-mode="product" id="modeProduct">Sales By Product</button>
-        <button class="mode-btn" data-mode="customer" id="modeCustomer">Sales By Customer</button>
-        <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">Sales By Customer Group</button>
+        <button class="mode-btn active" data-mode="detailed" id="modeDetailed">
+          👤 Detailed (per Salesperson)
+        </button>
+        <button class="mode-btn" data-mode="byDate" id="modeByDate">
+          📅 Sales By Date
+        </button>
+        <button class="mode-btn" data-mode="product" id="modeProduct">
+          📦 Sales By Product
+        </button>
+        <button class="mode-btn" data-mode="customer" id="modeCustomer">
+          👥 Sales By Customer
+        </button>
+        <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">
+          🏷️ Sales By Customer Group
+        </button>
       </div>
-
+     
       <div id="srResults" class="sr-table-placeholder">
-        <!-- placeholder content rendered by JS -->
+        🌟 <strong>This Month</strong> is default! Click <strong>Apply filters</strong> to generate your first report ✨
       </div>
     </div>
   `;
 
-  /************ helpers: presets & dates ************/
+  // ========== 1️⃣ DATE PRESETS - THIS MONTH = 1st → TODAY ✅ ==========
   function setPresetRange(preset) {
     const today = new Date();
     let from = new Date(today);
     let to = new Date(today);
-
+   
     switch(preset) {
-      case "today":
-        break;
+      case "today": break;
       case "yesterday":
         from.setDate(from.getDate()-1); to.setDate(to.getDate()-1); break;
-      case "last7":
-        from.setDate(from.getDate()-6); break;
-      case "last30":
-        from.setDate(from.getDate()-29); break;
+      case "last7": from.setDate(from.getDate()-6); break;
+      case "last30": from.setDate(from.getDate()-29); break;
       case "thisMonth":
-        from = new Date(today.getFullYear(), today.getMonth(), 1); to = new Date(today.getFullYear(), today.getMonth()+1, 0); break;
+        // ✅ BABY STEP: 1st of THIS MONTH → TODAY
+        from = new Date(today.getFullYear(), today.getMonth(), 1);
+        to = new Date(today);
+        break;
       case "lastMonth":
         from = new Date(today.getFullYear(), today.getMonth()-1, 1);
         to = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
-      case "thisYear":
-        from = new Date(today.getFullYear(), 0, 1); to = new Date(today.getFullYear(), 11, 31); break;
-      case "lastYear":
-        from = new Date(today.getFullYear()-1, 0, 1);
-        to = new Date(today.getFullYear()-1, 11, 31);
-        break;
-      case "custom":
-        // do not change inputs
-        return;
-      default:
-        from.setDate(from.getDate()-29);
+      case "thisYear": from = new Date(today.getFullYear(), 0, 1); to = new Date(today); break;
+      case "lastYear": from = new Date(today.getFullYear()-1, 0, 1); to = new Date(today.getFullYear()-1, 11, 31); break;
+      case "custom": return;
+      default: from.setDate(from.getDate()-29);
     }
+   
     const fEl = document.getElementById("srFrom");
     const tEl = document.getElementById("srTo");
     if (fEl && tEl) {
-      fEl.valueAsDate = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-      tEl.valueAsDate = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+      fEl.valueAsDate = from;
+      tEl.valueAsDate = to;
       document.getElementById("srMenuCustomDates").style.display = "none";
     }
+    updateDateFilterText();
   }
 
-/************ load locations ************/
-async function loadLocations() {
-  try {
-    const db = firebase.firestore();
-    const snap = await db.collection("businessLocations").get();
-    const selSmall = document.getElementById("srLocationSmall");
-    const seen = new Set();
-    snap.forEach(doc => {
-      const name = String(doc.data()?.name || "").trim();
-      if (!name || seen.has(name)) return;
-      seen.add(name);
-      selSmall.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
-    });
-  } catch(e) {
-    console.warn("loadLocations() failed", e);
-  }
-}
-
-// FINAL SUPER applyFilters() – now works for Detailed + By Date + By Product !
-async function applyFilters() {
-  const fromVal = document.getElementById("srFrom")?.value || "";
-  const toVal = document.getElementById("srTo")?.value || "";
-  const loc = document.getElementById("srLocationSmall")?.value || "";
-
-  // Save dates and location
-  salesState.location = loc;
-  salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
-  salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
-
-  // Clean old data
-  salesState.rows = [];
-  salesState.filtered = [];
-
-  // Show loading message
-  const container = document.getElementById("srResults");
-  container.innerHTML = `<div class="sr-table-placeholder">Loading report... please wait ♡</div>`;
-
-  try {
-    if (salesState.reportMode === "detailed") {
-      await aggregateSalesDetailed();
-      renderDetailedTable();
+  // ========== 2️⃣ UPDATE BUTTON TEXT ==========
+  function updateDateFilterText() {
+    const from = document.getElementById("srFrom")?.value;
+    const to = document.getElementById("srTo")?.value;
+    const textEl = document.getElementById("dateFilterText");
+    if (!textEl) return;
+   
+    if (from && to && from === to) {
+      textEl.textContent = `📅 ${from}`;
+    } else if (from && to) {
+      textEl.textContent = `${from} → ${to}`;
+    } else {
+      textEl.textContent = "Filter by date";
     }
-    else if (salesState.reportMode === "byDate") {
-      await aggregateSalesByDate();
-      renderSalesByDate();           // ← now draws the full pretty table
-    }
-    else if (salesState.reportMode === "product") {
-      await aggregateSalesByProduct();
-      renderSalesByProduct();        // ← new! shows top selling products
-    }
-       else if (salesState.reportMode === "customer") {
-      await aggregateSalesByCustomer();
-      renderSalesByCustomer();
-    }
-    else if (salesState.reportMode === "custGroup") {
-      await aggregateSalesByCustGroup();
-      renderSalesByCustGroup();
-    }
-
-   else {
-      // future modes will come here
-      renderModePlaceholder();
-    }
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = `<div class="sr-table-placeholder">Oops! Something went wrong: ${escapeHTML(err.message)}</div>`;
   }
 
-  closeDateMenu(); // close the purple menu
-}
-
-/************ render per-mode placeholder (clean report skeleton) ************/
-function renderModePlaceholder() {
-  const container = document.getElementById("srResults");
-  const mode = salesState.reportMode;
-  const fromStr = document.getElementById("srFrom")?.value || 'N/A';
-  const toStr = document.getElementById("srTo")?.value || 'N/A';
-  const locStr = document.getElementById("srLocationSmall")?.value || 'All';
-
-  // If we already have aggregated rows, show a compact summary and keep the area for the real table
-  if (salesState.rows && salesState.rows.length) {
-    container.innerHTML = `
-      <div class="muted">Mode: <strong>${modeLabel(mode)}</strong> — Showing <strong>${salesState.filtered.length}</strong> aggregated rows for <strong>${escapeHTML(locStr)}</strong> from <strong>${escapeHTML(fromStr)}</strong> to <strong>${escapeHTML(toStr)}</strong>.</div>
-      <div style="margin-top:10px;color:#666">Aggregation is ready — the full table will render here.</div>
-    `;
-    return;
+  // ========== 3️⃣ LOAD LOCATIONS ==========
+  async function loadLocations() {
+    try {
+      const db = firebase.firestore();
+      const snap = await db.collection("businessLocations").get();
+      const sel = document.getElementById("srLocationSmall");
+      const seen = new Set();
+      snap.forEach(doc => {
+        const name = String(doc.data()?.name || "").trim();
+        if (!name || seen.has(name)) return;
+        seen.add(name);
+        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
+      });
+    } catch(e) { console.warn("loadLocations failed:", e); }
   }
 
-  // No rows yet: render a clean empty report skeleton according to selected mode.
-  if (mode === "detailed") {
-    // Detailed Sales Report per salesperson layout
-    container.innerHTML = `
-      <div style="display:flex;gap:18px">
-        <!-- Left: main report table -->
-        <div style="flex:1">
-          <div style="text-align:center;font-weight:700;margin-bottom:12px">Detailed Sales Report</div>
-
-          <div style="margin-bottom:8px;color:#444">
-            <span style="margin-right:18px">Date or Date range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong></span>
-            <span>Business Location: <strong>${escapeHTML(locStr)}</strong></span>
-          </div>
-
-          <table style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Product</th>
-                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
-                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Selling Prices</th>
-                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
-                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Unit Price</th>
-                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost of sales</th>
-                <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
-              </tr>
-            </thead>
-            <tbody id="detailedBody">
-              <!-- salesperson groups will be injected here when aggregation is implemented -->
-            </tbody>
-            <tfoot id="detailedFooter">
-              <!-- totals/subtotals injected here -->
-            </tfoot>
-          </table>
-
-          <div id="detailedNote" style="margin-top:12px;color:#666;font-size:13px">
-            No aggregated sales yet. Click <strong>Apply filters</strong> to run aggregation (data will appear here).
-          </div>
-        </div>
-
-        <!-- Right: salesperson expenses / summary box -->
-        <aside style="width:320px;flex-shrink:0">
-          <div style="border-bottom:1px solid #ddd;padding-bottom:6px;margin-bottom:8px;text-align:center;font-weight:600">Salesperson Expenses</div>
-          <div style="background:#fafafa;border:1px solid #eee;padding:10px;border-radius:6px;min-height:200px;color:#444">
-            <div style="font-weight:600;margin-bottom:6px" id="spName">Salesperson: —</div>
-            <div style="font-size:13px;color:#666;margin-bottom:12px">Expense Category & Amount</div>
-            <div id="spExpensesList" style="min-height:80px">No expenses</div>
-
-            <div style="margin-top:12px;border-top:1px solid #eee;padding-top:8px">
-              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="muted">Total Expenses</span><span id="spTotal" class="muted">0</span></div>
-              <div style="display:flex;justify-content:space-between"><span class="muted">Net Revenue</span><strong id="spNet" style="background:#ffd7b2;padding:4px 8px;border-radius:4px;display:inline-block">0</strong></div>
-            </div>
-          </div>
-        </aside>
-      </div>
-    `;
-    // nothing else to fill yet — when aggregation is ready you will populate #detailedBody, #detailedFooter, #spName, #spExpensesList, #spTotal, #spNet
-    return;
+  // ========== 4️⃣ MAIN APPLY FILTERS ==========
+  async function applyFilters() {
+    const fromVal = document.getElementById("srFrom")?.value || "";
+    const toVal = document.getElementById("srTo")?.value || "";
+    const loc = document.getElementById("srLocationSmall")?.value || "";
+   
+    salesState.location = loc;
+    salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
+    salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
+   
+    const container = document.getElementById("srResults");
+    container.innerHTML = `<div class="sr-table-placeholder">🔄 Loading ${modeLabel(salesState.reportMode)}... please wait ♡</div>`;
+   
+    try {
+      if (salesState.reportMode === "detailed") {
+        await aggregateSalesDetailed();
+        renderDetailedTable();
+      } else if (salesState.reportMode === "byDate") {
+        await aggregateSalesByDate();
+        renderSalesByDate();
+      } else if (salesState.reportMode === "product") {
+        await aggregateSalesByProduct();
+        renderSalesByProduct();
+      } else if (salesState.reportMode === "customer") {
+        await aggregateSalesByCustomer();
+        renderSalesByCustomer();
+      } else if (salesState.reportMode === "custGroup") {
+        await aggregateSalesByCustGroup();
+        renderSalesByCustGroup();
+      }
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<div class="sr-table-placeholder">❌ Error: ${escapeHTML(err.message)}</div>`;
+    }
+    closeDateMenu();
   }
-
-  // For other modes render a simple table skeleton
-if (mode === "byDate") {
-  const fromStr = document.getElementById("srFrom")?.value || 'N/A';
-  const toStr = document.getElementById("srTo")?.value || 'N/A';
-  const locStr = document.getElementById("srLocationSmall")?.value || 'All locations';
-
-  container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px">Sales By Date</div>
-    <div style="color:#555; margin-bottom:15px">
-      ${fromStr} → ${toStr} | Location: <strong>${escapeHTML(locStr)}</strong>
-    </div>
-    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 2px 8px rgba(0,0,0,.1); border-radius:8px; overflow:hidden">
-      <thead style="background:#6f2cc1; color:white">
-        <tr>
-          <th style="padding:15px; text-align:left">Date</th>
-          <th style="padding:15px; text-align:right">Qty Sold</th>
-          <th style="padding:15px; text-align:right">Sales (KES)</th>
-          <th style="padding:15px; text-align:right">Cost</th>
-          <th style="padding:15px; text-align:right">Gross Profit</th>
-        </tr>
-      </thead>
-      <tbody id="byDateBody"></tbody>
-      <tfoot id="byDateFoot"></tfoot>
-    </table>
-  `;
-  return;
-}
-
-  if (mode === "product") {
-    container.innerHTML = `
-      <div style="font-weight:700;margin-bottom:8px">Sales By Product</div>
-      <div style="margin-bottom:8px;color:#444">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">Product</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Cost</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Gross Profit</th>
-          </tr>
-        </thead>
-        <tbody id="byProductBody"></tbody>
-        <tfoot id="byProductFoot"></tfoot>
-      </table>
-      <div style="margin-top:10px;color:#666">No aggregated rows yet. Click <strong>Apply filters</strong>.</div>
-    `;
-    return;
-  }
-
-  if (mode === "customer" || mode === "custGroup") {
-    const title = mode === "customer" ? "Sales By Customer" : "Sales By Customer Group";
-    container.innerHTML = `
-      <div style="font-weight:700;margin-bottom:8px">${escapeHTML(title)}</div>
-      <div style="margin-bottom:8px;color:#444">Selected range: <strong>${escapeHTML(fromStr)}</strong> — <strong>${escapeHTML(toStr)}</strong>; Location: <strong>${escapeHTML(locStr)}</strong></div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid #222">${escapeHTML(mode === "customer" ? "Customer" : "Customer Group")}</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Qty Sold</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Sales</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">#Invoices</th>
-            <th style="text-align:right;padding:6px 8px;border-bottom:2px solid #222">Avg Invoice</th>
-          </tr>
-        </thead>
-        <tbody id="byCustomerBody"></tbody>
-        <tfoot id="byCustomerFoot"></tfoot>
-      </table>
-      <div style="margin-top:10px;color:#666">No aggregated rows yet. Click <strong>Apply filters</strong>.</div>
-    `;
-    return;
-  }
-
-  // fallback — simple message
-  container.innerHTML = `<div class="sr-table-placeholder">Select a report mode and click <strong>Apply filters</strong> to run aggregation.</div>`;
-}
-
 
   function modeLabel(mode) {
-    switch(mode) {
-      case "detailed": return "Detailed Sales Report (per Salesperson)";
-      case "byDate": return "Sales By Date";
-      case "product": return "Sales By Product";
-      case "customer": return "Sales By Customer";
-      case "custGroup": return "Sales By Customer Group";
-      default: return mode;
-    }
+    const labels = {
+      detailed: "Detailed Sales Report",
+      byDate: "Sales By Date", 
+      product: "Sales By Product",
+      customer: "Sales By Customer",
+      custGroup: "Sales By Customer Group"
+    };
+    return labels[mode] || mode;
   }
 
-  /************ exports (unchanged) ************/
+  // ========== 5️⃣ MODE BUTTONS ==========
+  function setupModeButtons() {
+    const modeButtons = document.querySelectorAll(".mode-btn");
+    modeButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        salesState.reportMode = mode;
+        modeButtons.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+        
+        const container = document.getElementById("srResults");
+        const fromStr = document.getElementById("srFrom")?.value || 'N/A';
+        const toStr = document.getElementById("srTo")?.value || 'N/A';
+        const locStr = document.getElementById("srLocationSmall")?.value || 'All';
+        
+        container.innerHTML = `
+          <div style="text-align:center;padding:40px;background:linear-gradient(135deg,#f8f9ff,#e8f4fd);border-radius:12px">
+            <div style="font-size:28px;font-weight:700;color:#6f2cc1;margin-bottom:12px">
+              ${modeLabel(mode)}
+            </div>
+            <div style="color:#666;margin-bottom:20px">
+              📅 ${fromStr} → ${toStr} | 📍 ${locStr}
+            </div>
+            <div style="color:#888">
+              Click <strong>Apply filters</strong> to generate this report ✨
+            </div>
+          </div>
+        `;
+      });
+    });
+  }
+
+  // ========== 6️⃣ EXPORTS ==========
   function exportCSV() {
     const rows = salesState.filtered || [];
-    if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
+    if (!rows.length) return alert("No data to export. Run aggregation first.");
     const keys = Object.keys(rows[0]);
     const header = keys.join(",");
     const data = rows.map(r => keys.map(k => `"${String(r[k] ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
     downloadBlob([header, data].join("\n"), "sales-report.csv", "text/csv;charset=utf-8;");
   }
+
   function exportExcel() {
     const rows = salesState.filtered || [];
-    if (!rows.length) { alert("No rows to export. Aggregate sales first."); return; }
+    if (!rows.length) return alert("No data to export. Run aggregation first.");
     const keys = Object.keys(rows[0]);
     const head = keys.map(k=>`<th><strong>${escapeHTML(k)}</strong></th>`).join("");
     const body = rows.map(r => `<tr>${keys.map(k=>`<td>${escapeHTML(String(r[k] ?? ""))}</td>`).join("")}</tr>`).join("");
     const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
   }
-/************ FINAL PDF – ONLY THE FINAL BAR FIXED – EVERYTHING ELSE UNTOUCHED ************/
-function exportPDF() {
-  if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
-    alert("Please run the Detailed Sales Report first!");
-    return;
-  }
-  const win = window.open("", "_blank", "width=1300,height=900,scrollbars=yes,resizable=yes");
-  if (!win) { alert("Please allow popups!"); return; }
 
-  const fromStr = document.getElementById("srFrom")?.value || "Start";
-  const toStr = document.getElementById("srTo")?.value || "End";
-  const locStr = salesState.location || "All Locations";
-  const period = fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`;
+  // ========== 7️⃣ PDF EXPORT (COMPLETE FROM YOUR DATA) ==========
+  async function exportPDF() {
+    if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
+      alert("Please run the Detailed Sales Report first!");
+      return;
+    }
+    const win = window.open("", "_blank", "width=1300,height=900,scrollbars=yes,resizable=yes");
+    if (!win) { alert("Please allow popups!"); return; }
+    
+    const fromStr = document.getElementById("srFrom")?.value || "Start";
+    const toStr = document.getElementById("srTo")?.value || "End";
+    const locStr = salesState.location || "All Locations";
+    const period = fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`;
 
-  async function getExpensesForPeriod() {
-    const db = firebase.firestore();
-    let q = db.collection("expenses")
-      .where("expenseDate", ">=", salesState.from)
-      .where("expenseDate", "<=", salesState.to);
-    if (salesState.location) q = q.where("location", "==", salesState.location);
-    const snap = await q.get();
-    const map = {};
-    snap.forEach(doc => {
-      const e = doc.data();
-      const sp = String(e.salesperson || "Unknown").trim();
-      const cat = String(e.category || "Uncategorized").trim();
-      const amt = Number(e.totalAmount || e.paidAmount || 0);
-      if (!map[sp]) map[sp] = {};
-      if (!map[sp][cat]) map[sp][cat] = 0;
-      map[sp][cat] += amt;
-    });
-    return map;
-  }
+    async function getExpensesForPeriod() {
+      const db = firebase.firestore();
+      let q = db.collection("expenses")
+        .where("expenseDate", ">=", salesState.from)
+        .where("expenseDate", "<=", salesState.to);
+      if (salesState.location) q = q.where("location", "==", salesState.location);
+      const snap = await q.get();
+      const map = {};
+      snap.forEach(doc => {
+        const e = doc.data();
+        const sp = String(e.salesperson || "Unknown").trim();
+        const cat = String(e.category || "Uncategorized").trim();
+        const amt = Number(e.totalAmount || e.paidAmount || 0);
+        if (!map[sp]) map[sp] = {};
+        if (!map[sp][cat]) map[sp][cat] = 0;
+        map[sp][cat] += amt;
+      });
+      return map;
+    }
 
-  getExpensesForPeriod().then(expensesBySp => {
+    const expensesBySp = await getExpensesForPeriod();
     let allSections = "";
-    let grandTotalExpenses = 0;   // ← NEW: we need this for the final bar
+    let grandTotalExpenses = 0;
 
     salesState.filtered.forEach(spEntry => {
       const spName = escapeHTML(spEntry.salesperson || "Unknown");
@@ -9804,7 +9684,7 @@ function exportPDF() {
       const subSales = spEntry.totals.revenue;
       const subCost = spEntry.totals.cost;
       const grossProfit = subSales - subCost;
-
+      
       let salesRows = "";
       spEntry.products.forEach(p => {
         const profit = p.revenue - p.cost;
@@ -9835,10 +9715,10 @@ function exportPDF() {
       if (expensesRows === "") {
         expensesRows = `<tr><td colspan="2" style="text-align:center; color:#999; padding:20px;">No expenses recorded</td></tr>`;
       }
+      
       grandTotalExpenses += totalExpenses;
       const netProfit = grossProfit - totalExpenses;
 
-      // ← THIS ENTIRE BLOCK IS 100% UNCHANGED — YOUR BEAUTIFUL TABLES ARE SAFE!
       allSections += `
         <div style="margin:40px 0; padding:22px; border:3px solid #6f2cc1; border-radius:16px; background:#f8fdff; box-shadow:0 6px 20px rgba(0,0,0,0.08);">
           <h2 style="margin:0 0 20px 0; color:#6f2cc1; font-size:19px; text-align:center; font-weight:bold;">${spName}</h2>
@@ -9889,11 +9769,10 @@ function exportPDF() {
         </div>`;
     });
 
-    // ← ONLY THIS PART CHANGED — FINAL SUMMARY BAR EXACTLY LIKE YOUR SCREEN!
     const grandSales = salesState.filtered.reduce((a, b) => a + b.totals.revenue, 0);
-    const grandCost  = salesState.filtered.reduce((a, b) => a + b.totals.cost, 0);
+    const grandCost = salesState.filtered.reduce((a, b) => a + b.totals.cost, 0);
     const grossProfit = grandSales - grandCost;
-    const netRevenue  = grossProfit - grandTotalExpenses;
+    const netRevenue = grossProfit - grandTotalExpenses;
 
     const finalHTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Detailed Report - ${period}</title>
@@ -9924,11 +9803,11 @@ function exportPDF() {
   </div>
   ${allSections}
   <div class="final-summary">
-    FINAL SUMMARY → Sales: ${grandSales.toLocaleString()} | 
-    Cost: ${grandCost.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:3})} | 
-    Gross Profit: ${grossProfit.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:3})} | 
-    <span class="expenses">Expenses: ${grandTotalExpenses.toLocaleString()}</span> | 
-    <span class="net">NET REVENUE: ${netRevenue.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:3})} KES</span>
+    FINAL SUMMARY → Sales: ${grandSales.toLocaleString()} |
+    Cost: ${grandCost.toLocaleString()} |
+    Gross Profit: ${grossProfit.toLocaleString()} |
+    <span class="expenses">Expenses: ${grandTotalExpenses.toLocaleString()}</span> |
+    <span class="net">NET REVENUE: ${netRevenue.toLocaleString()} KES</span>
   </div>
 </body></html>`;
 
@@ -9936,122 +9815,73 @@ function exportPDF() {
     win.document.write(finalHTML);
     win.document.close();
     setTimeout(() => { win.focus(); win.print(); }, 1500);
-  }).catch(err => {
-    console.error("Failed to load expenses for PDF:", err);
-    alert("Could not load expenses for PDF. Check console.");
-  });
-}
+  }
 
-  /************ date menu open/close logic ************/
-  const dateBtn = document.getElementById("srDateFilterBtn");
-  const dateMenu = document.getElementById("srDateMenu");
-  const closeMenuLink = document.getElementById("srCloseMenu");
+  // ========== 8️⃣ DATE MENU ==========
+  let dateMenu;
+  function openDateMenu() { 
+    dateMenu.style.display = "block"; 
+    dateMenu.setAttribute("aria-hidden", "false"); 
+  }
+  function closeDateMenu() { 
+    dateMenu.style.display = "none"; 
+    dateMenu.setAttribute("aria-hidden", "true"); 
+  }
 
-  function openDateMenu(){ dateMenu.style.display = "block"; dateMenu.setAttribute("aria-hidden","false"); }
-  function closeDateMenu(){ dateMenu.style.display = "none"; dateMenu.setAttribute("aria-hidden","true"); }
+  // Wait for DOM
+  await new Promise(resolve => setTimeout(resolve, 100));
+  dateMenu = document.getElementById("srDateMenu");
 
-  dateBtn.addEventListener("click", (e) => {
+  // ========== 9️⃣ ALL EVENT LISTENERS ==========
+  document.getElementById("srDateFilterBtn").addEventListener("click", (e) => {
     e.stopPropagation();
-    if (dateMenu.style.display === "block") closeDateMenu(); else openDateMenu();
-  });
-  closeMenuLink.addEventListener("click", closeDateMenu);
-  // clicking outside closes menu
-  document.addEventListener("click", (e) => {
-    const menu = document.getElementById("srDateMenu");
-    const wrap = document.getElementById("dateFilterWrap");
-    if (!menu || !wrap) return;
-    if (!wrap.contains(e.target)) closeDateMenu();
+    dateMenu.style.display === "block" ? closeDateMenu() : openDateMenu();
   });
 
-  /************ wire UI controls ************/
   document.getElementById("srDatePreset").addEventListener("change", (e) => {
     if (e.target.value === "custom") {
-      document.getElementById("srMenuCustomDates").style.display = "";
+      document.getElementById("srMenuCustomDates").style.display = "block";
     } else {
       document.getElementById("srMenuCustomDates").style.display = "none";
       setPresetRange(e.target.value);
     }
   });
+
+  document.getElementById("srFrom")?.addEventListener("change", updateDateFilterText);
+  document.getElementById("srTo")?.addEventListener("change", updateDateFilterText);
   document.getElementById("srApplyFilters").addEventListener("click", applyFilters);
   document.getElementById("srExportCsv").addEventListener("click", exportCSV);
   document.getElementById("srExportExcel").addEventListener("click", exportExcel);
   document.getElementById("srExportPdf").addEventListener("click", exportPDF);
+  document.getElementById("srCloseMenu")?.addEventListener("click", closeDateMenu);
 
-  // mode buttons wiring
-  const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
-  function setReportMode(mode) {
-    salesState.reportMode = mode;
-    // toggle active class
-    modeButtons.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-    // re-render placeholder for the selected mode
-    renderModePlaceholder();
-  }
-  modeButtons.forEach(btn => btn.addEventListener("click", () => {
-    setReportMode(btn.dataset.mode);
-  }));
+  document.addEventListener("click", (e) => {
+    const wrap = document.getElementById("dateFilterWrap");
+    if (wrap && dateMenu && !wrap.contains(e.target)) closeDateMenu();
+  });
 
-  /************ initial setup ************/
-  setPresetRange(document.getElementById("srDatePreset").value);
+  // ========== 🔟 INITIALIZATION - THIS MONTH DEFAULT ✅ ==========
   await loadLocations();
-  // default render for the chosen mode
- setReportMode("detailed");  // force Detailed mode on start
-  applyFilters(); // populate salesState.filtered based on default dates (rows empty until aggregation is implemented)
+  setPresetRange("thisMonth");  // ✅ 1st → TODAY
+  setupModeButtons();
+  updateDateFilterText();
+  
+  // Auto-run with THIS MONTH
+  setTimeout(() => applyFilters(), 500);
 }
 
- // ----------------- Wire report mode buttons -----------------
-function setReportModeButtons() {
-  // ensures there's a default mode
-  if (!salesState.reportMode) salesState.reportMode = "detailed";
+// ========== 1️⃣1️⃣ AGGREGATION FUNCTIONS (COMPLETE FROM YOUR DATA) ==========
 
-  const btnsHtml = `
-    <button id="modeDetailed" class="btn btn-sm" style="background:#6f2cc1;color:#fff">Detailed Sales Report (per Salesperson)</button>
-    <button id="modeByDate" class="btn btn-sm" style="opacity:.45" disabled>Sales By Date</button>
-    <button id="modeProduct" class="btn btn-sm" style="opacity:.45" disabled>Sales By Product</button>
-    <button id="modeCustomer" class="btn btn-sm" style="opacity:.45" disabled>Sales By Customer</button>
-    <button id="modeCustGroup" class="btn btn-sm" style="opacity:.45" disabled>Sales By Customer Group</button>
-  `;
-  // insert buttons near top-left controls (adjust selector if needed)
-  const head = document.querySelector(".sr-controls");
-  if (head) {
-    const wrapper = document.createElement("div");
-    wrapper.style.display = "flex";
-    wrapper.style.gap = "8px";
-    wrapper.innerHTML = btnsHtml;
-    head.insertBefore(wrapper, head.firstChild);
-  }
-
-  const setActive = (mode) => {
-    salesState.reportMode = mode;
-    // style buttons: only detailed active for now
-    ["modeDetailed","modeByDate","modeProduct","modeCustomer","modeCustGroup"].forEach(id=>{
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (id === "modeDetailed" && mode === "detailed") { el.style.opacity = "1"; el.style.pointerEvents="auto"; el.style.background="#6f2cc1"; el.style.color="#fff"; }
-      else { el.style.opacity = ".45"; el.style.pointerEvents="none"; el.style.background=""; el.style.color=""; }
-    });
-    // re-render placeholder for new mode
-    renderModePlaceholder();
-  };
-
-  document.getElementById("modeDetailed")?.addEventListener("click", () => setActive("detailed"));
-  // other buttons are placeholders (disabled) — future hook here
-  setActive("detailed");
-}
-
-
-// ULTRA-FAST VERSION – No more slow product lookups! (2025 Edition)
+// DETAILED REPORT
 async function aggregateSalesDetailed() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
-
   let q = db.collection("sales").orderBy("saleDate", "desc");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-
-  const snap = await q.get();  // One single fast query → all your sales
-
+  const snap = await q.get();
   const spMap = {};
   const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
 
@@ -10060,7 +9890,6 @@ async function aggregateSalesDetailed() {
     const sp = String(sd.salesperson || sd.salespersonName || "").trim() || "Unknown";
     const sLoc = String(sd.location || sd.businessLocation || "").trim();
     if (loc && sLoc !== loc) continue;
-
     const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
     if (!Array.isArray(items) || items.length === 0) continue;
 
@@ -10071,13 +9900,9 @@ async function aggregateSalesDetailed() {
     for (const it of items) {
       const pname = String(it.prodName || it.productName || it.name || "").trim();
       if (!pname) continue;
-
-      const qty   = toNum(it.quantity || it.qty || 0);
+      const qty = toNum(it.quantity || it.qty || 0);
       if (qty === 0) continue;
-
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
-
-      // SUPER FAST: we now have costAtSale on EVERY sale (you already fixed them!)
       const costPrice = toNum(it.costAtSale || 0);
 
       if (!spMap[sp].products[pname]) {
@@ -10089,18 +9914,15 @@ async function aggregateSalesDetailed() {
           unitShort: String(it.unit || it.unitShort || "").trim()
         };
       }
-
-      spMap[sp].products[pname].qty      += qty;
-      spMap[sp].products[pname].revenue  += qty * price;
-      spMap[sp].products[pname].cost     += qty * costPrice;
-
-      spMap[sp].totals.qty      += qty;
+      spMap[sp].products[pname].qty += qty;
+      spMap[sp].products[pname].revenue += qty * price;
+      spMap[sp].products[pname].cost += qty * costPrice;
+      spMap[sp].totals.qty += qty;
       spMap[sp].totals.revenue += qty * price;
-      spMap[sp].totals.cost     += qty * costPrice;
+      spMap[sp].totals.cost += qty * costPrice;
     }
   }
 
-  // Build final array (sorted by salesperson name)
   const result = Object.keys(spMap)
     .sort()
     .map(spName => {
@@ -10109,7 +9931,6 @@ async function aggregateSalesDetailed() {
         .sort((a, b) => a.productName.localeCompare(b.productName));
       return { salesperson: entry.salesperson, products, totals: entry.totals };
     });
-
   salesState.rows = result;
   salesState.filtered = result.slice();
 }
@@ -10117,35 +9938,25 @@ async function aggregateSalesDetailed() {
 async function renderDetailedTable() {
   const container = document.getElementById("srResults");
   if (!salesState.rows || !salesState.rows.length) {
-    container.innerHTML = `<div class="sr-table-placeholder">No aggregated sales found for the selected filters.</div>`;
+    container.innerHTML = `<div class="sr-table-placeholder">No sales found for selected filters.</div>`;
     return;
   }
 
-  // FETCH EXPENSES FOR THE SAME PERIOD + LOCATION
   const db = firebase.firestore();
   let expQuery = db.collection("expenses")
     .where("expenseDate", ">=", salesState.from)
     .where("expenseDate", "<=", salesState.to);
-  if (salesState.location) {
-    expQuery = expQuery.where("location", "==", salesState.location);
-  }
+  if (salesState.location) expQuery = expQuery.where("location", "==", salesState.location);
   const expSnap = await expQuery.get();
 
-  // Group expenses by salesperson → category → total
   const expensesBySalesperson = {};
-
   expSnap.forEach(doc => {
     const e = doc.data();
     const spName = String(e.salesperson || "Unknown").trim();
     const category = String(e.category || "Uncategorized").trim();
     const amount = Number(e.totalAmount || e.paidAmount || 0);
-
-    if (!expensesBySalesperson[spName]) {
-      expensesBySalesperson[spName] = {};
-    }
-    if (!expensesBySalesperson[spName][category]) {
-      expensesBySalesperson[spName][category] = 0;
-    }
+    if (!expensesBySalesperson[spName]) expensesBySalesperson[spName] = {};
+    if (!expensesBySalesperson[spName][category]) expensesBySalesperson[spName][category] = 0;
     expensesBySalesperson[spName][category] += amount;
   });
 
@@ -10160,7 +9971,6 @@ async function renderDetailedTable() {
     grandTotalExpenses += totalExpenses;
     const netRevenue = grossProfit - totalExpenses;
 
-    // Build expense lines
     const expenseLines = Object.keys(spExpenses)
       .sort()
       .map(cat => {
@@ -10171,7 +9981,6 @@ async function renderDetailedTable() {
                 </div>`;
       }).join("") || `<div style="color:#999">No expenses recorded</div>`;
 
-    // === SALES TABLE ===
     const prodRows = spEntry.products.map(p => {
       const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
       const revenueText = Number(p.revenue || 0).toLocaleString();
@@ -10192,7 +10001,6 @@ async function renderDetailedTable() {
     const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
     const subGp = grossProfit.toLocaleString();
 
-    // === EXPENSES BOX ===
     const expensesBox = `
       <aside style="width:340px;flex-shrink:0;">
         <div style="background:#fff;border:1px solid #ddd;border-radius:10px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.05);height:fit-content">
@@ -10202,9 +10010,7 @@ async function renderDetailedTable() {
           <div style="padding:20px">
             <div style="background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:15px">
               <div style="color:#555;margin-bottom:12px;font-weight:600">Expense Categories</div>
-              <div style="min-height:120px;color:#777">
-                ${expenseLines}
-              </div>
+              <div style="min-height:120px;color:#777">${expenseLines}</div>
             </div>
             <div style="border-top:1px solid #eee;padding-top:12px;font-size:15px">
               <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -10212,7 +10018,7 @@ async function renderDetailedTable() {
                 <strong style="color:#c0392b">${totalExpenses.toLocaleString()}</strong>
               </div>
               <div style="display:flex;justify-content:space-between;padding-top:12px;border-top:2px solid #6f2cc1">
-                <span style="font-weight:600">Net Revenue (after expenses)</span>
+                <span style="font-weight:600">Net Revenue</span>
                 <strong style="color:${netRevenue >= 0 ? '#27ae60' : '#c0392b'};font-size:20px">
                   ${netRevenue.toLocaleString()}
                 </strong>
@@ -10252,27 +10058,25 @@ async function renderDetailedTable() {
         </div>
         ${expensesBox}
       </div>`;
-
     htmlParts.push(block);
   });
 
-  // Grand totals
   const grand = salesState.rows.reduce((a, b) => ({
     qty: a.qty + Number(b.totals.qty || 0),
     revenue: a.revenue + Number(b.totals.revenue || 0),
     cost: a.cost + Number(b.totals.cost || 0)
   }), { qty: 0, revenue: 0, cost: 0 });
-
+  
   const grandGrossProfit = grand.revenue - grand.cost;
   const grandNetRevenue = grandGrossProfit - grandTotalExpenses;
 
   const overall = `
     <div style="margin:60px 0;padding:25px;background:#222;color:#fff;border-radius:12px;text-align:center;font-size:22px;font-weight:700">
-      FINAL SUMMARY → 
-      Sales: ${grand.revenue.toLocaleString()} | 
-      Cost: ${grand.cost.toLocaleString()} | 
-      Gross Profit: ${grandGrossProfit.toLocaleString()} | 
-      <span style="color:#e74c3c">Expenses: ${grandTotalExpenses.toLocaleString()}</span> | 
+      FINAL SUMMARY →
+      Sales: ${grand.revenue.toLocaleString()} |
+      Cost: ${grand.cost.toLocaleString()} |
+      Gross Profit: ${grandGrossProfit.toLocaleString()} |
+      <span style="color:#e74c3c">Expenses: ${grandTotalExpenses.toLocaleString()}</span> |
       <strong style="color:${grandNetRevenue >= 0 ? '#27ae60' : '#c0392b'}">
         NET REVENUE: ${grandNetRevenue.toLocaleString()} KES
       </strong>
@@ -10280,46 +10084,37 @@ async function renderDetailedTable() {
 
   container.innerHTML = `
     <h2 style="text-align:center;margin:30px 0 40px;color:#333;font-size:28px">
-      Detailed Sales & Expenses Report (per Salesperson)
+      Detailed Sales & Expenses Report
     </h2>
     ${htmlParts.join("")}
     ${overall}
   `;
 }
 
-// 1. Collect sales for each day (same as before but safer)
+// BY DATE
 async function aggregateSalesByDate() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
-
   let q = db.collection("sales");
-  if (from && to) {
-    q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  }
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-
   const snap = await q.get();
   const dayMap = {};
 
   for (const doc of snap.docs) {
     const s = doc.data();
     if (!s.saleDate) continue;
-
     const dateObj = s.saleDate.toDate ? s.saleDate.toDate() : new Date(s.saleDate);
     const dateKey = dateObj.toISOString().split("T")[0];
-
-    if (!dayMap[dateKey]) {
-      dayMap[dateKey] = { date: dateKey, qty: 0, sales: 0, cost: 0 };
-    }
+    if (!dayMap[dateKey]) dayMap[dateKey] = { date: dateKey, qty: 0, sales: 0, cost: 0 };
 
     const items = s.items || s.products || [];
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
       const cost = Number(it.costAtSale || 0);
-
       dayMap[dateKey].qty += qty;
       dayMap[dateKey].sales += qty * price;
       dayMap[dateKey].cost += qty * cost;
@@ -10331,11 +10126,8 @@ async function aggregateSalesByDate() {
   salesState.filtered = rows.slice();
 }
 
-// 2. FIXED renderSalesByDate – now 100% safe!
 function renderSalesByDate() {
   const container = document.getElementById("srResults");
-
-  // If no sales
   if (!salesState.filtered || salesState.filtered.length === 0) {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
@@ -10343,13 +10135,12 @@ function renderSalesByDate() {
 
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalCost = 0;
-
+  
   salesState.filtered.forEach(r => {
     const profit = r.sales - r.cost;
     totalQty += r.qty;
     totalSales += r.sales;
     totalCost += r.cost;
-
     rowsHtml += `
       <tr>
         <td style="padding:14px; font-weight:600; background:#f9f9f9">${new Date(r.date).toLocaleDateString("en-KE", { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
@@ -10360,9 +10151,8 @@ function renderSalesByDate() {
       </tr>`;
   });
 
-  // Build the full table safely inside srResults
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">Sales By Date</div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📅 Sales By Date</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
@@ -10387,53 +10177,41 @@ function renderSalesByDate() {
   `;
 }
 
-// 1. Collect sales for each product
+// BY PRODUCT
 async function aggregateSalesByProduct() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
-
   let q = db.collection("sales");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-
   const snap = await q.get();
   const productMap = {};
 
   for (const doc of snap.docs) {
     const s = doc.data();
     const items = s.items || s.products || [];
-
     for (const it of items) {
       const name = String(it.prodName || it.productName || it.name || "Unknown").trim();
       if (!name || name === "Unknown") continue;
-
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
       const cost = Number(it.costAtSale || 0);
-
-      if (!productMap[name]) {
-        productMap[name] = { product: name, qty: 0, sales: 0, cost: 0 };
-      }
-
+      if (!productMap[name]) productMap[name] = { product: name, qty: 0, sales: 0, cost: 0 };
       productMap[name].qty += qty;
       productMap[name].sales += qty * price;
       productMap[name].cost += qty * cost;
     }
   }
 
-  const rows = Object.values(productMap)
-    .sort((a, b) => b.sales - a.sales); // best sellers first!
-
+  const rows = Object.values(productMap).sort((a, b) => b.sales - a.sales);
   salesState.rows = rows;
   salesState.filtered = rows.slice();
 }
 
-// 2. Show the beautiful product table
 function renderSalesByProduct() {
   const container = document.getElementById("srResults");
-
   if (!salesState.filtered || salesState.filtered.length === 0) {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
@@ -10441,15 +10219,12 @@ function renderSalesByProduct() {
 
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalCost = 0;
-
+  
   salesState.filtered.forEach((p, index) => {
     const profit = p.sales - p.cost;
     totalQty += p.qty;
     totalSales += p.sales;
     totalCost += p.cost;
-
-    const rank = index < 3 ? ["", "", ""][index] : "";
-
     rowsHtml += `
       <tr style="${index < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
         <td style="padding:14px">${index + 1}. ${escapeHTML(p.product)}</td>
@@ -10461,7 +10236,7 @@ function renderSalesByProduct() {
   });
 
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">Sales By Product (Top Sellers First)</div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📦 Sales By Product (Top Sellers First)</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
@@ -10486,55 +10261,42 @@ function renderSalesByProduct() {
   `;
 }
 
-// 1. Collect sales + convert customer ID → real name
+// BY CUSTOMER
 async function aggregateSalesByCustomer() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
-
   let q = db.collection("sales");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-
   const snap = await q.get();
   const customerMap = {};
   const customerPromises = [];
 
-  // First pass: collect all customer refs/IDs we need to look up
   for (const doc of snap.docs) {
     const s = doc.data();
-    let customerRef = s.customer; // this is usually a DocumentReference or string ID
+    let customerRef = s.customer;
     let customerName = "Walk-in Customer";
-
+    
     if (customerRef) {
-      // If it's a Firestore reference (has .get), or just a string ID
       const ref = typeof customerRef.get === "function" ? customerRef : db.collection("customers").doc(customerRef);
       customerPromises.push(
         ref.get().then(custSnap => {
-          if (custSnap.exists) {
-            return { id: custSnap.id, name: String(custSnap.data()?.name || "Unknown Customer").trim() };
-          } else {
-            return { id: custSnap.id, name: "Deleted Customer" };
-          }
+          if (custSnap.exists) return { id: custSnap.id, name: String(custSnap.data()?.name || "Unknown Customer").trim() };
+          return { id: custSnap.id, name: "Deleted Customer" };
         }).catch(() => ({ id: "error", name: "Name Not Found" }))
       );
     }
 
     const items = s.items || s.products || [];
     const key = customerRef ? (typeof customerRef.get === "function" ? customerRef.path : customerRef) : "walkin";
-
+    
     if (!customerMap[key]) {
-      customerMap[key] = {
-        customerRef: key,
-        customerName: customerName,
-        qty: 0,
-        sales: 0,
-        invoices: 0
-      };
+      customerMap[key] = { customerRef: key, customerName, qty: 0, sales: 0, invoices: 0 };
     }
-
     customerMap[key].invoices += 1;
+    
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
@@ -10543,10 +10305,7 @@ async function aggregateSalesByCustomer() {
     }
   }
 
-  // Wait for all customer names to load
   const customerResults = await Promise.all(customerPromises);
-
-  // Replace temporary names with real ones
   const nameMap = {};
   customerResults.forEach(c => { nameMap[c.id] = c.name; });
 
@@ -10554,7 +10313,6 @@ async function aggregateSalesByCustomer() {
     if (key === "walkin") {
       customerMap[key].customerName = "Walk-in Customer";
     } else if (typeof key === "string" && key.includes("/")) {
-      // it's a full path like customers/QmDs2b...
       const id = key.split("/").pop();
       customerMap[key].customerName = nameMap[id] || "Unknown Customer";
     } else {
@@ -10563,22 +10321,14 @@ async function aggregateSalesByCustomer() {
   }
 
   const rows = Object.values(customerMap)
-    .map(c => ({
-      customer: c.customerName,
-      qty: c.qty,
-      sales: c.sales,
-      invoices: c.invoices
-    }))
+    .map(c => ({ customer: c.customerName, qty: c.qty, sales: c.sales, invoices: c.invoices }))
     .sort((a, b) => b.sales - a.sales);
-
   salesState.rows = rows;
   salesState.filtered = rows.slice();
 }
 
-// 2. Show beautiful table with REAL customer names!
 function renderSalesByCustomer() {
   const container = document.getElementById("srResults");
-
   if (!salesState.filtered || salesState.filtered.length === 0) {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
@@ -10586,14 +10336,12 @@ function renderSalesByCustomer() {
 
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalInvoices = 0;
-
+  
   salesState.filtered.forEach((c, i) => {
     totalQty += c.qty;
     totalSales += c.sales;
     totalInvoices += c.invoices;
-
     const avgInvoice = c.invoices > 0 ? Math.round(c.sales / c.invoices) : 0;
-
     rowsHtml += `
       <tr style="${i < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
         <td style="padding:14px">${i + 1}. ${escapeHTML(c.customer)}</td>
@@ -10605,15 +10353,13 @@ function renderSalesByCustomer() {
   });
 
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">
-      Sales By Customer (Top Spenders First)
-    </div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">👥 Sales By Customer (Top Spenders)</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
           <th style="padding:16px; text-align:left">Customer</th>
           <th style="padding:16px; text-align:right">Qty Sold</th>
-          <th style="padding:16px; text-align:right">Total Sales (KES)</th>
+          <th style="padding:16px; text-align:right">Total Sales</th>
           <th style="padding:16px; text-align:center"># Invoices</th>
           <th style="padding:16px; text-align:right">Avg Invoice</th>
         </tr>
@@ -10632,54 +10378,36 @@ function renderSalesByCustomer() {
   `;
 }
 
-// 1. Collect sales by Customer Group
+// BY CUSTOMER GROUP
 async function aggregateSalesByCustGroup() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
-
   let q = db.collection("sales");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
   if (loc) q = q.where("location", "==", loc);
-
   const snap = await q.get();
   const groupMap = {};
 
   for (const doc of snap.docs) {
     const s = doc.data();
-    let group = "Unknown Group";
-
-    // Try to get group from customer reference first
+    let group = "Retail";
+    
     if (s.customer) {
       const custRef = typeof s.customer.get === "function" ? s.customer : db.collection("customers").doc(s.customer);
       try {
         const custSnap = await custRef.get();
-        if (custSnap.exists) {
-          group = String(custSnap.data()?.customerGroup || "Retail").trim();
-        }
-      } catch (e) {
-        // if can't load, fallback
-      }
+        if (custSnap.exists) group = String(custSnap.data()?.customerGroup || "Retail").trim();
+      } catch (e) {}
     }
-
-    // Fallback: check if sale has customerGroup directly (some systems save it)
-    if (s.customerGroup) {
-      group = String(s.customerGroup).trim();
-    }
+    
+    if (s.customerGroup) group = String(s.customerGroup).trim();
 
     const items = s.items || s.products || [];
-
-    if (!groupMap[group]) {
-      groupMap[group] = {
-        group: group,
-        qty: 0,
-        sales: 0,
-        invoices: 0
-      };
-    }
-
+    if (!groupMap[group]) groupMap[group] = { group, qty: 0, sales: 0, invoices: 0 };
     groupMap[group].invoices += 1;
+    
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
@@ -10688,17 +10416,13 @@ async function aggregateSalesByCustGroup() {
     }
   }
 
-  const rows = Object.values(groupMap)
-    .sort((a, b) => b.sales - a.sales);
-
+  const rows = Object.values(groupMap).sort((a, b) => b.sales - a.sales);
   salesState.rows = rows;
   salesState.filtered = rows.slice();
 }
 
-// 2. Show beautiful Customer Group table
 function renderSalesByCustGroup() {
   const container = document.getElementById("srResults");
-
   if (!salesState.filtered || salesState.filtered.length === 0) {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
@@ -10706,14 +10430,12 @@ function renderSalesByCustGroup() {
 
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalInvoices = 0;
-
+  
   salesState.filtered.forEach((g, i) => {
     totalQty += g.qty;
     totalSales += g.sales;
     totalInvoices += g.invoices;
-
     const avgInvoice = g.invoices > 0 ? Math.round(g.sales / g.invoices) : 0;
-
     rowsHtml += `
       <tr style="${i < 2 ? 'background:#fff8e1; font-weight:600' : ''}">
         <td style="padding:14px; font-weight:600">${i + 1}. ${escapeHTML(g.group)}</td>
@@ -10725,15 +10447,13 @@ function renderSalesByCustGroup() {
   });
 
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">
-      Sales By Customer Group (Highest Revenue First)
-    </div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">🏷️ Sales By Customer Group</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
           <th style="padding:16px; text-align:left">Customer Group</th>
           <th style="padding:16px; text-align:right">Qty Sold</th>
-          <th style="padding:16px; text-align:right">Total Sales (KES)</th>
+          <th style="padding:16px; text-align:right">Total Sales</th>
           <th style="padding:16px; text-align:center"># Invoices</th>
           <th style="padding:16px; text-align:right">Avg Invoice</th>
         </tr>
