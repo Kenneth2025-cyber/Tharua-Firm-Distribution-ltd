@@ -9358,116 +9358,215 @@ let salesState = {
 async function showSalesReport() {
   saveLastPage("showSalesReport");
   const el = document.getElementById("content");
-  
+ 
   el.innerHTML = `
     <style data-sales-clean>
-      .sr-wrap{background:#fff;border-radius:8px;padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-      .sr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-      .sr-head h2{margin:0}
-      .sr-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-      .sr-controls .input, .sr-controls select{padding:8px 10px;border:1px solid #d0d7de;border-radius:6px}
+      .sr-wrap{background:#fff;border-radius:12px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.06)}
+      .sr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+      .sr-head h2{margin:0;font-size:28px;font-weight:700}
+      .sr-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+      .sr-controls .input, .sr-controls select{padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff}
       .sr-presets{position:relative}
-      .sr-presets select{min-width:160px}
-      .sr-custom-dates{display:flex;gap:8px;align-items:center}
+      .sr-presets select{min-width:180px}
+      .sr-custom-dates{display:flex;gap:10px;align-items:center}
       .sr-export{display:flex;gap:8px}
-      .btn{border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
-      .btn-sm{padding:6px 10px;font-size:13px}
-      .btn-csv{background:#0d6efd;color:#fff}
-      .btn-excel{background:#198754;color:#fff}
-      .btn-pdf{background:#6b7280;color:#fff}
-      .mode-bar{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
-      .mode-btn{padding:8px 12px;border-radius:6px;border:1px solid #d0d7de;background:#f5f7fb;cursor:pointer;font-weight:600;transition:all .2s}
-      .mode-btn:hover{background:#e9ecef}
-      .mode-btn.active{background:#6f2cc1;color:#fff;border-color:#5a229f;box-shadow:0 2px 8px rgba(111,44,193,.3)}
-      .sr-table-placeholder{padding:18px;border:1px dashed #e6e6e6;border-radius:6px;color:#666;margin-top:8px;min-height:140px}
+      .btn{border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;transition:all .2s}
+      .btn-sm{padding:8px 14px;font-size:14px}
+      .btn-csv{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;box-shadow:0 4px 12px rgba(59,130,246,.3)}
+      .btn-csv:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.4)}
+      .btn-excel{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,.3)}
+      .btn-excel:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.4)}
+      .btn-pdf{background:linear-gradient(135deg,#6b7280,#4b5563);color:#fff;box-shadow:0 4px 12px rgba(107,114,128,.3)}
+      .btn-pdf:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(107,114,128,.4)}
+      .mode-bar{display:flex;gap:12px;align-items:center;margin:20px 0;flex-wrap:wrap}
+      .mode-btn{
+        display:flex;align-items:center;gap:10px;
+        padding:12px 20px;border-radius:12px;border:2px solid #e2e8f0;
+        background:#fff;cursor:pointer;font-weight:600;transition:all .3s;
+        box-shadow:0 2px 8px rgba(0,0,0,.06);
+        min-height:52px;
+      }
+      .mode-btn:hover{background:#f8fafc;border-color:#cbd5e1;transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.1)}
+      .mode-btn.active{
+        background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+        color:#fff;border-color:#7c3aed;
+        box-shadow:0 8px 25px rgba(139,92,246,.4);
+        transform:translateY(-2px)
+      }
+      .mode-icon{width:20px;height:20px;flex-shrink:0}
+      .sr-table-placeholder{padding:24px;border:2px dashed #e2e8f0;border-radius:12px;color:#64748b;margin-top:12px;min-height:160px;text-align:center}
       .date-filter-wrap{position:relative;display:inline-block}
-      .date-filter-btn{background:#6f2cc1;color:#fff;padding:10px 12px;border-radius:6px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center;transition:all .2s}
-      .date-filter-btn:hover{box-shadow:0 2px 8px rgba(111,44,193,.3)}
-      .date-filter-menu{position:absolute;right:0;top:42px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.08);min-width:220px;padding:12px;display:none;z-index:50}
-      .date-filter-menu label{display:block;margin-bottom:8px;font-size:13px}
-      .date-filter-menu .preset-list{max-height:240px;overflow:auto;border-top:1px solid #eee;padding-top:8px;margin-top:8px}
-      .apply-filters{background:#0d6efd;color:#fff;padding:8px 10px;border-radius:6px;border:none;cursor:pointer;width:100%;transition:all .2s}
-      .apply-filters:hover{background:#0b5ed7}
-      .small-link{font-size:12px;color:#6f2cc1;cursor:pointer;text-decoration:underline;margin-top:8px;display:inline-block}
-      .muted { color:#666; font-size:13px }
+      .date-filter-btn{
+        background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+        color:#fff;padding:12px 16px;border-radius:12px;border:none;
+        cursor:pointer;display:flex;gap:10px;align-items:center;
+        font-weight:600;transition:all .2s;box-shadow:0 4px 12px rgba(139,92,246,.3)
+      }
+      .date-filter-btn:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(139,92,246,.4)}
+      .date-filter-menu{
+        position:absolute;right:0;top:48px;background:#fff;
+        border:1px solid #e2e8f0;border-radius:12px;
+        box-shadow:0 20px 40px rgba(0,0,0,.12);
+        min-width:260px;padding:20px;display:none;z-index:50;
+        backdrop-filter:blur(10px)
+      }
+      .date-filter-menu label{display:block;margin-bottom:12px;font-size:14px;font-weight:500;color:#374151}
+      .date-filter-menu .preset-list{max-height:260px;overflow:auto;border-top:1px solid #f1f5f9;padding-top:12px;margin-top:12px}
+      .apply-filters{
+        background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+        color:#fff;padding:12px 16px;border-radius:8px;border:none;
+        cursor:pointer;width:100%;font-weight:600;transition:all .2s
+      }
+      .apply-filters:hover{background:linear-gradient(135deg,#2563eb,#1e40af);transform:translateY(-1px)}
+      .small-link{font-size:13px;color:#8b5cf6;cursor:pointer;text-decoration:none;font-weight:500;margin-top:12px;display:inline-block}
+      .small-link:hover{text-decoration:underline}
+      .muted { color:#6b7280; font-size:14px }
+      .professional-icons{line-height:1.2}
     </style>
     <div class="sr-wrap">
       <div class="sr-head">
-        <h2>📊 Sales Report</h2>
-        <div style="display:flex;gap:10px;align-items:center">
+        <h2 class="professional-icons">📈 <span style="font-size:24px">Sales Analytics</span></h2>
+        <div style="display:flex;gap:16px;align-items:center">
           <div class="sr-export">
-            <button id="srExportCsv" class="btn btn-csv btn-sm">CSV</button>
-            <button id="srExportExcel" class="btn btn-excel btn-sm">Excel</button>
-            <button id="srExportPdf" class="btn btn-pdf btn-sm">PDF</button>
+            <button id="srExportCsv" class="btn btn-csv btn-sm" title="Export CSV">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" opacity=".9"/><path d="M14 2v6h6M12 10l-3 3 3 3M16 12H8"/></svg>
+              CSV
+            </button>
+            <button id="srExportExcel" class="btn btn-excel btn-sm" title="Export Excel">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 15.98L8 22.25z"/><path d="M12 2L8.91 8.26 2 9.27l5-15.98L12 2zm4.55 13.55L12 22.25l-4.55-6.7-.45-1.06L7.5 14l4.45 6.55L16.5 14z"/></svg>
+              Excel
+            </button>
+            <button id="srExportPdf" class="btn btn-pdf btn-sm" title="Print PDF">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="22,2 12,13 9,10 2,21"/></svg>
+              PDF
+            </button>
           </div>
           <div class="date-filter-wrap" id="dateFilterWrap">
             <button id="srDateFilterBtn" class="date-filter-btn">
-              <span id="dateFilterText">Filter by date</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.9"><path d="M6 9l6 6 6-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity:0.9">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+                <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <span id="dateFilterText">Select Date Range</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.9">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </button>
             <div id="srDateMenu" class="date-filter-menu" role="menu" aria-hidden="true">
               <label>
-                Date range:
-                <select id="srDatePreset" class="input" style="width:100%;margin-top:6px;">
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="last7">Last 7 Days</option>
-                  <option value="last30">Last 30 Days</option>
-                  <option value="thisMonth" selected>🌟 This Month</option>
-                  <option value="lastMonth">Last Month</option>
-                  <option value="thisYear">This Year</option>
-                  <option value="lastYear">Last Year</option>
-                  <option value="custom">Custom Range</option>
+                <div style="font-weight:600;margin-bottom:8px">📅 Date Range</div>
+                <select id="srDatePreset" class="input" style="width:100%;margin-top:8px;">
+                  <option value="today">📍 Today</option>
+                  <option value="yesterday">📍 Yesterday</option>
+                  <option value="last7">📊 Last 7 Days</option>
+                  <option value="last30">📈 Last 30 Days</option>
+                  <option value="thisMonth" selected>🌟 This Month (Default)</option>
+                  <option value="lastMonth">📋 Last Month</option>
+                  <option value="thisYear">📅 This Year</option>
+                  <option value="lastYear">📋 Last Year</option>
+                  <option value="custom">⚙️ Custom Range</option>
                 </select>
               </label>
-              <div id="srMenuCustomDates" style="display:none;margin-top:8px">
-                <label>From: <input id="srFrom" type="date" class="input" style="width:100%"></label>
-                <label style="margin-top:8px">To: <input id="srTo" type="date" class="input" style="width:100%"></label>
+              <div id="srMenuCustomDates" style="display:none;margin-top:12px">
+                <label style="display:block;margin-bottom:10px">
+                  From: <input id="srFrom" type="date" class="input" style="width:100%;margin-top:6px">
+                </label>
+                <label style="display:block">
+                  To: <input id="srTo" type="date" class="input" style="width:100%;margin-top:6px">
+                </label>
               </div>
-              <div style="margin-top:10px">
-                <button id="srApplyFilters" class="apply-filters">✅ Apply filters</button>
+              <div style="margin-top:16px">
+                <button id="srApplyFilters" class="apply-filters">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="margin-right:8px;opacity:0.9;vertical-align:middle">
+                    <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Generate Report
+                </button>
               </div>
-              <div style="border-top:1px solid #f0f0f0;margin-top:10px;padding-top:8px">
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <label style="flex:1">📍 Location:</label>
-                  <select id="srLocationSmall" class="input" style="min-width:110px">
-                    <option value="">All locations</option>
+              <div style="border-top:1px solid #f1f5f9;margin-top:16px;padding-top:16px">
+                <div style="display:flex;gap:12px;align-items:center;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="color:#6b7280;flex-shrink:0">
+                    <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M9.414 10a2 2 0 00-2.828 2.828l.793.792.792-.792a2 2 0 012.828 0L16.485 17.25" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <label style="flex:1;margin:0">Location Filter</label>
+                  <select id="srLocationSmall" class="input" style="min-width:140px">
+                    <option value="">🌍 All Locations</option>
                   </select>
                 </div>
-                <div style="margin-top:8px;text-align:right"><span id="srCloseMenu" class="small-link">✕ Close</span></div>
+                <div style="margin-top:12px;text-align:right">
+                  <span id="srCloseMenu" class="small-link">✕ Close Menu</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       <div class="sr-controls">
-        <div style="flex:1;color:#666">
-          📅 Use <strong>Filter by date</strong> (top-right) → choose preset or custom range → click <strong>Apply filters</strong>
+        <div style="flex:1;color:#6b7280;font-size:15px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:8px;vertical-align:middle">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 15.98-8.09-2.73z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <strong>Quick Start:</strong> Date filter (top-right) → Select range → <strong>Generate Report</strong>
         </div>
-        <div style="color:#666">Choose mode below → apply filters → export 📊</div>
+        <div style="color:#6b7280;font-size:15px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:8px;vertical-align:middle">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001.73 1.73L10 21.94a2 2 0 002 0l6.27-3.61A2 2 0 0021 16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Choose report type → Generate → Export 📊
+        </div>
       </div>
-     
-      <!-- ✅ MODE BUTTONS -->
-      <div class="mode-bar" id="srModeBar" aria-label="Report modes">
+    
+      <!-- ✅ PROFESSIONAL MODE BUTTONS WITH SVG ICONS -->
+      <div class="mode-bar" id="srModeBar" aria-label="Analytics Dashboard">
         <button class="mode-btn active" data-mode="detailed" id="modeDetailed">
-          👤 Detailed (per Salesperson)
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M9 12H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 12h4a2 2 0 0 0 2 2v4a2 2 0 0 0-2 2h-4a2 2 0 0 0-2-2v-4a2 2 0 0 0 2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 4h4a2 2 0 0 0 2-2v2a2 2 0 0 0 2 2h2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 20h4a2 2 0 0 0 2 2v-2a2 2 0 0 0-2-2H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Detailed Salesperson</span>
         </button>
         <button class="mode-btn" data-mode="byDate" id="modeByDate">
-          📅 Sales By Date
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>Daily Performance</span>
         </button>
         <button class="mode-btn" data-mode="product" id="modeProduct">
-          📦 Sales By Product
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001.73 1.73L10 21.94a2 2 0 002 0l6.27-3.61A2 2 0 0021 16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Product Analytics</span>
         </button>
         <button class="mode-btn" data-mode="customer" id="modeCustomer">
-          👥 Sales By Customer
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+          <span>Customer Insights</span>
         </button>
         <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">
-          🏷️ Sales By Customer Group
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Group Analysis</span>
         </button>
       </div>
-     
+    
       <div id="srResults" class="sr-table-placeholder">
-        🌟 <strong>This Month</strong> is default! Click <strong>Apply filters</strong> to generate your first report ✨
+        <div style="font-size:24px;margin-bottom:12px">🚀 Welcome to Sales Analytics</div>
+        <div style="color:#64748b;font-size:16px">
+          <strong>This Month</strong> is pre-selected! Click <strong>Generate Report</strong> 
+          to see your detailed salesperson performance ✨
+        </div>
       </div>
     </div>
   `;
@@ -9477,7 +9576,7 @@ async function showSalesReport() {
     const today = new Date();
     let from = new Date(today);
     let to = new Date(today);
-   
+  
     switch(preset) {
       case "today": break;
       case "yesterday":
@@ -9498,7 +9597,7 @@ async function showSalesReport() {
       case "custom": return;
       default: from.setDate(from.getDate()-29);
     }
-   
+  
     const fEl = document.getElementById("srFrom");
     const tEl = document.getElementById("srTo");
     if (fEl && tEl) {
@@ -9515,13 +9614,13 @@ async function showSalesReport() {
     const to = document.getElementById("srTo")?.value;
     const textEl = document.getElementById("dateFilterText");
     if (!textEl) return;
-   
+  
     if (from && to && from === to) {
       textEl.textContent = `📅 ${from}`;
     } else if (from && to) {
       textEl.textContent = `${from} → ${to}`;
     } else {
-      textEl.textContent = "Filter by date";
+      textEl.textContent = "Select Date Range";
     }
   }
 
@@ -9546,14 +9645,14 @@ async function showSalesReport() {
     const fromVal = document.getElementById("srFrom")?.value || "";
     const toVal = document.getElementById("srTo")?.value || "";
     const loc = document.getElementById("srLocationSmall")?.value || "";
-   
+  
     salesState.location = loc;
     salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
     salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
-   
+  
     const container = document.getElementById("srResults");
     container.innerHTML = `<div class="sr-table-placeholder">🔄 Loading ${modeLabel(salesState.reportMode)}... please wait ♡</div>`;
-   
+  
     try {
       if (salesState.reportMode === "detailed") {
         await aggregateSalesDetailed();
@@ -9581,10 +9680,10 @@ async function showSalesReport() {
   function modeLabel(mode) {
     const labels = {
       detailed: "Detailed Sales Report",
-      byDate: "Sales By Date", 
-      product: "Sales By Product",
-      customer: "Sales By Customer",
-      custGroup: "Sales By Customer Group"
+      byDate: "Daily Performance",
+      product: "Product Analytics",
+      customer: "Customer Insights",
+      custGroup: "Customer Group Analysis"
     };
     return labels[mode] || mode;
   }
@@ -9597,12 +9696,12 @@ async function showSalesReport() {
         const mode = btn.dataset.mode;
         salesState.reportMode = mode;
         modeButtons.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-        
+       
         const container = document.getElementById("srResults");
         const fromStr = document.getElementById("srFrom")?.value || 'N/A';
         const toStr = document.getElementById("srTo")?.value || 'N/A';
         const locStr = document.getElementById("srLocationSmall")?.value || 'All';
-        
+       
         container.innerHTML = `
           <div style="text-align:center;padding:40px;background:linear-gradient(135deg,#f8f9ff,#e8f4fd);border-radius:12px">
             <div style="font-size:28px;font-weight:700;color:#6f2cc1;margin-bottom:12px">
@@ -9612,7 +9711,7 @@ async function showSalesReport() {
               📅 ${fromStr} → ${toStr} | 📍 ${locStr}
             </div>
             <div style="color:#888">
-              Click <strong>Apply filters</strong> to generate this report ✨
+              Click <strong>Generate Report</strong> to create this analysis ✨
             </div>
           </div>
         `;
@@ -9648,12 +9747,12 @@ async function showSalesReport() {
     }
     const win = window.open("", "_blank", "width=1300,height=900,scrollbars=yes,resizable=yes");
     if (!win) { alert("Please allow popups!"); return; }
-    
+   
     const fromStr = document.getElementById("srFrom")?.value || "Start";
     const toStr = document.getElementById("srTo")?.value || "End";
     const locStr = salesState.location || "All Locations";
     const period = fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`;
-
+    
     async function getExpensesForPeriod() {
       const db = firebase.firestore();
       let q = db.collection("expenses")
@@ -9673,18 +9772,18 @@ async function showSalesReport() {
       });
       return map;
     }
-
+    
     const expensesBySp = await getExpensesForPeriod();
     let allSections = "";
     let grandTotalExpenses = 0;
-
+    
     salesState.filtered.forEach(spEntry => {
       const spName = escapeHTML(spEntry.salesperson || "Unknown");
       const subQty = spEntry.totals.qty;
       const subSales = spEntry.totals.revenue;
       const subCost = spEntry.totals.cost;
       const grossProfit = subSales - subCost;
-      
+     
       let salesRows = "";
       spEntry.products.forEach(p => {
         const profit = p.revenue - p.cost;
@@ -9697,7 +9796,7 @@ async function showSalesReport() {
             <td style="padding:7px 9px; text-align:right; color:#27ae60; font-weight:600;">${profit.toLocaleString()}</td>
           </tr>`;
       });
-
+      
       const spExpenses = expensesBySp[spName] || {};
       let expensesRows = "";
       let totalExpenses = 0;
@@ -9715,10 +9814,9 @@ async function showSalesReport() {
       if (expensesRows === "") {
         expensesRows = `<tr><td colspan="2" style="text-align:center; color:#999; padding:20px;">No expenses recorded</td></tr>`;
       }
-      
+     
       grandTotalExpenses += totalExpenses;
       const netProfit = grossProfit - totalExpenses;
-
       allSections += `
         <div style="margin:40px 0; padding:22px; border:3px solid #6f2cc1; border-radius:16px; background:#f8fdff; box-shadow:0 6px 20px rgba(0,0,0,0.08);">
           <h2 style="margin:0 0 20px 0; color:#6f2cc1; font-size:19px; text-align:center; font-weight:bold;">${spName}</h2>
@@ -9768,12 +9866,12 @@ async function showSalesReport() {
           </div>
         </div>`;
     });
-
+    
     const grandSales = salesState.filtered.reduce((a, b) => a + b.totals.revenue, 0);
     const grandCost = salesState.filtered.reduce((a, b) => a + b.totals.cost, 0);
     const grossProfit = grandSales - grandCost;
     const netRevenue = grossProfit - grandTotalExpenses;
-
+    
     const finalHTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Detailed Report - ${period}</title>
 <style>
@@ -9810,7 +9908,7 @@ async function showSalesReport() {
     <span class="net">NET REVENUE: ${netRevenue.toLocaleString()} KES</span>
   </div>
 </body></html>`;
-
+    
     win.document.open();
     win.document.write(finalHTML);
     win.document.close();
@@ -9819,13 +9917,13 @@ async function showSalesReport() {
 
   // ========== 8️⃣ DATE MENU ==========
   let dateMenu;
-  function openDateMenu() { 
-    dateMenu.style.display = "block"; 
-    dateMenu.setAttribute("aria-hidden", "false"); 
+  function openDateMenu() {
+    dateMenu.style.display = "block";
+    dateMenu.setAttribute("aria-hidden", "false");
   }
-  function closeDateMenu() { 
-    dateMenu.style.display = "none"; 
-    dateMenu.setAttribute("aria-hidden", "true"); 
+  function closeDateMenu() {
+    dateMenu.style.display = "none";
+    dateMenu.setAttribute("aria-hidden", "true");
   }
 
   // Wait for DOM
@@ -9862,16 +9960,15 @@ async function showSalesReport() {
 
   // ========== 🔟 INITIALIZATION - THIS MONTH DEFAULT ✅ ==========
   await loadLocations();
-  setPresetRange("thisMonth");  // ✅ 1st → TODAY
+  setPresetRange("thisMonth"); // ✅ 1st → TODAY
   setupModeButtons();
   updateDateFilterText();
-  
+ 
   // Auto-run with THIS MONTH
   setTimeout(() => applyFilters(), 500);
 }
 
 // ========== 1️⃣1️⃣ AGGREGATION FUNCTIONS (COMPLETE FROM YOUR DATA) ==========
-
 // DETAILED REPORT
 async function aggregateSalesDetailed() {
   const db = firebase.firestore();
@@ -9884,7 +9981,6 @@ async function aggregateSalesDetailed() {
   const snap = await q.get();
   const spMap = {};
   const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
-
   for (const doc of snap.docs) {
     const sd = doc.data();
     const sp = String(sd.salesperson || sd.salespersonName || "").trim() || "Unknown";
@@ -9892,11 +9988,9 @@ async function aggregateSalesDetailed() {
     if (loc && sLoc !== loc) continue;
     const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
     if (!Array.isArray(items) || items.length === 0) continue;
-
     if (!spMap[sp]) {
       spMap[sp] = { salesperson: sp, products: {}, totals: { qty: 0, revenue: 0, cost: 0 } };
     }
-
     for (const it of items) {
       const pname = String(it.prodName || it.productName || it.name || "").trim();
       if (!pname) continue;
@@ -9904,7 +9998,6 @@ async function aggregateSalesDetailed() {
       if (qty === 0) continue;
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
       const costPrice = toNum(it.costAtSale || 0);
-
       if (!spMap[sp].products[pname]) {
         spMap[sp].products[pname] = {
           productName: pname,
@@ -9922,7 +10015,6 @@ async function aggregateSalesDetailed() {
       spMap[sp].totals.cost += qty * costPrice;
     }
   }
-
   const result = Object.keys(spMap)
     .sort()
     .map(spName => {
@@ -9941,14 +10033,12 @@ async function renderDetailedTable() {
     container.innerHTML = `<div class="sr-table-placeholder">No sales found for selected filters.</div>`;
     return;
   }
-
   const db = firebase.firestore();
   let expQuery = db.collection("expenses")
     .where("expenseDate", ">=", salesState.from)
     .where("expenseDate", "<=", salesState.to);
   if (salesState.location) expQuery = expQuery.where("location", "==", salesState.location);
   const expSnap = await expQuery.get();
-
   const expensesBySalesperson = {};
   expSnap.forEach(doc => {
     const e = doc.data();
@@ -9959,10 +10049,8 @@ async function renderDetailedTable() {
     if (!expensesBySalesperson[spName][category]) expensesBySalesperson[spName][category] = 0;
     expensesBySalesperson[spName][category] += amount;
   });
-
   const htmlParts = [];
   let grandTotalExpenses = 0;
-
   salesState.rows.forEach(spEntry => {
     const spName = escapeHTML(spEntry.salesperson || "Unknown");
     const grossProfit = Number(spEntry.totals.revenue || 0) - Number(spEntry.totals.cost || 0);
@@ -9970,7 +10058,6 @@ async function renderDetailedTable() {
     const totalExpenses = Object.values(spExpenses).reduce((a, b) => a + b, 0);
     grandTotalExpenses += totalExpenses;
     const netRevenue = grossProfit - totalExpenses;
-
     const expenseLines = Object.keys(spExpenses)
       .sort()
       .map(cat => {
@@ -9980,7 +10067,6 @@ async function renderDetailedTable() {
                   <strong>${amt}</strong>
                 </div>`;
       }).join("") || `<div style="color:#999">No expenses recorded</div>`;
-
     const prodRows = spEntry.products.map(p => {
       const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
       const revenueText = Number(p.revenue || 0).toLocaleString();
@@ -9995,12 +10081,10 @@ async function renderDetailedTable() {
         <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;font-weight:600;color:#2e8b57">${gpText}</td>
       </tr>`;
     }).join("") || `<tr><td colspan="5" style="padding:20px;color:#999;text-align:center">No sales recorded</td></tr>`;
-
     const subQty = Number(spEntry.totals.qty || 0).toLocaleString();
     const subRev = Number(spEntry.totals.revenue || 0).toLocaleString();
     const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
     const subGp = grossProfit.toLocaleString();
-
     const expensesBox = `
       <aside style="width:340px;flex-shrink:0;">
         <div style="background:#fff;border:1px solid #ddd;border-radius:10px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.05);height:fit-content">
@@ -10027,7 +10111,6 @@ async function renderDetailedTable() {
           </div>
         </div>
       </aside>`;
-
     const block = `
       <div style="margin-bottom:50px;display:flex;gap:25px;align-items:flex-start">
         <div style="flex:1;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden">
@@ -10060,16 +10143,16 @@ async function renderDetailedTable() {
       </div>`;
     htmlParts.push(block);
   });
-
+  
   const grand = salesState.rows.reduce((a, b) => ({
     qty: a.qty + Number(b.totals.qty || 0),
     revenue: a.revenue + Number(b.totals.revenue || 0),
     cost: a.cost + Number(b.totals.cost || 0)
   }), { qty: 0, revenue: 0, cost: 0 });
-  
+ 
   const grandGrossProfit = grand.revenue - grand.cost;
   const grandNetRevenue = grandGrossProfit - grandTotalExpenses;
-
+  
   const overall = `
     <div style="margin:60px 0;padding:25px;background:#222;color:#fff;border-radius:12px;text-align:center;font-size:22px;font-weight:700">
       FINAL SUMMARY →
@@ -10081,7 +10164,7 @@ async function renderDetailedTable() {
         NET REVENUE: ${grandNetRevenue.toLocaleString()} KES
       </strong>
     </div>`;
-
+    
   container.innerHTML = `
     <h2 style="text-align:center;margin:30px 0 40px;color:#333;font-size:28px">
       Detailed Sales & Expenses Report
@@ -10102,14 +10185,12 @@ async function aggregateSalesByDate() {
   if (loc) q = q.where("location", "==", loc);
   const snap = await q.get();
   const dayMap = {};
-
   for (const doc of snap.docs) {
     const s = doc.data();
     if (!s.saleDate) continue;
     const dateObj = s.saleDate.toDate ? s.saleDate.toDate() : new Date(s.saleDate);
     const dateKey = dateObj.toISOString().split("T")[0];
     if (!dayMap[dateKey]) dayMap[dateKey] = { date: dateKey, qty: 0, sales: 0, cost: 0 };
-
     const items = s.items || s.products || [];
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
@@ -10120,7 +10201,6 @@ async function aggregateSalesByDate() {
       dayMap[dateKey].cost += qty * cost;
     }
   }
-
   const rows = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
   salesState.rows = rows;
   salesState.filtered = rows.slice();
@@ -10132,10 +10212,9 @@ function renderSalesByDate() {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
   }
-
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalCost = 0;
-  
+ 
   salesState.filtered.forEach(r => {
     const profit = r.sales - r.cost;
     totalQty += r.qty;
@@ -10150,9 +10229,8 @@ function renderSalesByDate() {
         <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
       </tr>`;
   });
-
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📅 Sales By Date</div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📅 Daily Performance</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
@@ -10188,7 +10266,6 @@ async function aggregateSalesByProduct() {
   if (loc) q = q.where("location", "==", loc);
   const snap = await q.get();
   const productMap = {};
-
   for (const doc of snap.docs) {
     const s = doc.data();
     const items = s.items || s.products || [];
@@ -10204,7 +10281,6 @@ async function aggregateSalesByProduct() {
       productMap[name].cost += qty * cost;
     }
   }
-
   const rows = Object.values(productMap).sort((a, b) => b.sales - a.sales);
   salesState.rows = rows;
   salesState.filtered = rows.slice();
@@ -10216,10 +10292,9 @@ function renderSalesByProduct() {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
   }
-
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalCost = 0;
-  
+ 
   salesState.filtered.forEach((p, index) => {
     const profit = p.sales - p.cost;
     totalQty += p.qty;
@@ -10234,9 +10309,8 @@ function renderSalesByProduct() {
         <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
       </tr>`;
   });
-
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📦 Sales By Product (Top Sellers First)</div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📦 Product Analytics (Top Sellers First)</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
@@ -10273,12 +10347,11 @@ async function aggregateSalesByCustomer() {
   const snap = await q.get();
   const customerMap = {};
   const customerPromises = [];
-
   for (const doc of snap.docs) {
     const s = doc.data();
     let customerRef = s.customer;
     let customerName = "Walk-in Customer";
-    
+   
     if (customerRef) {
       const ref = typeof customerRef.get === "function" ? customerRef : db.collection("customers").doc(customerRef);
       customerPromises.push(
@@ -10288,15 +10361,14 @@ async function aggregateSalesByCustomer() {
         }).catch(() => ({ id: "error", name: "Name Not Found" }))
       );
     }
-
     const items = s.items || s.products || [];
     const key = customerRef ? (typeof customerRef.get === "function" ? customerRef.path : customerRef) : "walkin";
-    
+   
     if (!customerMap[key]) {
       customerMap[key] = { customerRef: key, customerName, qty: 0, sales: 0, invoices: 0 };
     }
     customerMap[key].invoices += 1;
-    
+   
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
@@ -10304,11 +10376,9 @@ async function aggregateSalesByCustomer() {
       customerMap[key].sales += qty * price;
     }
   }
-
   const customerResults = await Promise.all(customerPromises);
   const nameMap = {};
   customerResults.forEach(c => { nameMap[c.id] = c.name; });
-
   for (const key in customerMap) {
     if (key === "walkin") {
       customerMap[key].customerName = "Walk-in Customer";
@@ -10319,7 +10389,6 @@ async function aggregateSalesByCustomer() {
       customerMap[key].customerName = nameMap[key] || "Unknown Customer";
     }
   }
-
   const rows = Object.values(customerMap)
     .map(c => ({ customer: c.customerName, qty: c.qty, sales: c.sales, invoices: c.invoices }))
     .sort((a, b) => b.sales - a.sales);
@@ -10333,10 +10402,9 @@ function renderSalesByCustomer() {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
   }
-
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalInvoices = 0;
-  
+ 
   salesState.filtered.forEach((c, i) => {
     totalQty += c.qty;
     totalSales += c.sales;
@@ -10351,9 +10419,8 @@ function renderSalesByCustomer() {
         <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
       </tr>`;
   });
-
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">👥 Sales By Customer (Top Spenders)</div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">👥 Customer Insights (Top Spenders)</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
@@ -10389,11 +10456,10 @@ async function aggregateSalesByCustGroup() {
   if (loc) q = q.where("location", "==", loc);
   const snap = await q.get();
   const groupMap = {};
-
   for (const doc of snap.docs) {
     const s = doc.data();
     let group = "Retail";
-    
+   
     if (s.customer) {
       const custRef = typeof s.customer.get === "function" ? s.customer : db.collection("customers").doc(s.customer);
       try {
@@ -10401,13 +10467,12 @@ async function aggregateSalesByCustGroup() {
         if (custSnap.exists) group = String(custSnap.data()?.customerGroup || "Retail").trim();
       } catch (e) {}
     }
-    
+   
     if (s.customerGroup) group = String(s.customerGroup).trim();
-
     const items = s.items || s.products || [];
     if (!groupMap[group]) groupMap[group] = { group, qty: 0, sales: 0, invoices: 0 };
     groupMap[group].invoices += 1;
-    
+   
     for (const it of items) {
       const qty = Number(it.quantity || it.qty || 0);
       const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
@@ -10415,7 +10480,6 @@ async function aggregateSalesByCustGroup() {
       groupMap[group].sales += qty * price;
     }
   }
-
   const rows = Object.values(groupMap).sort((a, b) => b.sales - a.sales);
   salesState.rows = rows;
   salesState.filtered = rows.slice();
@@ -10427,10 +10491,9 @@ function renderSalesByCustGroup() {
     container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
     return;
   }
-
   let rowsHtml = "";
   let totalQty = 0, totalSales = 0, totalInvoices = 0;
-  
+ 
   salesState.filtered.forEach((g, i) => {
     totalQty += g.qty;
     totalSales += g.sales;
@@ -10445,9 +10508,8 @@ function renderSalesByCustGroup() {
         <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
       </tr>`;
   });
-
   container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">🏷️ Sales By Customer Group</div>
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">🏷️ Customer Group Analysis</div>
     <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
       <thead style="background:#6f2cc1; color:white">
         <tr>
