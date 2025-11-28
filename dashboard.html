@@ -9758,7 +9758,10 @@ async function loadLocations() {
     const rows = salesState.filtered || [];
     if (!rows.length) return alert("No data to export. Run aggregation first.");
     const keys = Object.keys(rows[0]);
-    const head = keys.map(k=>\`<th><strong>\${escapeHTML(k)}</strong></th>\`).join("");
+    const head = keys
+  .map(k => `<th><strong>${escapeHTML(k)}</strong></th>`)
+  .join("");
+
     const body = rows.map(r => \`<tr>\${keys.map(k=>\`<td>\${escapeHTML(String(r[k] ?? ""))}</td>\`).join("")}</tr>\`).join("");
     const html = \`<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>\${head}</tr></thead><tbody>\${body}</tbody></table></body></html>\`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
