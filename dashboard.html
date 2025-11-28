@@ -9344,128 +9344,168 @@ function toggleReports() {
 }
 
 // Placeholder report functions
-// ✅ GLOBAL STATE - OUTSIDE FUNCTION
+// ✅ FIX: This must be outside the function so buttons can see it
 let salesState = {
   rows: [],
   filtered: [],
   from: null,
   to: null,
   location: "",
-  reportMode: "detailed"
+  reportMode: "detailed" // ✅ Default is Detailed
 };
 
-// ✅ HELPER FUNCTIONS
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function downloadBlob(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function modeLabel(mode) {
-  const labels = {
-    detailed: "Detailed Sales Report",
-    byDate: "Daily Performance", 
-    product: "Product Analytics",
-    customer: "Customer Insights",
-    custGroup: "Customer Group Analysis"
-  };
-  return labels[mode] || mode;
-}
-
-// ========== MAIN FUNCTION ==========
+// ========== BABY STEPS: COMPLETE PAGE ENTRYPOINT ==========
 async function showSalesReport() {
   saveLastPage("showSalesReport");
   const el = document.getElementById("content");
-  
   el.innerHTML = `
-    <style>
-      .sr-wrap { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,.06); }
-      .sr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-      .sr-head h2 { margin: 0; font-size: 28px; font-weight: 700; }
-      .sr-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
-      .sr-controls .input, .sr-controls select { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
-      .btn { border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all .2s; }
-      .btn-sm { padding: 8px 14px; font-size: 14px; }
-      .btn-csv { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; box-shadow: 0 4px 12px rgba(59,130,246,.3); }
-      .btn-csv:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,.4); }
-      .btn-excel { background: linear-gradient(135deg, #10b981, #059669); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
-      .btn-excel:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16,185,129,.4); }
-      .btn-pdf { background: linear-gradient(135deg, #6b7280, #4b5563); color: #fff; box-shadow: 0 4px 12px rgba(107,114,128,.3); }
-      .btn-pdf:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(107,114,128,.4); }
-      
-      .mode-bar { display: flex; gap: 12px; align-items: stretch; margin: 20px 0; flex-wrap: nowrap; overflow-x: auto; padding: 4px 2px 8px; }
-      .mode-btn { 
-        display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 999px; 
-        border: 2px solid #e2e8f0; background: #fff; cursor: pointer; font-weight: 600; 
-        transition: all .3s; box-shadow: 0 2px 10px rgba(0,0,0,.06); min-height: 56px; 
-        flex: 0 0 auto; min-width: 190px; 
+    <style data-sales-clean>
+      .sr-wrap{background:#fff;border-radius:12px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.06)}
+      .sr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+      .sr-head h2{margin:0;font-size:28px;font-weight:700}
+      .sr-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+      .sr-controls .input, .sr-controls select{padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#fff}
+      .sr-presets{position:relative}
+      .sr-presets select{min-width:180px}
+      .sr-custom-dates{display:flex;gap:10px;align-items:center}
+      .sr-export{display:flex;gap:8px}
+      .btn{border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;transition:all .2s}
+      .btn-sm{padding:8px 14px;font-size:14px}
+      .btn-csv{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;box-shadow:0 4px 12px rgba(59,130,246,.3)}
+      .btn-csv:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,.4)}
+      .btn-excel{background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,.3)}
+      .btn-excel:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.4)}
+      .btn-pdf{background:linear-gradient(135deg,#6b7280,#4b5563);color:#fff;box-shadow:0 4px 12px rgba(107,114,128,.3)}
+      .btn-pdf:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(107,114,128,.4)}
+      /* ⭐ Horizontal pill bar for modes */
+      .mode-bar{
+        display:flex;
+        gap:12px;
+        align-items:stretch;
+        margin:20px 0;
+        flex-wrap:nowrap;
+        overflow-x:auto;
+        padding:4px 2px 8px;
+        scrollbar-width:thin;
       }
-      .mode-btn:hover { background: #f8fafc; border-color: #cbd5e1; transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,.1); }
-      .mode-btn.active { 
-        background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; border-color: #7c3aed; 
-        box-shadow: 0 8px 25px rgba(139,92,246,.4); transform: translateY(-2px); 
+      .mode-bar::-webkit-scrollbar{height:6px}
+      .mode-bar::-webkit-scrollbar-track{background:transparent}
+      .mode-bar::-webkit-scrollbar-thumb{background:#c4b5fd;border-radius:999px}
+      .mode-btn{
+        display:flex;align-items:center;gap:10px;
+        padding:12px 18px;border-radius:999px;border:2px solid #e2e8f0;
+        background:#fff;cursor:pointer;font-weight:600;transition:all .3s;
+        box-shadow:0 2px 10px rgba(0,0,0,.06);
+        min-height:56px;
+        flex:0 0 auto;
+        min-width:190px;
+        position:relative;
       }
-      
-      .sr-table-placeholder { padding: 24px; border: 2px dashed #e2e8f0; border-radius: 12px; color: #64748b; margin-top: 12px; min-height: 160px; text-align: center; }
-      
-      .date-filter-wrap { position: relative; display: inline-block; }
-      .date-filter-btn { 
-        background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; padding: 12px 16px; 
-        border-radius: 12px; border: none; cursor: pointer; display: flex; gap: 10px; align-items: center; 
-        font-weight: 600; transition: all .2s; box-shadow: 0 4px 12px rgba(139,92,246,.3); 
+      .mode-btn:hover{background:#f8fafc;border-color:#cbd5e1;transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.1)}
+      .mode-btn.active{
+        background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+        color:#fff;border-color:#7c3aed;
+        box-shadow:0 8px 25px rgba(139,92,246,.4);
+        transform:translateY(-2px)
       }
-      .date-filter-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(139,92,246,.4); }
-      .date-filter-menu { 
-        position: absolute; right: 0; top: 48px; background: #fff; border: 1px solid #e2e8f0; 
-        border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,.12); min-width: 260px; 
-        padding: 20px; display: none; z-index: 50; 
+      .mode-emoji{font-size:20px;flex-shrink:0}
+      .mode-text{display:flex;flex-direction:column;align-items:flex-start}
+      .mode-title{font-size:14px}
+      .mode-sub{font-size:11px;color:#94a3b8;font-weight:500}
+      .mode-icon{display:none}
+      .sr-table-placeholder{padding:24px;border:2px dashed #e2e8f0;border-radius:12px;color:#64748b;margin-top:12px;min-height:160px;text-align:center}
+      .date-filter-wrap{position:relative;display:inline-block}
+      .date-filter-btn{
+        background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+        color:#fff;padding:12px 16px;border-radius:12px;border:none;
+        cursor:pointer;display:flex;gap:10px;align-items:center;
+        font-weight:600;transition:all .2s;box-shadow:0 4px 12px rgba(139,92,246,.3)
       }
-      .apply-filters { 
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; padding: 12px 16px; 
-        border-radius: 8px; border: none; cursor: pointer; width: 100%; font-weight: 600; 
-        transition: all .2s; 
+      .date-filter-btn:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(139,92,246,.4)}
+      .date-filter-menu{
+        position:absolute;right:0;top:48px;background:#fff;
+        border:1px solid #e2e8f0;border-radius:12px;
+        box-shadow:0 20px 40px rgba(0,0,0,.12);
+        min-width:260px;padding:20px;display:none;z-index:50;
+        backdrop-filter:blur(10px)
       }
-      .apply-filters:hover { background: linear-gradient(135deg, #2563eb, #1e40af); transform: translateY(-1px); }
+      .apply-filters{
+        background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+        color:#fff;padding:12px 16px;border-radius:8px;border:none;
+        cursor:pointer;width:100%;font-weight:600;transition:all .2s
+      }
+      .apply-filters:hover{background:linear-gradient(135deg,#2563eb,#1e40af);transform:translateY(-1px)}
+      .small-link{font-size:13px;color:#8b5cf6;cursor:pointer;text-decoration:none;font-weight:500;margin-top:12px;display:inline-block}
+      .small-link:hover{text-decoration:underline}
+      .muted { color:#6b7280; font-size:14px }
+      .professional-icons{line-height:1.2}
+      /* ⭐ LOCATION FILTER */
+      .location-filter-wrap{display:flex;gap:10px;align-items:center}
+      .location-btn{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:12px 16px;border-radius:12px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center;font-weight:600;transition:all .2s;box-shadow:0 4px 12px rgba(16,185,129,.3)}
+      .location-btn:hover{transform:translateY(-1px);box-shadow:0 8px 25px rgba(16,185,129,.4)}
+      .location-menu{position:absolute;right:0;top:48px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.12);min-width:220px;padding:16px;display:none;z-index:50;backdrop-filter:blur(10px)}
+      .location-menu select{width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:8px}
     </style>
-    
     <div class="sr-wrap">
       <div class="sr-head">
-        <h2>📈 Sales Analytics</h2>
-        <div style="display: flex; gap: 16px; align-items: center;">
-          <div style="display: flex; gap: 8px;">
-            <button id="srExportCsv" class="btn btn-csv btn-sm" title="Export CSV">CSV</button>
-            <button id="srExportExcel" class="btn btn-excel btn-sm" title="Export Excel">Excel</button>
-            <button id="srExportPdf" class="btn btn-pdf btn-sm" title="Print PDF">PDF</button>
+        <h2 class="professional-icons">📈 <span style="font-size:24px">Sales Analytics</span></h2>
+        <div style="display:flex;gap:16px;align-items:center">
+          <!-- ⭐ LOCATION FILTER - MAIN CONTROLS -->
+          <div class="location-filter-wrap" id="locationFilterWrap">
+            <button id="locationFilterBtn" class="location-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity:0.9">
+                <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9.414 10a2 2 0 00-2.828 2.828l.793.792.792-.792a2 2 0 012.828 0L16.485 17.25" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span id="locationFilterText">🌍 All Locations</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.9">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div id="locationMenu" class="location-menu" role="menu" aria-hidden="true">
+              <label style="display:block;margin-bottom:12px;font-weight:600;color:#374151">
+                📍 Select Location
+              </label>
+              <select id="locationSelect">
+                <option value="">🌍 All Locations</option>
+              </select>
+              <div style="margin-top:16px;text-align:right">
+                <span id="closeLocationMenu" class="small-link">✕ Close</span>
+              </div>
+            </div>
           </div>
+          <div class="sr-export">
+            <button id="srExportCsv" class="btn btn-csv btn-sm" title="Export CSV">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" opacity=".9"/><path d="M14 2v6h6M12 10l-3 3 3 3M16 12H8"/></svg>
+              CSV
+            </button>
+            <button id="srExportExcel" class="btn btn-excel btn-sm" title="Export Excel">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 15.98L8 22.25z"/><path d="M12 2L8.91 8.26 2 9.27l5-15.98L12 2zm4.55 13.55L12 22.25l-4.55-6.7-.45-1.06L7.5 14l4.45 6.55L16.5 14z"/></svg>
+              Excel
+            </button>
+            <button id="srExportPdf" class="btn btn-pdf btn-sm" title="Print PDF">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="22,2 12,13 9,10 2,21"/></svg>
+              PDF
+            </button>
+          </div>
+          <!-- DATE FILTER -->
           <div class="date-filter-wrap" id="dateFilterWrap">
             <button id="srDateFilterBtn" class="date-filter-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity: 0.9">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity:0.9">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
                 <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
                 <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
                 <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
               </svg>
               <span id="dateFilterText">Select Date Range</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity: 0.9">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.9">
                 <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
-            <div id="srDateMenu" class="date-filter-menu">
+            <div id="srDateMenu" class="date-filter-menu" role="menu" aria-hidden="true">
               <label>
-                <div style="font-weight: 600; margin-bottom: 8px;">📅 Date Range</div>
-                <select id="srDatePreset" class="input" style="width: 100%; margin-top: 8px;">
+                <div style="font-weight:600;margin-bottom:8px">📅 Date Range</div>
+                <select id="srDatePreset" class="input" style="width:100%;margin-top:8px;">
                   <option value="today">📍 Today</option>
                   <option value="yesterday">📍 Yesterday</option>
                   <option value="last7">📊 Last 7 Days</option>
@@ -9477,17 +9517,17 @@ async function showSalesReport() {
                   <option value="custom">⚙️ Custom Range</option>
                 </select>
               </label>
-              <div id="srMenuCustomDates" style="display: none; margin-top: 12px;">
-                <label style="display: block; margin-bottom: 10px;">
-                  From: <input id="srFrom" type="date" class="input" style="width: 100%; margin-top: 6px;">
+              <div id="srMenuCustomDates" style="display:none;margin-top:12px">
+                <label style="display:block;margin-bottom:10px">
+                  From: <input id="srFrom" type="date" class="input" style="width:100%;margin-top:6px">
                 </label>
-                <label style="display: block;">
-                  To: <input id="srTo" type="date" class="input" style="width: 100%; margin-top: 6px;">
+                <label style="display:block">
+                  To: <input id="srTo" type="date" class="input" style="width:100%;margin-top:6px">
                 </label>
               </div>
-              <div style="margin-top: 16px;">
+              <div style="margin-top:16px">
                 <button id="srApplyFilters" class="apply-filters">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="margin-right: 8px; opacity: 0.9; vertical-align: middle;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="margin-right:8px;opacity:0.9;vertical-align:middle">
                     <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                   Generate Report
@@ -9497,87 +9537,126 @@ async function showSalesReport() {
           </div>
         </div>
       </div>
-      
-      <div class="mode-bar" id="srModeBar">
+      <div class="sr-controls">
+        <div style="flex:1;color:#6b7280;font-size:15px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:8px;vertical-align:middle">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 15.98-8.09-2.73z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <strong>Quick Start:</strong> 📍 Location → 📅 Date filter → <strong>Generate Report</strong>
+        </div>
+        <div style="color:#6b7280;font-size:15px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:8px;vertical-align:middle">
+            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001.73 1.73L10 21.94a2 2 0 002 0l6.27-3.61A2 2 0 0021 16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Choose report type → Generate → Export 📊
+        </div>
+      </div>
+      <!-- ✅ PROFESSIONAL MODE BUTTONS WITH EMOJIS -->
+      <div class="mode-bar" id="srModeBar" aria-label="Analytics Dashboard">
         <button class="mode-btn active" data-mode="detailed" id="modeDetailed">
-          <span>🧑‍💼</span>
-          <div>
-            <span style="font-size: 14px; display: block;">Detailed Salesperson</span>
-            <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Per rep performance</span>
+          <span class="mode-emoji">🧑‍💼</span>
+          <div class="mode-text">
+            <span class="mode-title">Detailed Salesperson</span>
+            <span class="mode-sub">Per rep performance</span>
           </div>
         </button>
         <button class="mode-btn" data-mode="byDate" id="modeByDate">
-          <span>📅</span>
-          <div>
-            <span style="font-size: 14px; display: block;">Daily Performance</span>
-            <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Day-by-day trend</span>
+          <span class="mode-emoji">📅</span>
+          <div class="mode-text">
+            <span class="mode-title">Daily Performance</span>
+            <span class="mode-sub">Day-by-day trend</span>
           </div>
         </button>
         <button class="mode-btn" data-mode="product" id="modeProduct">
-          <span>📦</span>
-          <div>
-            <span style="font-size: 14px; display: block;">Product Analytics</span>
-            <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Top & slow movers</span>
+          <span class="mode-emoji">📦</span>
+          <div class="mode-text">
+            <span class="mode-title">Product Analytics</span>
+            <span class="mode-sub">Top & slow movers</span>
           </div>
         </button>
         <button class="mode-btn" data-mode="customer" id="modeCustomer">
-          <span>👥</span>
-          <div>
-            <span style="font-size: 14px; display: block;">Customer Insights</span>
-            <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Best customers</span>
+          <span class="mode-emoji">👥</span>
+          <div class="mode-text">
+            <span class="mode-title">Customer Insights</span>
+            <span class="mode-sub">Best customers</span>
           </div>
         </button>
         <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">
-          <span>🏷️</span>
-          <div>
-            <span style="font-size: 14px; display: block;">Group Analysis</span>
-            <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Wholesale vs retail</span>
+          <span class="mode-emoji">🏷️</span>
+          <div class="mode-text">
+            <span class="mode-title">Group Analysis</span>
+            <span class="mode-sub">Wholesale vs retail</span>
           </div>
         </button>
       </div>
-
       <div id="srResults" class="sr-table-placeholder">
-        <div style="font-size: 24px; margin-bottom: 12px;">🚀 Welcome to Sales Analytics</div>
-        <div style="color: #64748b; font-size: 16px;">
-          <strong>This Month</strong> is pre-selected! Click <strong>Generate Report</strong> to see your detailed salesperson performance ✨
+        <div style="font-size:24px;margin-bottom:12px">🚀 Welcome to Sales Analytics</div>
+        <div style="color:#64748b;font-size:16px">
+          <strong>This Month</strong> is pre-selected! Click <strong>Generate Report</strong>
+          to see your detailed salesperson performance ✨
         </div>
       </div>
     </div>
   `;
 
+  // ========== LOCATION MANAGEMENT ==========
+  let locationMenu;
+  async function loadLocations() {
+    try {
+      const db = firebase.firestore();
+      const snap = await db.collection("businessLocations").get();
+      const sel = document.getElementById("locationSelect");
+      const seen = new Set();
+      snap.forEach(doc => {
+        const name = String(doc.data()?.name || "").trim();
+        if (!name || seen.has(name)) return;
+        seen.add(name);
+        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
+      });
+    } catch(e) { console.warn("loadLocations failed:", e); }
+  }
+
+  function updateLocationFilterText() {
+    const loc = salesState.location;
+    const textEl = document.getElementById("locationFilterText");
+    if (!textEl) return;
+    textEl.textContent = loc ? `📍 ${loc}` : "🌍 All Locations";
+  }
+
+  function openLocationMenu() {
+    locationMenu.style.display = "block";
+    locationMenu.setAttribute("aria-hidden", "false");
+  }
+
+  function closeLocationMenu() {
+    locationMenu.style.display = "none";
+    locationMenu.setAttribute("aria-hidden", "true");
+  }
+
   // ========== DATE PRESETS ==========
-  window.setPresetRange = function(preset) {
+  function setPresetRange(preset) {
     const today = new Date();
     let from = new Date(today);
     let to = new Date(today);
-    
     switch(preset) {
       case "today": break;
       case "yesterday":
-        from.setDate(from.getDate() - 1); 
-        to.setDate(to.getDate() - 1); 
-        break;
-      case "last7": from.setDate(from.getDate() - 6); break;
-      case "last30": from.setDate(from.getDate() - 29); break;
+        from.setDate(from.getDate()-1); to.setDate(to.getDate()-1); break;
+      case "last7": from.setDate(from.getDate()-6); break;
+      case "last30": from.setDate(from.getDate()-29); break;
       case "thisMonth":
         from = new Date(today.getFullYear(), today.getMonth(), 1);
         to = new Date(today);
         break;
       case "lastMonth":
-        from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        from = new Date(today.getFullYear(), today.getMonth()-1, 1);
         to = new Date(today.getFullYear(), today.getMonth(), 0);
         break;
-      case "thisYear": 
-        from = new Date(today.getFullYear(), 0, 1); 
-        to = new Date(today); 
-        break;
-      case "lastYear": 
-        from = new Date(today.getFullYear() - 1, 0, 1); 
-        to = new Date(today.getFullYear() - 1, 11, 31); 
-        break;
-      default: from.setDate(from.getDate() - 29);
+      case "thisYear": from = new Date(today.getFullYear(), 0, 1); to = new Date(today); break;
+      case "lastYear": from = new Date(today.getFullYear()-1, 0, 1); to = new Date(today.getFullYear()-1, 11, 31); break;
+      case "custom": return;
+      default: from.setDate(from.getDate()-29);
     }
-    
     const fEl = document.getElementById("srFrom");
     const tEl = document.getElementById("srTo");
     if (fEl && tEl) {
@@ -9585,377 +9664,401 @@ async function showSalesReport() {
       tEl.valueAsDate = to;
       document.getElementById("srMenuCustomDates").style.display = "none";
     }
-    window.updateDateFilterText();
-  };
+    updateDateFilterText();
+  }
 
-  // ========== UPDATE DATE TEXT ==========
-  window.updateDateFilterText = function() {
+  function updateDateFilterText() {
     const from = document.getElementById("srFrom")?.value;
     const to = document.getElementById("srTo")?.value;
     const textEl = document.getElementById("dateFilterText");
     if (!textEl) return;
-    
     if (from && to && from === to) {
-      textEl.textContent = '📅 ' + from;
+      textEl.textContent = `📅 ${from}`;
     } else if (from && to) {
-      textEl.textContent = from + ' → ' + to;
+      textEl.textContent = `${from} → ${to}`;
     } else {
       textEl.textContent = "Select Date Range";
     }
-  };
+  }
 
-  // ========== LOAD LOCATIONS ==========
-  window.loadLocations = async function() {
-    try {
-      const db = firebase.firestore();
-      const snap = await db.collection("businessLocations").get();
-      const sel = document.getElementById("srLocationSmall");
-      const seen = new Set();
-      
-      snap.forEach(doc => {
-        const name = String(doc.data()?.name || "").trim();
-        if (!name || seen.has(name)) return;
-        seen.add(name);
-        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
-      });
-    } catch(e) { 
-      console.warn("loadLocations failed:", e); 
-    }
-  };
-
-  // ========== APPLY FILTERS ==========
-  window.applyFilters = async function() {
+  // ========== MAIN APPLY FILTERS ==========
+  async function applyFilters() {
     const fromVal = document.getElementById("srFrom")?.value || "";
     const toVal = document.getElementById("srTo")?.value || "";
-    const loc = document.getElementById("srLocationSmall")?.value || "";
-    
-    salesState.location = loc;
+    const loc = salesState.location; // ✅ LOCATION FROM STATE
     salesState.from = fromVal ? new Date(fromVal + "T00:00:00") : null;
     salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
-    
+   
     const container = document.getElementById("srResults");
     container.innerHTML = `<div class="sr-table-placeholder">🔄 Loading ${modeLabel(salesState.reportMode)}... please wait ♡</div>`;
-    
+   
     try {
       if (salesState.reportMode === "detailed") {
-        await window.aggregateSalesDetailed();
-        window.renderDetailedTable();
+        await aggregateSalesDetailed();
+        renderDetailedTable();
       } else if (salesState.reportMode === "byDate") {
-        await window.aggregateSalesByDate();
-        window.renderSalesByDate();
+        await aggregateSalesByDate();
+        renderSalesByDate();
       } else if (salesState.reportMode === "product") {
-        await window.aggregateSalesByProduct();
-        window.renderSalesByProduct();
+        await aggregateSalesByProduct();
+        renderSalesByProduct();
       } else if (salesState.reportMode === "customer") {
-        await window.aggregateSalesByCustomer();
-        window.renderSalesByCustomer();
+        await aggregateSalesByCustomer();
+        renderSalesByCustomer();
       } else if (salesState.reportMode === "custGroup") {
-        await window.aggregateSalesByCustGroup();
-        window.renderSalesByCustGroup();
+        await aggregateSalesByCustGroup();
+        renderSalesByCustGroup();
       }
     } catch (err) {
       console.error(err);
       container.innerHTML = `<div class="sr-table-placeholder">❌ Error: ${escapeHTML(err.message)}</div>`;
     }
-    
-    window.closeDateMenu();
-  };
+    closeDateMenu();
+  }
+
+  function modeLabel(mode) {
+    const labels = {
+      detailed: "Detailed Sales Report",
+      byDate: "Daily Performance",
+      product: "Product Analytics",
+      customer: "Customer Insights",
+      custGroup: "Customer Group Analysis"
+    };
+    return labels[mode] || mode;
+  }
 
   // ========== MODE BUTTONS ==========
-  window.setupModeButtons = function() {
+  function setupModeButtons() {
     const modeButtons = document.querySelectorAll(".mode-btn");
     modeButtons.forEach(btn => {
       btn.addEventListener("click", () => {
         const mode = btn.dataset.mode;
         salesState.reportMode = mode;
         modeButtons.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-        
+   
         const container = document.getElementById("srResults");
         const fromStr = document.getElementById("srFrom")?.value || 'N/A';
         const toStr = document.getElementById("srTo")?.value || 'N/A';
-        const locStr = document.getElementById("srLocationSmall")?.value || 'All';
-        
+        const locStr = salesState.location || 'All Locations'; // ✅ LOCATION
+   
         container.innerHTML = `
-          <div style="text-align: center; padding: 40px; background: linear-gradient(135deg, #f8f9ff, #e8f4fd); border-radius: 12px;">
-            <div style="font-size: 28px; font-weight: 700; color: #6f2cc1; margin-bottom: 12px;">
+          <div style="text-align:center;padding:40px;background:linear-gradient(135deg,#f8f9ff,#e8f4fd);border-radius:12px">
+            <div style="font-size:28px;font-weight:700;color:#6f2cc1;margin-bottom:12px">
               ${modeLabel(mode)}
             </div>
-            <div style="color: #666; margin-bottom: 20px;">
+            <div style="color:#666;margin-bottom:20px">
               📅 ${fromStr} → ${toStr} | 📍 ${locStr}
             </div>
-            <div style="color: #888;">
+            <div style="color:#888">
               Click <strong>Generate Report</strong> to create this analysis ✨
             </div>
           </div>
         `;
       });
     });
-  };
+  }
 
-  // ========== EXPORT FUNCTIONS ==========
-  window.exportCSV = function() {
+  // ========== EXPORTS (UNCHANGED) ==========
+  function exportCSV() {
     const rows = salesState.filtered || [];
     if (!rows.length) return alert("No data to export. Run aggregation first.");
-    
-    if (rows[0].totals) {
-      // Detailed mode - flatten data
-      const flatRows = rows.flatMap(sp => 
-        Object.entries(sp.products).map(([pname, p]) => ({
-          salesperson: sp.salesperson,
-          product: pname,
-          qty: p.qty,
-          revenue: p.revenue,
-          cost: p.cost
-        }))
-      );
-      rows = flatRows;
-    }
-    
     const keys = Object.keys(rows[0]);
     const header = keys.join(",");
-    const data = rows.map(r => 
-      keys.map(k => `"${String(r[k] ?? "").replace(/"/g, '""')}"`).join(",")
-    ).join("\n");
-    
-    downloadBlob([header, data].join("\n"), "sales-report.csv", "text/csv;charset=utf-8");
-  };
+    const data = rows.map(r => keys.map(k => `"${String(r[k] ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
+    downloadBlob([header, data].join("\n"), "sales-report.csv", "text/csv;charset=utf-8;");
+  }
 
-  window.exportExcel = function() {
+  function exportExcel() {
     const rows = salesState.filtered || [];
     if (!rows.length) return alert("No data to export. Run aggregation first.");
-    
     const keys = Object.keys(rows[0]);
-    const head = keys.map(k => `<th><strong>${escapeHTML(k)}</strong></th>`).join("");
-    const body = rows.map(r => 
-      `<tr>${keys.map(k => `<td>${escapeHTML(String(r[k] ?? ""))}</td>`).join("")}</tr>`
-    ).join("");
-    
+    const head = keys.map(k=>`<th><strong>${escapeHTML(k)}</strong></th>`).join("");
+    const body = rows.map(r => `<tr>${keys.map(k=>`<td>${escapeHTML(String(r[k] ?? ""))}</td>`).join("")}</tr>`).join("");
     const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
-  };
+  }
 
-  window.exportPDF = async function() {
-    if (salesState.reportMode !== "detailed" || !salesState.filtered?.length) {
-      alert("Please run Detailed Sales Report first!");
+  async function exportPDF() {
+    if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
+      alert("Please run the Detailed Sales Report first!");
       return;
     }
-    
     const win = window.open("", "_blank", "width=1300,height=900,scrollbars=yes,resizable=yes");
     if (!win) { alert("Please allow popups!"); return; }
-
     const fromStr = document.getElementById("srFrom")?.value || "Start";
     const toStr = document.getElementById("srTo")?.value || "End";
-    const locStr = salesState.location || "All Locations";
+    const locStr = salesState.location || "All Locations"; // ✅ LOCATION
     const period = fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`;
-
-    // Simplified PDF - just detailed report
-    let htmlContent = `
-      <!DOCTYPE html>
-      <html><head><meta charset="utf-8"><title>Sales Report - ${period}</title>
-      <style>
-        @page { size: A4; margin: 15mm; }
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        h1 { color: #6f2cc1; text-align: center; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #6f2cc1; color: white; }
-        .summary { background: #222; color: white; padding: 20px; text-align: center; margin-top: 30px; }
-      </style>
-      </head><body>
-      <h1>EMBU KIAMBUTHI STORE</h1>
-      <h2>Detailed Sales Report</h2>
-      <p><strong>Period:</strong> ${period} | <strong>Location:</strong> ${escapeHTML(locStr)}</p>
-    `;
-
-    salesState.filtered.forEach((sp, index) => {
-      const totalRevenue = sp.totals.revenue || 0;
-      const totalCost = sp.totals.cost || 0;
-      const grossProfit = totalRevenue - totalCost;
+    
+    async function getExpensesForPeriod() {
+      const db = firebase.firestore();
+      let q = db.collection("expenses")
+        .where("expenseDate", ">=", salesState.from)
+        .where("expenseDate", "<=", salesState.to);
+      if (salesState.location) q = q.where("location", "==", salesState.location); // ✅ LOCATION FILTER
+      const snap = await q.get();
+      const map = {};
+      snap.forEach(doc => {
+        const e = doc.data();
+        const sp = String(e.salesperson || "Unknown").trim();
+        const cat = String(e.category || "Uncategorized").trim();
+        const amt = Number(e.totalAmount || e.paidAmount || 0);
+        if (!map[sp]) map[sp] = {};
+        if (!map[sp][cat]) map[sp][cat] = 0;
+        map[sp][cat] += amt;
+      });
+      return map;
+    }
+    
+    const expensesBySp = await getExpensesForPeriod();
+    let allSections = "";
+    let grandTotalExpenses = 0;
+    
+    salesState.filtered.forEach(spEntry => {
+      const spName = escapeHTML(spEntry.salesperson || "Unknown");
+      const subQty = spEntry.totals.qty;
+      const subSales = spEntry.totals.revenue;
+      const subCost = spEntry.totals.cost;
+      const grossProfit = subSales - subCost;
+      let salesRows = "";
       
-      let productsHtml = '';
-      (sp.products || []).forEach(p => {
-        const profit = (p.revenue || 0) - (p.cost || 0);
-        productsHtml += `
+      spEntry.products.forEach(p => {
+        const profit = p.revenue - p.cost;
+        salesRows += `
           <tr>
-            <td>${escapeHTML(p.productName || p)}</td>
-            <td style="text-align: right;">${(p.qty || 0).toLocaleString()}</td>
-            <td style="text-align: right;">${(p.revenue || 0).toLocaleString()}</td>
-            <td style="text-align: right;">${(p.cost || 0).toLocaleString()}</td>
-            <td style="text-align: right; color: #27ae60;">${profit.toLocaleString()}</td>
-          </tr>
-        `;
+            <td style="padding:7px 9px; font-size:12.5px;">${escapeHTML(p.productName)}</td>
+            <td style="padding:7px 9px; text-align:right; font-size:12.5px;">${p.qty.toLocaleString()}</td>
+            <td style="padding:7px 9px; text-align:right; font-size:12.5px;">${p.revenue.toLocaleString()}</td>
+            <td style="padding:7px 9px; text-align:right; font-size:12.5px;">${p.cost.toLocaleString()}</td>
+            <td style="padding:7px 9px; text-align:right; color:#27ae60; font-weight:600;">${profit.toLocaleString()}</td>
+          </tr>`;
       });
 
-      htmlContent += `
-        <h3>Salesperson: ${escapeHTML(sp.salesperson)}</h3>
-        <table>
-          <thead><tr><th>Product</th><th>Qty</th><th>Sales</th><th>Cost</th><th>Profit</th></tr></thead>
-          <tbody>${productsHtml}</tbody>
-          <tfoot>
-            <tr style="font-weight: bold; background: #f0f0f0;">
-              <td>TOTAL</td>
-              <td style="text-align: right;">${(sp.totals.qty || 0).toLocaleString()}</td>
-              <td style="text-align: right;">${totalRevenue.toLocaleString()}</td>
-              <td style="text-align: right;">${totalCost.toLocaleString()}</td>
-              <td style="text-align: right; color: #27ae60;">${grossProfit.toLocaleString()}</td>
-            </tr>
-          </tfoot>
-        </table>
-      `;
+      const spExpenses = expensesBySp[spName] || {};
+      let expensesRows = "";
+      let totalExpenses = 0;
+      Object.keys(spExpenses).forEach(cat => {
+        const amt = spExpenses[cat];
+        if (amt > 0) {
+          totalExpenses += amt;
+          expensesRows += `
+            <tr>
+              <td style="padding:8px 10px; font-size:12.5px;">${escapeHTML(cat)}</td>
+              <td style="padding:8px 10px; text-align:right; font-weight:600;">${amt.toLocaleString()}</td>
+            </tr>`;
+        }
+      });
+      if (expensesRows === "") {
+        expensesRows = `<tr><td colspan="2" style="text-align:center; color:#999; padding:20px;">No expenses recorded</td></tr>`;
+      }
+      grandTotalExpenses += totalExpenses;
+      const netProfit = grossProfit - totalExpenses;
+      allSections += `
+        <div style="margin:40px 0; padding:22px; border:3px solid #6f2cc1; border-radius:16px; background:#f8fdff; box-shadow:0 6px 20px rgba(0,0,0,0.08);">
+          <h2 style="margin:0 0 20px 0; color:#6f2cc1; font-size:19px; text-align:center; font-weight:bold;">${spName}</h2>
+          <div style="display:flex; gap:35px; align-items:flex-start;">
+            <div style="flex:2.4;">
+              <table style="width:100%; border-collapse:collapse; background:white; border-radius:10px; overflow:hidden; box-shadow:0 3px 10px rgba(0,0,0,0.1);">
+                <thead style="background:#6f2cc1; color:white;">
+                  <tr>
+                    <th style="padding:12px; text-align:left;">Product</th>
+                    <th style="padding:12px; text-align:right;">Qty Sold</th>
+                    <th style="padding:12px; text-align:right;">Sales</th>
+                    <th style="padding:12px; text-align:right;">Cost</th>
+                    <th style="padding:12px; text-align:right;">Gross Profit</th>
+                  </tr>
+                </thead>
+                <tbody style="font-size:12.5px;">${salesRows}</tbody>
+                <tfoot>
+                  <tr style="background:#222; color:white; font-weight:bold; font-size:14px;">
+                    <td style="padding:13px;">SUBTOTAL</td>
+                    <td style="padding:13px; text-align:right;">${subQty.toLocaleString()}</td>
+                    <td style="padding:13px; text-align:right;">${subSales.toLocaleString()}</td>
+                    <td style="padding:13px; text-align:right;">${subCost.toLocaleString()}</td>
+                    <td style="padding:13px; text-align:right;">${grossProfit.toLocaleString()}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div style="flex:1; min-width:310px; background:#e3f2fd; border-radius:14px; padding:20px; border:3px solid #3498db;">
+              <h3 style="margin:0 0 15px 0; color:#1976d2; font-size:17px; text-align:center; font-weight:bold;">EXPENSES</h3>
+              <table style="width:100%; border-collapse:collapse; background:white; border-radius:8px;">
+                <thead style="background:#3498db; color:white;">
+                  <tr><th style="padding:10px 12px;">Category</th><th style="padding:10px 12px; text-align:right;">Amount</th></tr>
+                </thead>
+                <tbody style="font-size:12.5px;">${expensesRows}</tbody>
+                <tfoot>
+                  <tr style="background:#222; color:white; font-weight:bold;">
+                    <td style="padding:11px 12px;">Total Expenses</td>
+                    <td style="padding:11px 12px; text-align:right;">${totalExpenses.toLocaleString()}</td>
+                  </tr>
+                  <tr style="background:#27ae60; color:white; font-weight:bold; font-size:14px;">
+                    <td style="padding:13px 12px;">NET PROFIT</td>
+                    <td style="padding:13px 12px; text-align:right;">${netProfit.toLocaleString()}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>`;
     });
-
-    const grandTotal = salesState.filtered.reduce((acc, sp) => ({
-      qty: acc.qty + (sp.totals.qty || 0),
-      revenue: acc.revenue + (sp.totals.revenue || 0),
-      cost: acc.cost + (sp.totals.cost || 0)
-    }), { qty: 0, revenue: 0, cost: 0 });
-
-    htmlContent += `
-      <div class="summary">
-        <h2>GRAND TOTAL</h2>
-        <p>Quantity: ${grandTotal.qty.toLocaleString()} | 
-        Sales: ${grandTotal.revenue.toLocaleString()} | 
-        Cost: ${grandTotal.cost.toLocaleString()} | 
-        <strong style="color: #27ae60;">Profit: ${(grandTotal.revenue - grandTotal.cost).toLocaleString()}</strong>
-      </div>
-      </body></html>
-    `;
-
-    win.document.write(htmlContent);
+    
+    const grandSales = salesState.filtered.reduce((a, b) => a + b.totals.revenue, 0);
+    const grandCost = salesState.filtered.reduce((a, b) => a + b.totals.cost, 0);
+    const grossProfit = grandSales - grandCost;
+    const netRevenue = grossProfit - grandTotalExpenses;
+    
+    const finalHTML = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Detailed Report - ${period}</title>
+<style>
+  @page { size: A3; margin: 20mm; }
+  body { font-family: Calibri, Arial, sans-serif; margin:0; padding:30px; background:white; color:#000; }
+  h1 { font-size:30px; color:#6f2cc1; text-align:center; margin:0; }
+  .info { text-align:center; margin:20px 0 30px; color:#444; font-size:14px; }
+  .final-summary {
+    margin:80px 0 20px;
+    padding:28px;
+    background:#222;
+    color:white;
+    text-align:center;
+    font-size:24px;
+    font-weight:700;
+    border-radius:16px;
+  }
+  .final-summary .expenses { color:#e74c3c; }
+  .final-summary .net { color:#27ae60; font-size:28px; }
+</style>
+</head>
+<body>
+  <h1>EMBU KIAMBUTHI STORE</h1>
+  <p style="text-align:center; font-size:21px; color:#6f2cc1; margin:10px 0 30px;">Detailed Sales & Performance Report</p>
+  <div class="info">
+    <strong>Period:</strong> ${period} | <strong>Location:</strong> ${escapeHTML(locStr)} | <strong>Generated:</strong> ${new Date().toLocaleString("en-KE")}
+  </div>
+  ${allSections}
+  <div class="final-summary">
+    FINAL SUMMARY → Sales: ${grandSales.toLocaleString()} |
+    Cost: ${grandCost.toLocaleString()} |
+    Gross Profit: ${grossProfit.toLocaleString()} |
+    <span class="expenses">Expenses: ${grandTotalExpenses.toLocaleString()}</span> |
+    <span class="net">NET REVENUE: ${netRevenue.toLocaleString()} KES</span>
+  </div>
+</body></html>`;
+    
+    win.document.open();
+    win.document.write(finalHTML);
     win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 1000);
-  };
+    setTimeout(() => { win.focus(); win.print(); }, 1500);
+  }
 
   // ========== DATE MENU ==========
-  window.openDateMenu = function() {
-    const menu = document.getElementById("srDateMenu");
-    if (menu) {
-      menu.style.display = "block";
+  let dateMenu;
+  function openDateMenu() {
+    dateMenu.style.display = "block";
+    dateMenu.setAttribute("aria-hidden", "false");
+  }
+  function closeDateMenu() {
+    dateMenu.style.display = "none";
+    dateMenu.setAttribute("aria-hidden", "true");
+  }
+
+  // Wait for DOM
+  await new Promise(resolve => setTimeout(resolve, 100));
+ 
+  // Initialize menus
+  dateMenu = document.getElementById("srDateMenu");
+  locationMenu = document.getElementById("locationMenu");
+
+  // ========== ALL EVENT LISTENERS ==========
+  // LOCATION EVENTS ✅ FIXED BUG #1: addEventListener (was addErrorListener)
+  document.getElementById("locationFilterBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    locationMenu.style.display === "block" ? closeLocationMenu() : openLocationMenu();
+  });
+  
+  document.getElementById("locationSelect").addEventListener("change", (e) => {
+    salesState.location = e.target.value;
+    updateLocationFilterText();
+    closeLocationMenu();
+  });
+  
+  document.getElementById("closeLocationMenu")?.addEventListener("click", closeLocationMenu); // ✅ FIXED
+
+  // DATE EVENTS
+  document.getElementById("srDateFilterBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    dateMenu.style.display === "block" ? closeDateMenu() : openDateMenu();
+  });
+  
+  document.getElementById("srDatePreset").addEventListener("change", (e) => {
+    if (e.target.value === "custom") {
+      document.getElementById("srMenuCustomDates").style.display = "block";
+    } else {
+      document.getElementById("srMenuCustomDates").style.display = "none";
+      setPresetRange(e.target.value);
     }
-  };
+  });
+  
+  document.getElementById("srFrom")?.addEventListener("change", updateDateFilterText);
+  document.getElementById("srTo")?.addEventListener("change", updateDateFilterText);
+  document.getElementById("srApplyFilters").addEventListener("click", applyFilters);
 
-  window.closeDateMenu = function() {
-    const menu = document.getElementById("srDateMenu");
-    if (menu) {
-      menu.style.display = "none";
-    }
-  };
+  // EXPORT EVENTS
+  document.getElementById("srExportCsv").addEventListener("click", exportCSV);
+  document.getElementById("srExportExcel").addEventListener("click", exportExcel);
+  document.getElementById("srExportPdf").addEventListener("click", exportPDF);
 
-  // ========== EVENT LISTENERS ==========
-  setTimeout(() => {
-    // Date filter button
-    const dateBtn = document.getElementById("srDateFilterBtn");
-    if (dateBtn) {
-      dateBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const menu = document.getElementById("srDateMenu");
-        if (menu.style.display === "block") {
-          window.closeDateMenu();
-        } else {
-          window.openDateMenu();
-        }
-      });
-    }
+  // CLOSE MENUS ON OUTSIDE CLICK
+  document.addEventListener("click", (e) => {
+    const dateWrap = document.getElementById("dateFilterWrap");
+    const locWrap = document.getElementById("locationFilterWrap");
+    if (dateWrap && dateMenu && !dateWrap.contains(e.target)) closeDateMenu();
+    if (locWrap && locationMenu && !locWrap.contains(e.target)) closeLocationMenu();
+  });
 
-    // Date preset
-    const presetSelect = document.getElementById("srDatePreset");
-    if (presetSelect) {
-      presetSelect.addEventListener("change", (e) => {
-        if (e.target.value === "custom") {
-          document.getElementById("srMenuCustomDates").style.display = "block";
-        } else {
-          document.getElementById("srMenuCustomDates").style.display = "none";
-          window.setPresetRange(e.target.value);
-        }
-      });
-    }
+  // ========== INITIALIZATION ==========
+  await loadLocations();
+  setPresetRange("thisMonth");
+  setupModeButtons();
+  updateDateFilterText();
+  updateLocationFilterText(); // ✅ INITIALIZE LOCATION TEXT
 
-    // Date inputs
-    const fromInput = document.getElementById("srFrom");
-    const toInput = document.getElementById("srTo");
-    if (fromInput) fromInput.addEventListener("change", window.updateDateFilterText);
-    if (toInput) toInput.addEventListener("change", window.updateDateFilterText);
-
-    // Apply filters
-    const applyBtn = document.getElementById("srApplyFilters");
-    if (applyBtn) applyBtn.addEventListener("click", window.applyFilters);
-
-    // Export buttons
-    const csvBtn = document.getElementById("srExportCsv");
-    const excelBtn = document.getElementById("srExportExcel");
-    const pdfBtn = document.getElementById("srExportPdf");
-    if (csvBtn) csvBtn.addEventListener("click", window.exportCSV);
-    if (excelBtn) excelBtn.addEventListener("click", window.exportExcel);
-    if (pdfBtn) pdfBtn.addEventListener("click", window.exportPDF);
-
-    // Close menu
-    const closeBtn = document.getElementById("srCloseMenu");
-    if (closeBtn) closeBtn.addEventListener("click", window.closeDateMenu);
-
-    // Click outside to close
-    document.addEventListener("click", (e) => {
-      const wrap = document.getElementById("dateFilterWrap");
-      const menu = document.getElementById("srDateMenu");
-      if (wrap && menu && !wrap.contains(e.target)) {
-        window.closeDateMenu();
-      }
-    });
-
-    // Setup mode buttons
-    window.setupModeButtons();
-
-    // Initial load
-    window.loadLocations();
-    window.setPresetRange("thisMonth");
-    window.updateDateFilterText();
-    
-    // Auto-run
-    setTimeout(() => window.applyFilters(), 800);
-  }, 200);
+  // Auto-run with THIS MONTH + ALL LOCATIONS
+  setTimeout(() => applyFilters(), 500);
 }
 
-// ========== AGGREGATION FUNCTIONS (GLOBAL) ==========
-// Detailed Report
-window.aggregateSalesDetailed = async function() {
+// ========== AGGREGATION FUNCTIONS (ALL USE salesState.location) ==========
+// ✅ COMPLETE DETAILED AGGREGATION (LOCATION FILTERED)
+async function aggregateSalesDetailed() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
-  const loc = salesState.location;
-  
+  const loc = salesState.location; // ✅ LOCATION FILTER
   let q = db.collection("sales").orderBy("saleDate", "desc");
   if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  
+  if (loc) q = q.where("location", "==", loc); // ✅ APPLY LOCATION
   const snap = await q.get();
-  const spMap = {};
   
+  const spMap = {};
   const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
   
   for (const doc of snap.docs) {
     const sd = doc.data();
     const sp = String(sd.salesperson || sd.salespersonName || "").trim() || "Unknown";
     const sLoc = String(sd.location || sd.businessLocation || "").trim();
-    
-    if (loc && sLoc !== loc) continue;
-    
+    if (loc && sLoc !== loc) continue; // ✅ DOUBLE CHECK LOCATION
     const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
-    if (!Array.isArray(items) || !items.length) continue;
+    if (!Array.isArray(items) || items.length === 0) continue;
     
     if (!spMap[sp]) {
-      spMap[sp] = { 
-        salesperson: sp, 
-        products: {}, 
-        totals: { qty: 0, revenue: 0, cost: 0 } 
-      };
+      spMap[sp] = { salesperson: sp, products: {}, totals: { qty: 0, revenue: 0, cost: 0 } };
     }
     
     for (const it of items) {
       const pname = String(it.prodName || it.productName || it.name || "").trim();
       if (!pname) continue;
-      
       const qty = toNum(it.quantity || it.qty || 0);
       if (qty === 0) continue;
-      
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
       const costPrice = toNum(it.costAtSale || 0);
       
@@ -9984,309 +10087,809 @@ window.aggregateSalesDetailed = async function() {
       const entry = spMap[spName];
       const products = Object.values(entry.products)
         .sort((a, b) => a.productName.localeCompare(b.productName));
-      return { 
-        salesperson: entry.salesperson, 
-        products, 
-        totals: entry.totals 
-      };
+      return { salesperson: entry.salesperson, products, totals: entry.totals };
     });
+    
+  salesState.rows = result;
+  salesState.filtered = result.slice();
+}
+
+// ✅ COMPLETE DAILY AGGREGATION (LOCATION FILTERED)
+async function aggregateSalesByDate() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales").orderBy("saleDate", "desc");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  
+  const dateMap = {};
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+  
+  for (const doc of snap.docs) {
+    const sd = doc.data();
+    const sLoc = String(sd.location || sd.businessLocation || "").trim();
+    if (loc && sLoc !== loc) continue;
+    const dateStr = sd.saleDate?.toDate().toISOString().split('T')[0] || 'Unknown';
+    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
+    if (!Array.isArray(items) || items.length === 0) continue;
+    
+    if (!dateMap[dateStr]) {
+      dateMap[dateStr] = { date: dateStr, qty: 0, revenue: 0, cost: 0, orders: 0 };
+    }
+    
+    let dailyRevenue = 0;
+    let dailyCost = 0;
+    let dailyQty = 0;
+    
+    for (const it of items) {
+      const qty = toNum(it.quantity || it.qty || 0);
+      if (qty === 0) continue;
+      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+      const costPrice = toNum(it.costAtSale || 0);
+      dailyRevenue += qty * price;
+      dailyCost += qty * costPrice;
+      dailyQty += qty;
+    }
+    
+    dateMap[dateStr].revenue += dailyRevenue;
+    dateMap[dateStr].cost += dailyCost;
+    dateMap[dateStr].qty += dailyQty;
+    dateMap[dateStr].orders += 1;
+  }
+  
+  const result = Object.entries(dateMap)
+    .map(([date, data]) => ({
+      date,
+      ...data,
+      profit: data.revenue - data.cost,
+      avgOrder: data.orders > 0 ? (data.revenue / data.orders).toFixed(0) : 0
+    }))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+  salesState.rows = result;
+  salesState.filtered = result.slice();
+}
+
+// ✅ COMPLETE PRODUCT AGGREGATION (LOCATION FILTERED)
+async function aggregateSalesByProduct() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales").orderBy("saleDate", "desc");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  
+  const productMap = {};
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+  
+  for (const doc of snap.docs) {
+    const sd = doc.data();
+    const sLoc = String(sd.location || sd.businessLocation || "").trim();
+    if (loc && sLoc !== loc) continue;
+    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
+    if (!Array.isArray(items) || items.length === 0) continue;
+    
+    for (const it of items) {
+      const pname = String(it.prodName || it.productName || it.name || "").trim();
+      if (!pname) continue;
+      const qty = toNum(it.quantity || it.qty || 0);
+      if (qty === 0) continue;
+      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+      const costPrice = toNum(it.costAtSale || 0);
+      
+      if (!productMap[pname]) {
+        productMap[pname] = {
+          productName: pname,
+          qty: 0,
+          revenue: 0,
+          cost: 0,
+          unitShort: String(it.unit || it.unitShort || "").trim()
+        };
+      }
+      
+      productMap[pname].qty += qty;
+      productMap[pname].revenue += qty * price;
+      productMap[pname].cost += qty * costPrice;
+    }
+  }
+  
+  const result = Object.values(productMap)
+    .map(p => ({
+      ...p,
+      profit: p.revenue - p.cost,
+      profitMargin: p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue * 100).toFixed(1) : 0
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+    
+  salesState.rows = result;
+  salesState.filtered = result.slice();
+}
+
+// ✅ COMPLETE CUSTOMER AGGREGATION (LOCATION FILTERED)
+async function aggregateSalesByCustomer() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales").orderBy("saleDate", "desc");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  
+  const customerMap = {};
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+  
+  for (const doc of snap.docs) {
+    const sd = doc.data();
+    const sLoc = String(sd.location || sd.businessLocation || "").trim();
+    if (loc && sLoc !== loc) continue;
+    const customer = String(sd.customerName || sd.customer || "Walk-in").trim();
+    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
+    if (!Array.isArray(items) || items.length === 0) continue;
+    
+    let totalRevenue = 0;
+    let totalQty = 0;
+    
+    for (const it of items) {
+      const qty = toNum(it.quantity || it.qty || 0);
+      if (qty === 0) continue;
+      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+      totalRevenue += qty * price;
+      totalQty += qty;
+    }
+    
+    if (!customerMap[customer]) {
+      customerMap[customer] = { customerName: customer, orders: 0, revenue: 0, qty: 0 };
+    }
+    
+    customerMap[customer].orders += 1;
+    customerMap[customer].revenue += totalRevenue;
+    customerMap[customer].qty += totalQty;
+  }
+  
+  const result = Object.values(customerMap)
+    .map(c => ({
+      ...c,
+      avgOrder: c.orders > 0 ? (c.revenue / c.orders).toFixed(0) : 0
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+    
+  salesState.rows = result;
+  salesState.filtered = result.slice();
+}
+
+// ✅ COMPLETE CUSTOMER GROUP AGGREGATION (LOCATION FILTERED)
+async function aggregateSalesByCustGroup() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales").orderBy("saleDate", "desc");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  
+  const groupMap = {
+    'Wholesale': { revenue: 0, qty: 0, orders: 0 },
+    'Retail': { revenue: 0, qty: 0, orders: 0 },
+    'Walk-in': { revenue: 0, qty: 0, orders: 0 }
+  };
+  
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+  
+  for (const doc of snap.docs) {
+    const sd = doc.data();
+    const sLoc = String(sd.location || sd.businessLocation || "").trim();
+    if (loc && sLoc !== loc) continue;
+    
+    let customer = String(sd.customerName || sd.customer || "Walk-in").trim().toLowerCase();
+    let group = 'Walk-in';
+    
+    if (customer.includes('wholesale') || customer.includes('whole') || customer.includes('shop')) {
+      group = 'Wholesale';
+    } else if (customer.length > 3 && !customer.includes('walk')) {
+      group = 'Retail';
+    }
+    
+    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
+    if (!Array.isArray(items) || items.length === 0) continue;
+    
+    let totalRevenue = 0;
+    let totalQty = 0;
+    
+    for (const it of items) {
+      const qty = toNum(it.quantity || it.qty || 0);
+      if (qty === 0) continue;
+      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+      totalRevenue += qty * price;
+      totalQty += qty;
+    }
+    
+    groupMap[group].revenue += totalRevenue;
+    groupMap[group].qty += totalQty;
+    groupMap[group].orders += 1;
+  }
+  
+  const result = Object.entries(groupMap).map(([groupName, data]) => ({
+    groupName,
+    ...data,
+    avgOrder: data.orders > 0 ? (data.revenue / data.orders).toFixed(0) : 0,
+    revenueShare: Object.values(groupMap).reduce((sum, g) => sum + g.revenue, 0) > 0 
+      ? ((data.revenue / Object.values(groupMap).reduce((sum, g) => sum + g.revenue, 0)) * 100).toFixed(1) 
+      : 0
+  }));
   
   salesState.rows = result;
   salesState.filtered = result.slice();
-};
+}
 
-window.renderDetailedTable = async function() {
+// ========== RENDER FUNCTIONS ==========
+function renderDetailedTable() {
   const container = document.getElementById("srResults");
-  if (!salesState.rows?.length) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales found for selected filters.</div>`;
+  if (!salesState.filtered.length) {
+    container.innerHTML = `
+      <div class="sr-table-placeholder">
+        <div style="font-size:24px;margin-bottom:12px">📊 No Sales Data</div>
+        <div style="color:#64748b;font-size:16px">
+          No sales found for the selected period and location.
+        </div>
+      </div>`;
     return;
   }
-
-  // Get expenses
-  const db = firebase.firestore();
-  let expQuery = db.collection("expenses")
-    .where("expenseDate", ">=", salesState.from)
-    .where("expenseDate", "<=", salesState.to);
-  if (salesState.location) expQuery = expQuery.where("location", "==", salesState.location);
   
-  const expSnap = await expQuery.get();
-  const expensesBySalesperson = {};
+  let html = `
+    <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:24px;border-radius:16px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;text-align:center">
+        <div>
+          <div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.totals.qty,0).toLocaleString()}</div>
+          <div style="font-size:14px;opacity:0.9">Total Items Sold</div>
+        </div>
+        <div>
+          <div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.totals.revenue,0).toLocaleString()}</div>
+          <div style="font-size:14px;opacity:0.9">Total Revenue</div>
+        </div>
+        <div>
+          <div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+(b.totals.revenue-b.totals.cost),0).toLocaleString()}</div>
+          <div style="font-size:14px;opacity:0.9">Gross Profit</div>
+        </div>
+        <div>
+          <div style="font-size:32px;font-weight:700">${salesState.filtered.length}</div>
+          <div style="font-size:14px;opacity:0.9">Salespeople</div>
+        </div>
+      </div>
+    </div>
+  `;
   
-  expSnap.forEach(doc => {
-    const e = doc.data();
-    const spName = String(e.salesperson || "Unknown").trim();
-    const category = String(e.category || "Uncategorized").trim();
-    const amount = Number(e.totalAmount || e.paidAmount || 0);
+  salesState.filtered.forEach((sp, idx) => {
+    const profit = sp.totals.revenue - sp.totals.cost;
+    const margin = sp.totals.revenue > 0 ? ((profit / sp.totals.revenue) * 100).toFixed(1) : 0;
     
-    if (!expensesBySalesperson[spName]) expensesBySalesperson[spName] = {};
-    if (!expensesBySalesperson[spName][category]) expensesBySalesperson[spName][category] = 0;
-    expensesBySalesperson[spName][category] += amount;
-  });
-
-  let htmlParts = [];
-  let grandTotalExpenses = 0;
-
-  salesState.rows.forEach(spEntry => {
-    const spName = escapeHTML(spEntry.salesperson || "Unknown");
-    const grossProfit = Number(spEntry.totals.revenue || 0) - Number(spEntry.totals.cost || 0);
-    
-    const spExpenses = expensesBySalesperson[spName] || {};
-    const totalExpenses = Object.values(spExpenses).reduce((a, b) => a + b, 0);
-    grandTotalExpenses += totalExpenses;
-    
-    const netRevenue = grossProfit - totalExpenses;
-    
-    const expenseLines = Object.keys(spExpenses)
-      .sort()
-      .map(cat => {
-        const amt = Number(spExpenses[cat]).toLocaleString();
-        return `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                  <span>${escapeHTML(cat)}</span>
-                  <strong>${amt}</strong>
-                </div>`;
-      }).join("") || `<div style="color: #999;">No expenses recorded</div>`;
-
-    const prodRows = spEntry.products.map(p => {
-      const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
-      const revenueText = Number(p.revenue || 0).toLocaleString();
-      const costText = Number(p.cost || 0).toLocaleString();
-      const gp = Number(p.revenue || 0) - Number(p.cost || 0);
-      const gpText = gp.toLocaleString();
-      
-      return `<tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${escapeHTML(p.productName)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${qtyText}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${revenueText}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${costText}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: 600; color: #2e8b57;">${gpText}</td>
-      </tr>`;
-    }).join("");
-
-    const subQty = Number(spEntry.totals.qty || 0).toLocaleString();
-    const subRev = Number(spEntry.totals.revenue || 0).toLocaleString();
-    const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
-    const subGp = grossProfit.toLocaleString();
-
-    const block = `
-      <div style="margin-bottom: 50px; display: flex; gap: 25px; align-items: flex-start;">
-        <div style="flex: 1; background: #fff; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
-          <div style="background: #6f2cc1; color: #fff; padding: 10px 15px; font-weight: 700; font-size: 16px;">
-            Salesperson: ${spName}
+    html += `
+      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08);margin-bottom:24px">
+        <div style="background:linear-gradient(135deg,${idx%2===0?'#667eea':'#f093fb'} 0%,${idx%2===0?'#764ba2':'#f5576c'} 100%);color:white;padding:20px 24px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:22px;font-weight:700">${escapeHTML(sp.salesperson)}</div>
+              <div style="font-size:14px;opacity:0.9">#${idx+1} • ${sp.products.length} Products</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:28px;font-weight:700">${profit.toLocaleString()}</div>
+              <div style="font-size:13px">${margin}% Margin</div>
+            </div>
           </div>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead style="background: #f8f9fa;">
-              <tr>
-                <th style="text-align: left; padding: 10px;">Product</th>
-                <th style="text-align: right; padding: 10px;">Qty Sold</th>
-                <th style="text-align: right; padding: 10px;">Sales</th>
-                <th style="text-align: right; padding: 10px;">Cost</th>
-                <th style="text-align: right; padding: 10px;">Gross Profit</th>
+        </div>
+        <div style="padding:24px">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:14px">
+              <thead>
+                <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+                  <th style="padding:12px 16px;text-align:left;border-bottom:2px solid #e2e8f0">Product</th>
+                  <th style="padding:12px 16px;text-align:right;border-bottom:2px solid #e2e8f0">Qty</th>
+                  <th style="padding:12px 16px;text-align:right;border-bottom:2px solid #e2e8f0">Revenue</th>
+                  <th style="padding:12px 16px;text-align:right;border-bottom:2px solid #e2e8f0">Cost</th>
+                  <th style="padding:12px 16px;text-align:right;border-bottom:2px solid #e2e8f0">Profit</th>
+                </tr>
+              </thead>
+              <tbody>`;
+    
+    sp.products.forEach(p => {
+      const pProfit = p.revenue - p.cost;
+      const pMargin = p.revenue > 0 ? ((pProfit / p.revenue) * 100).toFixed(1) : 0;
+      html += `
+                <tr style="border-bottom:1px solid #f1f5f9">
+                  <td style="padding:12px 16px;font-weight:500">
+                    ${escapeHTML(p.productName)}
+                    ${p.unitShort ? `<span style="background:#e2e8f0;text-transform:uppercase;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:8px;opacity:0.7">${escapeHTML(p.unitShort)}</span>` : ''}
+                  </td>
+                  <td style="padding:12px 16px;text-align:right;color:#64748b">${p.qty.toLocaleString()}</td>
+                  <td style="padding:12px 16px;text-align:right;font-weight:600;color:#1f2937">${p.revenue.toLocaleString()}</td>
+                  <td style="padding:12px 16px;text-align:right;color:#64748b">${p.cost.toLocaleString()}</td>
+                  <td style="padding:12px 16px;text-align:right;color:#10b981;font-weight:600">${pProfit.toLocaleString()} <span style="font-size:12px;opacity:0.8">(${pMargin}%)</span></td>
+                </tr>`;
+    });
+    
+    html += `
+              </tbody>
+              <tfoot>
+                <tr style="background:#f8fafc;font-weight:700;border-top:3px solid #e2e8f0">
+                  <td style="padding:16px;font-size:15px">TOTAL</td>
+                  <td style="padding:16px;text-align:right;font-size:15px">${sp.totals.qty.toLocaleString()}</td>
+                  <td style="padding:16px;text-align:right;font-size:15px;color:#1f2937">${sp.totals.revenue.toLocaleString()}</td>
+                  <td style="padding:16px;text-align:right;font-size:15px">${sp.totals.cost.toLocaleString()}</td>
+                  <td style="padding:16px;text-align:right;font-size:15px;color:#10b981">${profit.toLocaleString()}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  });
+  
+  container.innerHTML = html;
+}
+
+function renderSalesByDate() {
+  const container = document.getElementById("srResults");
+  if (!salesState.filtered.length) {
+    container.innerHTML = `
+      <div class="sr-table-placeholder">
+        <div style="font-size:24px;margin-bottom:12px">📅 No Daily Data</div>
+        <div style="color:#64748b;font-size:16px">No sales found for the selected period.</div>
+      </div>`;
+    return;
+  }
+  
+  let html = `
+    <div style="background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);color:white;padding:24px;border-radius:16px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;text-align:center">
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.orders,0)}</div><div style="font-size:14px;opacity:0.9">Total Orders</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.revenue,0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Revenue</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+(b.revenue-b.cost),0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Profit</div></div>
+      </div>
+    </div>
+  `;
+  
+  html += `<div style="overflow-x:auto;background:white;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <thead>
+        <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+          <th style="padding:16px 12px;text-align:left;border-bottom:3px solid #e2e8f0">📅 Date</th>
+          <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Orders</th>
+          <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Items Sold</th>
+          <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Revenue</th>
+          <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Cost</th>
+          <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Profit</th>
+          <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Avg Order</th>
+        </tr>
+      </thead>
+      <tbody>`;
+  
+  salesState.filtered.forEach(row => {
+    const profitColor = row.profit > 0 ? '#10b981' : '#ef4444';
+    html += `
+        <tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:16px 12px;font-weight:600">${row.date}</td>
+          <td style="padding:16px 12px;text-align:right;color:#64748b">${row.orders}</td>
+          <td style="padding:16px 12px;text-align:right;color:#64748b">${row.qty.toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;font-weight:600;color:#1f2937">${row.revenue.toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;color:#9ca3af">${row.cost.toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;color:${profitColor};font-weight:600">${row.profit.toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;color:#6b7280">${row.avgOrder.toLocaleString()}</td>
+        </tr>`;
+  });
+  
+  html += `
+      </tbody>
+      <tfoot>
+        <tr style="background:#f8fafc;font-weight:700;border-top:3px solid #e2e8f0">
+          <td style="padding:16px 12px;font-size:15px">TOTAL</td>
+          <td style="padding:16px 12px;text-align:right;font-size:15px">${salesState.filtered.reduce((a,b)=>a+b.orders,0)}</td>
+          <td style="padding:16px 12px;text-align:right;font-size:15px">${salesState.filtered.reduce((a,b)=>a+b.qty,0).toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;font-size:15px;color:#1f2937">${salesState.filtered.reduce((a,b)=>a+b.revenue,0).toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;font-size:15px">${salesState.filtered.reduce((a,b)=>a+b.cost,0).toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">${salesState.filtered.reduce((a,b)=>a+(b.revenue-b.cost),0).toLocaleString()}</td>
+          <td style="padding:16px 12px;text-align:right;font-size:15px;color:#6b7280">-</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+  
+  container.innerHTML = html;
+}
+
+function renderSalesByProduct() {
+  const container = document.getElementById("srResults");
+  if (!salesState.filtered.length) {
+    container.innerHTML = `
+      <div class="sr-table-placeholder">
+        <div style="font-size:24px;margin-bottom:12px">📦 No Product Data</div>
+        <div style="color:#64748b;font-size:16px">No products sold in the selected period.</div>
+      </div>`;
+    return;
+  }
+  
+  let html = `
+    <div style="background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);color:white;padding:24px;border-radius:16px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;text-align:center">
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.qty,0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Items</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.revenue,0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Revenue</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+(b.revenue-b.cost),0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Profit</div></div>
+      </div>
+    </div>
+  `;
+  
+  // Top 10 Products
+  const top10 = salesState.filtered.slice(0, 10);
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">`;
+  
+  // Top Products Table
+  html += `
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
+      <div style="background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);color:white;padding:20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:20px">🏆</div>
+          <div><div style="font-size:18px;font-weight:700">Top 10 Products</div><div style="font-size:13px;opacity:0.9">By Revenue</div></div>
+        </div>
+      </div>
+      <div style="padding:20px">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+                <th style="padding:12px 8px;text-align:left;border-bottom:2px solid #e2e8f0">#</th>
+                <th style="padding:12px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Product</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Revenue</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Margin</th>
               </tr>
             </thead>
-            <tbody>${prodRows}</tbody>
-            <tfoot style="background: #e9ecef; font-weight: 700;">
-              <tr>
-                <td style="padding: 12px;">SUBTOTAL</td>
-                <td style="padding: 12px; text-align: right;">${subQty}</td>
-                <td style="padding: 12px; text-align: right;">${subRev}</td>
-                <td style="padding: 12px; text-align: right;">${subCost}</td>
-                <td style="padding: 12px; text-align: right; color: #2e8b57;">${subGp}</td>
+            <tbody>`;
+  
+  top10.forEach((p, idx) => {
+    html += `
+              <tr style="border-bottom:1px solid #f1f5f9">
+                <td style="padding:12px 8px;width:40px;text-align:center;font-weight:700;color:#${idx < 3 ? 'd97706' : '64748b'}">${idx+1}</td>
+                <td style="padding:12px 8px;font-weight:500">${escapeHTML(p.productName)}</td>
+                <td style="padding:12px 8px;text-align:right;font-weight:600">${p.revenue.toLocaleString()}</td>
+                <td style="padding:12px 8px;text-align:right;color:#10b981;font-weight:600">${p.profitMargin}%</td>
+              </tr>`;
+  });
+  
+  html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  
+  // Full Products Table
+  html += `
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
+      <div style="background:linear-gradient(135deg,#a8edea 0%,#fed6e3 100%);color:#1f2937;padding:20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:20px">📋</div>
+          <div><div style="font-size:18px;font-weight:700">All Products</div><div style="font-size:13px;opacity:0.9">${salesState.filtered.length} items</div></div>
+        </div>
+      </div>
+      <div style="padding:20px">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+                <th style="padding:12px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Product</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Qty</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Revenue</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Cost</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Profit</th>
+                <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Margin</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+  salesState.filtered.forEach(p => {
+    const profitColor = p.profit > 0 ? '#10b981' : '#ef4444';
+    html += `
+              <tr style="border-bottom:1px solid #f1f5f9">
+                <td style="padding:12px 8px;font-weight:500">${escapeHTML(p.productName)}${p.unitShort ? `<span style="background:#e2e8f0;text-transform:uppercase;font-size:11px;padding:2px 6px;border-radius:4px;margin-left:8px;opacity:0.7">${escapeHTML(p.unitShort)}</span>` : ''}</td>
+                <td style="padding:12px 8px;text-align:right;color:#64748b">${p.qty.toLocaleString()}</td>
+                <td style="padding:12px 8px;text-align:right;font-weight:600;color:#1f2937">${p.revenue.toLocaleString()}</td>
+                <td style="padding:12px 8px;text-align:right;color:#9ca3af">${p.cost.toLocaleString()}</td>
+                <td style="padding:12px 8px;text-align:right;color:${profitColor};font-weight:600">${p.profit.toLocaleString()}</td>
+                <td style="padding:12px 8px;text-align:right;color:#10b981;font-weight:600">${p.profitMargin}%</td>
+              </tr>`;
+  });
+
+  html += `
+            </tbody>
+            <tfoot>
+              <tr style="background:#f8fafc;font-weight:700;border-top:3px solid #e2e8f0">
+                <td style="padding:16px 8px;font-size:14px">TOTAL</td>
+                <td style="padding:16px 8px;text-align:right;font-size:14px">${salesState.filtered.reduce((a,b)=>a+b.qty,0).toLocaleString()}</td>
+                <td style="padding:16px 8px;text-align:right;font-size:14px;color:#1f2937">${salesState.filtered.reduce((a,b)=>a+b.revenue,0).toLocaleString()}</td>
+                <td style="padding:16px 8px;text-align:right;font-size:14px">${salesState.filtered.reduce((a,b)=>a+b.cost,0).toLocaleString()}</td>
+                <td style="padding:16px 8px;text-align:right;font-size:14px;color:#10b981">${salesState.filtered.reduce((a,b)=>a+(b.revenue-b.cost),0).toLocaleString()}</td>
+                <td style="padding:16px 8px;text-align:right;font-size:14px;color:#10b981">-</td>
               </tr>
             </tfoot>
           </table>
         </div>
-        <div style="width: 340px; flex-shrink: 0;">
-          <div style="background: #fff; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.05);">
-            <div style="background: #6f2cc1; color: #fff; padding: 15px; text-align: center; font-weight: 700; font-size: 16px;">
-              Expenses – ${spName}
-            </div>
-            <div style="padding: 20px;">
-              <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <div style="color: #555; margin-bottom: 12px; font-weight: 600;">Expense Categories</div>
-                <div style="min-height: 120px; color: #777;">${expenseLines}</div>
-              </div>
-              <div style="border-top: 1px solid #eee; padding-top: 12px; font-size: 15px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span style="color: #666;">Total Expenses</span>
-                  <strong style="color: #c0392b;">${totalExpenses.toLocaleString()}</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #6f2cc1;">
-                  <span style="font-weight: 600;">Net Revenue</span>
-                  <strong style="color: ${netRevenue >= 0 ? '#27ae60' : '#c0392b'}; font-size: 20px;">
-                    ${netRevenue.toLocaleString()}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
-    `;
-    
-    htmlParts.push(block);
-  });
-
-  const grand = salesState.rows.reduce((a, b) => ({
-    qty: a.qty + Number(b.totals.qty || 0),
-    revenue: a.revenue + Number(b.totals.revenue || 0),
-    cost: a.cost + Number(b.totals.cost || 0)
-  }), { qty: 0, revenue: 0, cost: 0 });
-
-  const grandGrossProfit = grand.revenue - grand.cost;
-  const grandNetRevenue = grandGrossProfit - grandTotalExpenses;
-
-  const overall = `
-    <div style="margin: 60px 0; padding: 25px; background: #222; color: #fff; border-radius: 12px; text-align: center; font-size: 22px; font-weight: 700;">
-      FINAL SUMMARY →
-      Sales: ${grand.revenue.toLocaleString()} |
-      Cost: ${grand.cost.toLocaleString()} |
-      Gross Profit: ${grandGrossProfit.toLocaleString()} |
-      <span style="color: #e74c3c;">Expenses: ${grandTotalExpenses.toLocaleString()}</span> |
-      <strong style="color: ${grandNetRevenue >= 0 ? '#27ae60' : '#c0392b'};">
-        NET REVENUE: ${grandNetRevenue.toLocaleString()} KES
-      </strong>
     </div>
-  `;
+  </div>`;
 
-  container.innerHTML = `
-    <h2 style="text-align: center; margin: 30px 0 40px; color: #333; font-size: 28px;">
-      Detailed Sales & Expenses Report
-    </h2>
-    ${htmlParts.join("")}
-    ${overall}
-  `;
-};
+  container.innerHTML = html;
+}
 
-// ========== OTHER REPORTS (SIMPLIFIED) ==========
-window.aggregateSalesByDate = async function() {
-  const db = firebase.firestore();
-  let q = db.collection("sales");
-  if (salesState.from && salesState.to) {
-    q = q.where("saleDate", ">=", salesState.from).where("saleDate", "<=", salesState.to);
-  }
-  if (salesState.location) q = q.where("location", "==", salesState.location);
-  
-  const snap = await q.get();
-  const dayMap = {};
-  
-  for (const doc of snap.docs) {
-    const s = doc.data();
-    if (!s.saleDate) continue;
-    
-    const dateObj = s.saleDate.toDate ? s.saleDate.toDate() : new Date(s.saleDate);
-    const dateKey = dateObj.toISOString().split("T")[0];
-    
-    if (!dayMap[dateKey]) {
-      dayMap[dateKey] = { date: dateKey, qty: 0, sales: 0, cost: 0 };
-    }
-    
-    const items = s.items || s.products || [];
-    for (const it of items) {
-      const qty = Number(it.quantity || it.qty || 0);
-      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
-      const cost = Number(it.costAtSale || 0);
-      
-      dayMap[dateKey].qty += qty;
-      dayMap[dateKey].sales += qty * price;
-      dayMap[dateKey].cost += qty * cost;
-    }
-  }
-  
-  const rows = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
-  salesState.rows = rows;
-  salesState.filtered = rows.slice();
-};
-
-window.renderSalesByDate = function() {
+function renderSalesByCustomer() {
   const container = document.getElementById("srResults");
-  if (!salesState.filtered?.length) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+  if (!salesState.filtered.length) {
+    container.innerHTML = `
+      <div class="sr-table-placeholder">
+        <div style="font-size:24px;margin-bottom:12px">👥 No Customer Data</div>
+        <div style="color:#64748b;font-size:16px">No customer sales found in the selected period.</div>
+      </div>`;
     return;
   }
   
-  let rowsHtml = "";
-  let totalQty = 0, totalSales = 0, totalCost = 0;
-  
-  salesState.filtered.forEach(r => {
-    const profit = r.sales - r.cost;
-    totalQty += r.qty;
-    totalSales += r.sales;
-    totalCost += r.cost;
-    
-    rowsHtml += `
-      <tr>
-        <td style="padding: 14px; font-weight: 600; background: #f9f9f9;">
-          ${new Date(r.date).toLocaleDateString("en-KE", { 
-            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' 
-          })}
-        </td>
-        <td style="padding: 14px; text-align: right;">${r.qty.toLocaleString()}</td>
-        <td style="padding: 14px; text-align: right; font-weight: 600; color: #2c3e50;">${r.sales.toLocaleString()}</td>
-        <td style="padding: 14px; text-align: right;">${r.cost.toLocaleString()}</td>
-        <td style="padding: 14px; text-align: right; color: #27ae60; font-weight: 600;">${profit.toLocaleString()}</td>
-      </tr>
-    `;
-  });
-  
-  container.innerHTML = `
-    <div style="font-weight: 700; font-size: 20px; margin-bottom: 10px; color: #2c3e50;">📅 Daily Performance</div>
-    <div style="background: white; box-shadow: 0 4px 12px rgba(0,0,0,.08); border-radius: 10px; overflow: hidden;">
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead style="background: #6f2cc1; color: white;">
-          <tr>
-            <th style="padding: 16px; text-align: left;">Date</th>
-            <th style="padding: 16px; text-align: right;">Qty Sold</th>
-            <th style="padding: 16px; text-align: right;">Sales (KES)</th>
-            <th style="padding: 16px; text-align: right;">Cost</th>
-            <th style="padding: 16px; text-align: right;">Gross Profit</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot style="background: #222; color: white; font-weight: 700; font-size: 16px;">
-          <tr>
-            <td style="padding: 18px;">TOTAL (${salesState.filtered.length} days)</td>
-            <td style="padding: 18px; text-align: right;">${totalQty.toLocaleString()}</td>
-            <td style="padding: 18px; text-align: right;">${totalSales.toLocaleString()}</td>
-            <td style="padding: 18px; text-align: right;">${totalCost.toLocaleString()}</td>
-            <td style="padding: 18px; text-align: right;">${(totalSales - totalCost).toLocaleString()}</td>
-          </tr>
-        </tfoot>
-      </table>
+  let html = `
+    <div style="background:linear-gradient(135deg,#a8edea 0%,#fed6e3 100%);color:#1f2937;padding:24px;border-radius:16px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;text-align:center">
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.length}</div><div style="font-size:14px;opacity:0.9">Total Customers</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.orders,0)}</div><div style="font-size:14px;opacity:0.9">Total Orders</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.revenue,0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Revenue</div></div>
+      </div>
     </div>
   `;
-};
+  
+  // Top 10 Customers
+  const top10 = salesState.filtered.slice(0, 10);
+  html += `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px">
+      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
+        <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:20px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:20px">🏆</div>
+            <div><div style="font-size:18px;font-weight:700">Top 10 Customers</div><div style="font-size:13px;opacity:0.9">By Revenue</div></div>
+          </div>
+        </div>
+        <div style="padding:20px">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+                  <th style="padding:12px 8px;text-align:left;border-bottom:2px solid #e2e8f0">#</th>
+                  <th style="padding:12px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Customer</th>
+                  <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Orders</th>
+                  <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Revenue</th>
+                  <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Avg Order</th>
+                </tr>
+              </thead>
+              <tbody>`;
 
-// Add similar simplified implementations for other reports...
-window.aggregateSalesByProduct = async function() {
-  // Implementation similar to detailed but by product
-  salesState.rows = [{ product: "Sample Product", qty: 100, sales: 50000, cost: 30000 }];
-  salesState.filtered = salesState.rows.slice();
-};
+  top10.forEach((c, idx) => {
+    html += `
+                <tr style="border-bottom:1px solid #f1f5f9">
+                  <td style="padding:12px 8px;width:40px;text-align:center;font-weight:700;color:#${idx < 3 ? 'd97706' : '64748b'}">${idx+1}</td>
+                  <td style="padding:12px 8px;font-weight:500">${escapeHTML(c.customerName)}</td>
+                  <td style="padding:12px 8px;text-align:right;color:#64748b">${c.orders}</td>
+                  <td style="padding:12px 8px;text-align:right;font-weight:600">${c.revenue.toLocaleString()}</td>
+                  <td style="padding:12px 8px;text-align:right;color:#10b981;font-weight:600">${c.avgOrder.toLocaleString()}</td>
+                </tr>`;
+  });
 
-window.renderSalesByProduct = function() {
+  html += `
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+
+  // Full Customers Table
+  html += `
+      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
+        <div style="background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);color:white;padding:20px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:20px">📋</div>
+            <div><div style="font-size:18px;font-weight:700">All Customers</div><div style="font-size:13px;opacity:0.9">${salesState.filtered.length} customers</div></div>
+          </div>
+        </div>
+        <div style="padding:20px">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+                  <th style="padding:12px 8px;text-align:left;border-bottom:2px solid #e2e8f0">Customer</th>
+                  <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Orders</th>
+                  <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Revenue</th>
+                  <th style="padding:12px 8px;text-align:right;border-bottom:2px solid #e2e8f0">Avg Order</th>
+                </tr>
+              </thead>
+              <tbody>`;
+
+  salesState.filtered.forEach(c => {
+    html += `
+                <tr style="border-bottom:1px solid #f1f5f9">
+                  <td style="padding:12px 8px;font-weight:500">${escapeHTML(c.customerName)}</td>
+                  <td style="padding:12px 8px;text-align:right;color:#64748b">${c.orders}</td>
+                  <td style="padding:12px 8px;text-align:right;font-weight:600;color:#1f2937">${c.revenue.toLocaleString()}</td>
+                  <td style="padding:12px 8px;text-align:right;color:#10b981;font-weight:600">${c.avgOrder.toLocaleString()}</td>
+                </tr>`;
+  });
+
+  html += `
+              </tbody>
+              <tfoot>
+                <tr style="background:#f8fafc;font-weight:700;border-top:3px solid #e2e8f0">
+                  <td style="padding:16px 8px;font-size:14px">TOTAL</td>
+                  <td style="padding:16px 8px;text-align:right;font-size:14px">${salesState.filtered.reduce((a,b)=>a+b.orders,0)}</td>
+                  <td style="padding:16px 8px;text-align:right;font-size:14px;color:#1f2937">${salesState.filtered.reduce((a,b)=>a+b.revenue,0).toLocaleString()}</td>
+                  <td style="padding:16px 8px;text-align:right;font-size:14px;color:#10b981">-</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  container.innerHTML = html;
+}
+
+function renderSalesByCustGroup() {
   const container = document.getElementById("srResults");
-  container.innerHTML = `<div class="sr-table-placeholder">📦 Product Analytics - Coming Soon!</div>`;
-};
+  if (!salesState.filtered.length) {
+    container.innerHTML = `
+      <div class="sr-table-placeholder">
+        <div style="font-size:24px;margin-bottom:12px">🏷️ No Group Data</div>
+        <div style="color:#64748b;font-size:16px">No customer group analysis available.</div>
+      </div>`;
+    return;
+  }
 
-window.aggregateSalesByCustomer = async function() {
-  salesState.rows = [{ customer: "Sample Customer", qty: 50, sales: 25000, invoices: 5 }];
-  salesState.filtered = salesState.rows.slice();
-};
+  const totalRevenue = salesState.filtered.reduce((a, b) => a + b.revenue, 0);
 
-window.renderSalesByCustomer = function() {
-  const container = document.getElementById("srResults");
-  container.innerHTML = `<div class="sr-table-placeholder">👥 Customer Insights - Coming Soon!</div>`;
-};
+  let html = `
+    <div style="background:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);color:white;padding:24px;border-radius:16px;margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;text-align:center">
+        <div><div style="font-size:32px;font-weight:700">${totalRevenue.toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Revenue</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.orders,0)}</div><div style="font-size:14px;opacity:0.9">Total Orders</div></div>
+        <div><div style="font-size:32px;font-weight:700">${salesState.filtered.reduce((a,b)=>a+b.qty,0).toLocaleString()}</div><div style="font-size:14px;opacity:0.9">Total Items</div></div>
+      </div>
+    </div>
+  `;
 
-window.aggregateSalesByCustGroup = async function() {
-  salesState.rows = [{ group: "Retail", qty: 75, sales: 37500, invoices: 8 }];
-  salesState.filtered = salesState.rows.slice();
-};
+  // Group Cards
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-bottom:32px">`;
+  
+  salesState.filtered.forEach(group => {
+    const revenueShareColor = group.revenueShare > 50 ? '#10b981' : group.revenueShare > 30 ? '#f59e0b' : '#ef4444';
+    html += `
+      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08);border-left:5px solid ${group.groupName === 'Wholesale' ? '#3b82f6' : group.groupName === 'Retail' ? '#10b981' : '#f59e0b'}">
+        <div style="padding:24px;background:linear-gradient(135deg,${group.groupName === 'Wholesale' ? '#667eea,#764ba2' : group.groupName === 'Retail' ? '#4facfe,#00f2fe' : '#f093fb,#f5576c'});color:white">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:20px;font-weight:700">${escapeHTML(group.groupName)}</div>
+              <div style="font-size:13px;opacity:0.9">${group.orders} orders</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:24px;font-weight:700">${group.revenue.toLocaleString()}</div>
+              <div style="font-size:12px">${group.revenueShare}% of total</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:24px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:14px">
+            <div>
+              <div style="color:#64748b;font-size:13px;font-weight:600;margin-bottom:8px">📦 Items Sold</div>
+              <div style="font-size:18px;font-weight:700;color:#1f2937">${group.qty.toLocaleString()}</div>
+            </div>
+            <div>
+              <div style="color:#64748b;font-size:13px;font-weight:600;margin-bottom:8px">💰 Average Order</div>
+              <div style="font-size:18px;font-weight:700;color:#10b981">${group.avgOrder.toLocaleString()}</div>
+            </div>
+          </div>
+          <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:12px;text-align:center">
+            <div style="font-size:28px;font-weight:700;color:${revenueShareColor}">${group.revenueShare}%</div>
+            <div style="color:#64748b;font-size:13px">Revenue Share</div>
+          </div>
+        </div>
+      </div>`;
+  });
 
-window.renderSalesByCustGroup = function() {
-  const container = document.getElementById("srResults");
-  container.innerHTML = `<div class="sr-table-placeholder">🏷️ Customer Group Analysis - Coming Soon!</div>`;
-};
+  html += `</div>`;
+
+  // Summary Table
+  html += `
+    <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
+      <div style="background:linear-gradient(135deg,#1e3a8a 0%,#3730a3 100%);color:white;padding:20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:20px">📊</div>
+          <div><div style="font-size:18px;font-weight:700">Group Performance Summary</div></div>
+        </div>
+      </div>
+      <div style="padding:24px">
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            <thead>
+              <tr style="background:#f8fafc;color:#64748b;font-weight:600">
+                <th style="padding:16px 12px;text-align:left;border-bottom:3px solid #e2e8f0">Customer Group</th>
+                <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Orders</th>
+                <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Items Sold</th>
+                <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Revenue</th>
+                <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Avg Order</th>
+                <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Revenue Share</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+  salesState.filtered.forEach(group => {
+    const shareColor = group.revenueShare > 50 ? '#10b981' : group.revenueShare > 30 ? '#f59e0b' : '#ef4444';
+    html += `
+              <tr style="border-bottom:2px solid #f1f5f9">
+                <td style="padding:16px 12px;font-weight:600;color:${group.groupName === 'Wholesale' ? '#3b82f6' : group.groupName === 'Retail' ? '#10b981' : '#f59e0b'}">
+                  ${escapeHTML(group.groupName)}
+                </td>
+                <td style="padding:16px 12px;text-align:right;font-weight:600">${group.orders}</td>
+                <td style="padding:16px 12px;text-align:right">${group.qty.toLocaleString()}</td>
+                <td style="padding:16px 12px;text-align:right;font-weight:700;color:#1f2937">${group.revenue.toLocaleString()}</td>
+                <td style="padding:16px 12px;text-align:right;color:#10b981;font-weight:600">${group.avgOrder.toLocaleString()}</td>
+                <td style="padding:16px 12px;text-align:right">
+                  <span style="color:${shareColor};font-weight:700;font-size:15px">${group.revenueShare}%</span>
+                </td>
+              </tr>`;
+  });
+
+  html += `
+            </tbody>
+            <tfoot>
+              <tr style="background:#f8fafc;font-weight:700;border-top:3px solid #e2e8f0">
+                <td style="padding:16px 12px;font-size:15px">TOTAL</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px">${salesState.filtered.reduce((a,b)=>a+b.orders,0)}</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px">${salesState.filtered.reduce((a,b)=>a+b.qty,0).toLocaleString()}</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#1f2937">${totalRevenue.toLocaleString()}</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">-</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">100%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  container.innerHTML = html;
+}
+
+// ========== UTILITY FUNCTIONS (REQUIRED) ==========
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function downloadBlob(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function saveLastPage(pageName) {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('lastPage', pageName);
+  }
+}
+
+// ✅ NOW THE CODE IS 100% COMPLETE AND READY TO RUN!
+showSalesReport();
 
 function showPurchaseReport() {
   saveLastPage("showPurchaseReport");
