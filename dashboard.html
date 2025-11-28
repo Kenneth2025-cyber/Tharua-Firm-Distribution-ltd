@@ -9344,7 +9344,7 @@ function toggleReports() {
 }
 
 // Placeholder report functions
-// ✅ GLOBAL STATE - OUTSIDE FUNCTION (FIXED)
+// ✅ FIX: This must be outside the function so buttons can see it
 let salesState = {
   rows: [],
   filtered: [],
@@ -9353,633 +9353,10 @@ let salesState = {
   location: "",
   reportMode: "detailed" // ✅ Default is Detailed
 };
-
-// ========== UTILITY FUNCTIONS (REQUIRED) ==========
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function downloadBlob(content, filename, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createBlobURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-// ========== ALL AGGREGATION FUNCTIONS (100% WORKING) ==========
-async function aggregateSalesDetailed() {
-  const db = firebase.firestore();
-  const from = salesState.from;
-  const to = salesState.to;
-  const loc = salesState.location;
-  let q = db.collection("sales").orderBy("saleDate", "desc");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
-  const spMap = {};
-  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
-  
-  for (const doc of snap.docs) {
-    const sd = doc.data();
-    const sp = String(sd.salesperson || sd.salespersonName || "").trim() || "Unknown";
-    const sLoc = String(sd.location || sd.businessLocation || "").trim();
-    if (loc && sLoc !== loc) continue;
-    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
-    if (!Array.isArray(items) || items.length === 0) continue;
-    
-    if (!spMap[sp]) {
-      spMap[sp] = { 
-        salesperson: sp, 
-        products: {}, 
-        totals: { qty: 0, revenue: 0, cost: 0 } 
-      };
-    }
-    
-    for (const it of items) {
-      const pname = String(it.prodName || it.productName || it.name || "").trim();
-      if (!pname) continue;
-      const qty = toNum(it.quantity || it.qty || 0);
-      if (qty === 0) continue;
-      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
-      const costPrice = toNum(it.costAtSale || 0);
-      
-      if (!spMap[sp].products[pname]) {
-        spMap[sp].products[pname] = {
-          productName: pname,
-          qty: 0,
-          revenue: 0,
-          cost: 0,
-          unitShort: String(it.unit || it.unitShort || "").trim()
-        };
-      }
-      
-      spMap[sp].products[pname].qty += qty;
-      spMap[sp].products[pname].revenue += qty * price;
-      spMap[sp].products[pname].cost += qty * costPrice;
-      spMap[sp].totals.qty += qty;
-      spMap[sp].totals.revenue += qty * price;
-      spMap[sp].totals.cost += qty * costPrice;
-    }
-  }
-  
-  const result = Object.keys(spMap)
-    .sort()
-    .map(spName => {
-      const entry = spMap[spName];
-      const products = Object.values(entry.products)
-        .sort((a, b) => a.productName.localeCompare(b.productName));
-      return { salesperson: entry.salesperson, products, totals: entry.totals };
-    });
-    
-  salesState.rows = result;
-  salesState.filtered = result.slice();
-}
-
-async function aggregateSalesByDate() {
-  const db = firebase.firestore();
-  const from = salesState.from;
-  const to = salesState.to;
-  const loc = salesState.location;
-  let q = db.collection("sales");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
-  
-  const dayMap = {};
-  for (const doc of snap.docs) {
-    const s = doc.data();
-    if (!s.saleDate) continue;
-    const dateObj = s.saleDate.toDate ? s.saleDate.toDate() : new Date(s.saleDate);
-    const dateKey = dateObj.toISOString().split("T")[0];
-    
-    if (!dayMap[dateKey]) dayMap[dateKey] = { date: dateKey, qty: 0, sales: 0, cost: 0 };
-    
-    const items = s.items || s.products || [];
-    for (const it of items) {
-      const qty = Number(it.quantity || it.qty || 0);
-      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
-      const cost = Number(it.costAtSale || 0);
-      dayMap[dateKey].qty += qty;
-      dayMap[dateKey].sales += qty * price;
-      dayMap[dateKey].cost += qty * cost;
-    }
-  }
-  
-  const rows = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
-  salesState.rows = rows;
-  salesState.filtered = rows.slice();
-}
-
-async function aggregateSalesByProduct() {
-  const db = firebase.firestore();
-  const from = salesState.from;
-  const to = salesState.to;
-  const loc = salesState.location;
-  let q = db.collection("sales");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
-  
-  const productMap = {};
-  for (const doc of snap.docs) {
-    const s = doc.data();
-    const items = s.items || s.products || [];
-    for (const it of items) {
-      const name = String(it.prodName || it.productName || it.name || "Unknown").trim();
-      if (!name || name === "Unknown") continue;
-      const qty = Number(it.quantity || it.qty || 0);
-      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
-      const cost = Number(it.costAtSale || 0);
-      
-      if (!productMap[name]) productMap[name] = { product: name, qty: 0, sales: 0, cost: 0 };
-      productMap[name].qty += qty;
-      productMap[name].sales += qty * price;
-      productMap[name].cost += qty * cost;
-    }
-  }
-  
-  const rows = Object.values(productMap).sort((a, b) => b.sales - a.sales);
-  salesState.rows = rows;
-  salesState.filtered = rows.slice();
-}
-
-async function aggregateSalesByCustomer() {
-  const db = firebase.firestore();
-  const from = salesState.from;
-  const to = salesState.to;
-  const loc = salesState.location;
-  let q = db.collection("sales");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
-  
-  const customerMap = {};
-  const customerPromises = [];
-  
-  for (const doc of snap.docs) {
-    const s = doc.data();
-    let customerRef = s.customer;
-    let customerName = "Walk-in Customer";
-    
-    const items = s.items || s.products || [];
-    const key = customerRef ? (typeof customerRef.get === "function" ? customerRef.path : customerRef) : "walkin";
-    
-    if (!customerMap[key]) {
-      customerMap[key] = { customerRef: key, customerName, qty: 0, sales: 0, invoices: 0 };
-    }
-    customerMap[key].invoices += 1;
-    
-    for (const it of items) {
-      const qty = Number(it.quantity || it.qty || 0);
-      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
-      customerMap[key].qty += qty;
-      customerMap[key].sales += qty * price;
-    }
-    
-    // Fetch customer name if reference exists
-    if (customerRef && key !== "walkin") {
-      const ref = typeof customerRef.get === "function" ? customerRef : db.collection("customers").doc(customerRef);
-      customerPromises.push(
-        ref.get().then(custSnap => {
-          if (custSnap.exists) {
-            const name = String(custSnap.data()?.name || "Unknown Customer").trim();
-            customerMap[key].customerName = name;
-          }
-          return Promise.resolve();
-        }).catch(() => Promise.resolve())
-      );
-    }
-  }
-  
-  await Promise.all(customerPromises);
-  
-  const rows = Object.values(customerMap)
-    .map(c => ({ customer: c.customerName, qty: c.qty, sales: c.sales, invoices: c.invoices }))
-    .sort((a, b) => b.sales - a.sales);
-    
-  salesState.rows = rows;
-  salesState.filtered = rows.slice();
-}
-
-async function aggregateSalesByCustGroup() {
-  const db = firebase.firestore();
-  const from = salesState.from;
-  const to = salesState.to;
-  const loc = salesState.location;
-  let q = db.collection("sales");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
-  
-  const groupMap = {};
-  for (const doc of snap.docs) {
-    const s = doc.data();
-    let group = "Retail";
-    
-    // Try to get customer group
-    if (s.customer) {
-      const custRef = typeof s.customer.get === "function" ? s.customer : db.collection("customers").doc(s.customer);
-      try {
-        const custSnap = await custRef.get();
-        if (custSnap.exists) {
-          group = String(custSnap.data()?.customerGroup || "Retail").trim();
-        }
-      } catch (e) {}
-    }
-    
-    if (s.customerGroup) group = String(s.customerGroup).trim();
-    
-    const items = s.items || s.products || [];
-    if (!groupMap[group]) groupMap[group] = { group, qty: 0, sales: 0, invoices: 0 };
-    groupMap[group].invoices += 1;
-    
-    for (const it of items) {
-      const qty = Number(it.quantity || it.qty || 0);
-      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
-      groupMap[group].qty += qty;
-      groupMap[group].sales += qty * price;
-    }
-  }
-  
-  const rows = Object.values(groupMap).sort((a, b) => b.sales - a.sales);
-  salesState.rows = rows;
-  salesState.filtered = rows.slice();
-}
-
-// ========== RENDER FUNCTIONS (100% WORKING) ==========
-async function renderDetailedTable() {
-  const container = document.getElementById("srResults");
-  if (!salesState.rows || !salesState.rows.length) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales found for selected filters.</div>`;
-    return;
-  }
-  
-  const db = firebase.firestore();
-  let expQuery = db.collection("expenses")
-    .where("expenseDate", ">=", salesState.from)
-    .where("expenseDate", "<=", salesState.to);
-  if (salesState.location) expQuery = expQuery.where("location", "==", salesState.location);
-  const expSnap = await expQuery.get();
-  
-  const expensesBySalesperson = {};
-  expSnap.forEach(doc => {
-    const e = doc.data();
-    const spName = String(e.salesperson || "Unknown").trim();
-    const category = String(e.category || "Uncategorized").trim();
-    const amount = Number(e.totalAmount || e.paidAmount || 0);
-    if (!expensesBySalesperson[spName]) expensesBySalesperson[spName] = {};
-    if (!expensesBySalesperson[spName][category]) expensesBySalesperson[spName][category] = 0;
-    expensesBySalesperson[spName][category] += amount;
-  });
-  
-  const htmlParts = [];
-  let grandTotalExpenses = 0;
-  
-  salesState.rows.forEach(spEntry => {
-    const spName = escapeHTML(spEntry.salesperson || "Unknown");
-    const grossProfit = Number(spEntry.totals.revenue || 0) - Number(spEntry.totals.cost || 0);
-    const spExpenses = expensesBySalesperson[spName] || {};
-    const totalExpenses = Object.values(spExpenses).reduce((a, b) => a + b, 0);
-    grandTotalExpenses += totalExpenses;
-    const netRevenue = grossProfit - totalExpenses;
-    
-    const expenseLines = Object.keys(spExpenses)
-      .sort()
-      .map(cat => {
-        const amt = Number(spExpenses[cat]).toLocaleString();
-        return `<div style="display:flex;justify-content:space-between;padding:4px 0">
-                  <span>${escapeHTML(cat)}</span>
-                  <strong>${amt}</strong>
-                </div>`;
-      }).join("") || `<div style="color:#999">No expenses recorded</div>`;
-    
-    const prodRows = spEntry.products.map(p => {
-      const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
-      const revenueText = Number(p.revenue || 0).toLocaleString();
-      const costText = Number(p.cost || 0).toLocaleString();
-      const gp = (Number(p.revenue || 0) - Number(p.cost || 0));
-      const gpText = gp.toLocaleString();
-      return `<tr>
-        <td style="padding:8px;border-bottom:1px solid #eee">${escapeHTML(p.productName)}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${qtyText}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${revenueText}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${costText}</td>
-        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;font-weight:600;color:#2e8b57">${gpText}</td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="5" style="padding:20px;color:#999;text-align:center">No sales recorded</td></tr>`;
-    
-    const subQty = Number(spEntry.totals.qty || 0).toLocaleString();
-    const subRev = Number(spEntry.totals.revenue || 0).toLocaleString();
-    const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
-    const subGp = grossProfit.toLocaleString();
-    
-    const expensesBox = `
-      <aside style="width:340px;flex-shrink:0;">
-        <div style="background:#fff;border:1px solid #ddd;border-radius:10px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.05);height:fit-content">
-          <div style="background:#6f2cc1;color:#fff;padding:15px;text-align:center;font-weight:700;font-size:16px">
-            Expenses – ${spName}
-          </div>
-          <div style="padding:20px">
-            <div style="background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:15px">
-              <div style="color:#555;margin-bottom:12px;font-weight:600">Expense Categories</div>
-              <div style="min-height:120px;color:#777">${expenseLines}</div>
-            </div>
-            <div style="border-top:1px solid #eee;padding-top:12px;font-size:15px">
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                <span style="color:#666">Total Expenses</span>
-                <strong style="color:#c0392b">${totalExpenses.toLocaleString()}</strong>
-              </div>
-              <div style="display:flex;justify-content:space-between;padding-top:12px;border-top:2px solid #6f2cc1">
-                <span style="font-weight:600">Net Revenue</span>
-                <strong style="color:${netRevenue >= 0 ? '#27ae60' : '#c0392b'};font-size:20px">
-                  ${netRevenue.toLocaleString()}
-                </strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>`;
-    
-    const block = `
-      <div style="margin-bottom:50px;display:flex;gap:25px;align-items:flex-start">
-        <div style="flex:1;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden">
-          <div style="background:#6f2cc1;color:#fff;padding:10px 15px;font-weight:700;font-size:16px">
-            Salesperson: ${spName}
-          </div>
-          <table style="width:100%;border-collapse:collapse">
-            <thead style="background:#f8f9fa">
-              <tr>
-                <th style="text-align:left;padding:10px">Product</th>
-                <th style="text-align:right;padding:10px">Qty Sold</th>
-                <th style="text-align:right;padding:10px">Sales</th>
-                <th style="text-align:right;padding:10px">Cost</th>
-                <th style="text-align:right;padding:10px">Gross Profit</th>
-              </tr>
-            </thead>
-            <tbody>${prodRows}</tbody>
-            <tfoot style="background:#e9ecef;font-weight:700">
-              <tr>
-                <td style="padding:12px">SUBTOTAL</td>
-                <td style="padding:12px;text-align:right">${subQty}</td>
-                <td style="padding:12px;text-align:right">${subRev}</td>
-                <td style="padding:12px;text-align:right">${subCost}</td>
-                <td style="padding:12px;text-align:right;color:#2e8b57">${subGp}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        ${expensesBox}
-      </div>`;
-    
-    htmlParts.push(block);
-  });
-  
-  const grand = salesState.rows.reduce((a, b) => ({
-    qty: a.qty + Number(b.totals.qty || 0),
-    revenue: a.revenue + Number(b.totals.revenue || 0),
-    cost: a.cost + Number(b.totals.cost || 0)
-  }), { qty: 0, revenue: 0, cost: 0 });
-  
-  const grandGrossProfit = grand.revenue - grand.cost;
-  const grandNetRevenue = grandGrossProfit - grandTotalExpenses;
-  
-  const overall = `
-    <div style="margin:60px 0;padding:25px;background:#222;color:#fff;border-radius:12px;text-align:center;font-size:22px;font-weight:700">
-      FINAL SUMMARY →
-      Sales: ${grand.revenue.toLocaleString()} |
-      Cost: ${grand.cost.toLocaleString()} |
-      Gross Profit: ${grandGrossProfit.toLocaleString()} |
-      <span style="color:#e74c3c">Expenses: ${grandTotalExpenses.toLocaleString()}</span> |
-      <strong style="color:${grandNetRevenue >= 0 ? '#27ae60' : '#c0392b'}">
-        NET REVENUE: ${grandNetRevenue.toLocaleString()} KES
-      </strong>
-    </div>`;
-   
-  container.innerHTML = `
-    <h2 style="text-align:center;margin:30px 0 40px;color:#333;font-size:28px">
-      Detailed Sales & Expenses Report
-    </h2>
-    ${htmlParts.join("")}
-    ${overall}
-  `;
-}
-
-function renderSalesByDate() {
-  const container = document.getElementById("srResults");
-  if (!salesState.filtered || salesState.filtered.length === 0) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
-    return;
-  }
-  
-  let rowsHtml = "";
-  let totalQty = 0, totalSales = 0, totalCost = 0;
-  
-  salesState.filtered.forEach(r => {
-    const profit = r.sales - r.cost;
-    totalQty += r.qty;
-    totalSales += r.sales;
-    totalCost += r.cost;
-    rowsHtml += `
-      <tr>
-        <td style="padding:14px; font-weight:600; background:#f9f9f9">${new Date(r.date).toLocaleDateString("en-KE", { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
-        <td style="padding:14px; text-align:right">${r.qty.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${r.sales.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right">${r.cost.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
-      </tr>`;
-  });
-  
-  container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📅 Daily Performance</div>
-    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
-      <thead style="background:#6f2cc1; color:white">
-        <tr>
-          <th style="padding:16px; text-align:left">Date</th>
-          <th style="padding:16px; text-align:right">Qty Sold</th>
-          <th style="padding:16px; text-align:right">Sales (KES)</th>
-          <th style="padding:16px; text-align:right">Cost</th>
-          <th style="padding:16px; text-align:right">Gross Profit</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-      <tfoot>
-        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
-          <td style="padding:18px">TOTAL (${salesState.filtered.length} days)</td>
-          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${(totalSales - totalCost).toLocaleString()}</td>
-        </tr>
-      </tfoot>
-    </table>
-  `;
-}
-
-function renderSalesByProduct() {
-  const container = document.getElementById("srResults");
-  if (!salesState.filtered || salesState.filtered.length === 0) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
-    return;
-  }
-  
-  let rowsHtml = "";
-  let totalQty = 0, totalSales = 0, totalCost = 0;
-  
-  salesState.filtered.forEach((p, index) => {
-    const profit = p.sales - p.cost;
-    totalQty += p.qty;
-    totalSales += p.sales;
-    totalCost += p.cost;
-    rowsHtml += `
-      <tr style="${index < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
-        <td style="padding:14px">${index + 1}. ${escapeHTML(p.product)}</td>
-        <td style="padding:14px; text-align:right">${p.qty.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${p.sales.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right">${p.cost.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
-      </tr>`;
-  });
-  
-  container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📦 Product Analytics (Top Sellers First)</div>
-    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
-      <thead style="background:#6f2cc1; color:white">
-        <tr>
-          <th style="padding:16px; text-align:left">Product</th>
-          <th style="padding:16px; text-align:right">Qty Sold</th>
-          <th style="padding:16px; text-align:right">Sales (KES)</th>
-          <th style="padding:16px; text-align:right">Cost</th>
-          <th style="padding:16px; text-align:right">Gross Profit</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-      <tfoot>
-        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
-          <td style="padding:18px">GRAND TOTAL</td>
-          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${(totalSales - totalCost).toLocaleString()}</td>
-        </tr>
-      </tfoot>
-    </table>
-  `;
-}
-
-function renderSalesByCustomer() {
-  const container = document.getElementById("srResults");
-  if (!salesState.filtered || salesState.filtered.length === 0) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
-    return;
-  }
-  
-  let rowsHtml = "";
-  let totalQty = 0, totalSales = 0, totalInvoices = 0;
-  
-  salesState.filtered.forEach((c, i) => {
-    totalQty += c.qty;
-    totalSales += c.sales;
-    totalInvoices += c.invoices;
-    const avgInvoice = c.invoices > 0 ? Math.round(c.sales / c.invoices) : 0;
-    rowsHtml += `
-      <tr style="${i < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
-        <td style="padding:14px">${i + 1}. ${escapeHTML(c.customer)}</td>
-        <td style="padding:14px; text-align:right">${c.qty.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${c.sales.toLocaleString()}</td>
-        <td style="padding:14px; text-align:center">${c.invoices}</td>
-        <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
-      </tr>`;
-  });
-  
-  container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">👥 Customer Insights (Top Spenders)</div>
-    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
-      <thead style="background:#6f2cc1; color:white">
-        <tr>
-          <th style="padding:16px; text-align:left">Customer</th>
-          <th style="padding:16px; text-align:right">Qty Sold</th>
-          <th style="padding:16px; text-align:right">Total Sales</th>
-          <th style="padding:16px; text-align:center"># Invoices</th>
-          <th style="padding:16px; text-align:right">Avg Invoice</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-      <tfoot>
-        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
-          <td style="padding:18px">GRAND TOTAL</td>
-          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
-          <td style="padding:18px; text-align:center">${totalInvoices}</td>
-          <td style="padding:18px; text-align:right">${totalInvoices > 0 ? Math.round(totalSales / totalInvoices).toLocaleString() : 0}</td>
-        </tr>
-      </tfoot>
-    </table>
-  `;
-}
-
-function renderSalesByCustGroup() {
-  const container = document.getElementById("srResults");
-  if (!salesState.filtered || salesState.filtered.length === 0) {
-    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
-    return;
-  }
-  
-  let rowsHtml = "";
-  let totalQty = 0, totalSales = 0, totalInvoices = 0;
-  
-  salesState.filtered.forEach((g, i) => {
-    totalQty += g.qty;
-    totalSales += g.sales;
-    totalInvoices += g.invoices;
-    const avgInvoice = g.invoices > 0 ? Math.round(g.sales / g.invoices) : 0;
-    rowsHtml += `
-      <tr style="${i < 2 ? 'background:#fff8e1; font-weight:600' : ''}">
-        <td style="padding:14px; font-weight:600">${i + 1}. ${escapeHTML(g.group)}</td>
-        <td style="padding:14px; text-align:right">${g.qty.toLocaleString()}</td>
-        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${g.sales.toLocaleString()}</td>
-        <td style="padding:14px; text-align:center">${g.invoices}</td>
-        <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
-      </tr>`;
-  });
-  
-  container.innerHTML = `
-    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">🏷️ Customer Group Analysis</div>
-    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
-      <thead style="background:#6f2cc1; color:white">
-        <tr>
-          <th style="padding:16px; text-align:left">Customer Group</th>
-          <th style="padding:16px; text-align:right">Qty Sold</th>
-          <th style="padding:16px; text-align:right">Total Sales</th>
-          <th style="padding:16px; text-align:center"># Invoices</th>
-          <th style="padding:16px; text-align:right">Avg Invoice</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-      <tfoot>
-        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
-          <td style="padding:18px">GRAND TOTAL</td>
-          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
-          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
-          <td style="padding:18px; text-align:center">${totalInvoices}</td>
-          <td style="padding:18px; text-align:right">${totalInvoices > 0 ? Math.round(totalSales / totalInvoices).toLocaleString() : 0}</td>
-        </tr>
-      </tfoot>
-    </table>
-  `;
-}
-
-// ========== MAIN ENTRYPOINT (COMPLETE & FIXED) ==========
+// ========== BABY STEPS: COMPLETE PAGE ENTRYPOINT ==========
 async function showSalesReport() {
   saveLastPage("showSalesReport");
   const el = document.getElementById("content");
-  
   el.innerHTML = `
     <style data-sales-clean>
       .sr-wrap{background:#fff;border-radius:12px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.06)}
@@ -9999,13 +9376,31 @@ async function showSalesReport() {
       .btn-excel:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.4)}
       .btn-pdf{background:linear-gradient(135deg,#6b7280,#4b5563);color:#fff;box-shadow:0 4px 12px rgba(107,114,128,.3)}
       .btn-pdf:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(107,114,128,.4)}
-      .mode-bar{display:flex;gap:12px;align-items:center;margin:20px 0;flex-wrap:wrap}
+
+      /* ⭐ Horizontal pill bar for modes */
+      .mode-bar{
+        display:flex;
+        gap:12px;
+        align-items:stretch;
+        margin:20px 0;
+        flex-wrap:nowrap;
+        overflow-x:auto;
+        padding:4px 2px 8px;
+        scrollbar-width:thin;
+      }
+      .mode-bar::-webkit-scrollbar{height:6px}
+      .mode-bar::-webkit-scrollbar-track{background:transparent}
+      .mode-bar::-webkit-scrollbar-thumb{background:#c4b5fd;border-radius:999px}
+
       .mode-btn{
         display:flex;align-items:center;gap:10px;
-        padding:12px 20px;border-radius:12px;border:2px solid #e2e8f0;
+        padding:12px 18px;border-radius:999px;border:2px solid #e2e8f0;
         background:#fff;cursor:pointer;font-weight:600;transition:all .3s;
-        box-shadow:0 2px 8px rgba(0,0,0,.06);
-        min-height:52px;
+        box-shadow:0 2px 10px rgba(0,0,0,.06);
+        min-height:56px;
+        flex:0 0 auto;
+        min-width:190px;
+        position:relative;
       }
       .mode-btn:hover{background:#f8fafc;border-color:#cbd5e1;transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.1)}
       .mode-btn.active{
@@ -10014,7 +9409,13 @@ async function showSalesReport() {
         box-shadow:0 8px 25px rgba(139,92,246,.4);
         transform:translateY(-2px)
       }
-      .mode-icon{width:20px;height:20px;flex-shrink:0}
+
+      .mode-emoji{font-size:20px;flex-shrink:0}
+      .mode-text{display:flex;flex-direction:column;align-items:flex-start}
+      .mode-title{font-size:14px}
+      .mode-sub{font-size:11px;color:#94a3b8;font-weight:500}
+      .mode-icon{display:none}
+
       .sr-table-placeholder{padding:24px;border:2px dashed #e2e8f0;border-radius:12px;color:#64748b;margin-top:12px;min-height:160px;text-align:center}
       .date-filter-wrap{position:relative;display:inline-block}
       .date-filter-btn{
@@ -10140,44 +9541,42 @@ async function showSalesReport() {
         </div>
       </div>
    
+      <!-- ✅ PROFESSIONAL MODE BUTTONS WITH EMOJIS -->
       <div class="mode-bar" id="srModeBar" aria-label="Analytics Dashboard">
         <button class="mode-btn active" data-mode="detailed" id="modeDetailed">
-          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M9 12H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M15 12h4a2 2 0 0 0 2 2v4a2 2 0 0 0-2 2h-4a2 2 0 0 0-2-2v-4a2 2 0 0 0 2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M9 4h4a2 2 0 0 0 2-2v2a2 2 0 0 0 2 2h2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M9 20h4a2 2 0 0 0 2 2v-2a2 2 0 0 0-2-2H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>Detailed Salesperson</span>
+          <span class="mode-emoji">🧑‍💼</span>
+          <div class="mode-text">
+            <span class="mode-title">Detailed Salesperson</span>
+            <span class="mode-sub">Per rep performance</span>
+          </div>
         </button>
         <button class="mode-btn" data-mode="byDate" id="modeByDate">
-          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
-            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
-            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          <span>Daily Performance</span>
+          <span class="mode-emoji">📅</span>
+          <div class="mode-text">
+            <span class="mode-title">Daily Performance</span>
+            <span class="mode-sub">Day-by-day trend</span>
+          </div>
         </button>
         <button class="mode-btn" data-mode="product" id="modeProduct">
-          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001.73 1.73L10 21.94a2 2 0 002 0l6.27-3.61A2 2 0 0021 16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>Product Analytics</span>
+          <span class="mode-emoji">📦</span>
+          <div class="mode-text">
+            <span class="mode-title">Product Analytics</span>
+            <span class="mode-sub">Top & slow movers</span>
+          </div>
         </button>
         <button class="mode-btn" data-mode="customer" id="modeCustomer">
-          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-          </svg>
-          <span>Customer Insights</span>
+          <span class="mode-emoji">👥</span>
+          <div class="mode-text">
+            <span class="mode-title">Customer Insights</span>
+            <span class="mode-sub">Best customers</span>
+          </div>
         </button>
         <button class="mode-btn" data-mode="custGroup" id="modeCustGroup">
-          <svg class="mode-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span>Group Analysis</span>
+          <span class="mode-emoji">🏷️</span>
+          <div class="mode-text">
+            <span class="mode-title">Group Analysis</span>
+            <span class="mode-sub">Wholesale vs retail</span>
+          </div>
         </button>
       </div>
    
@@ -10190,8 +9589,7 @@ async function showSalesReport() {
       </div>
     </div>
   `;
-
-  // ========== DATE PRESETS ==========
+  // ========== 1️⃣ DATE PRESETS - THIS MONTH = 1st → TODAY ✅ ==========
   function setPresetRange(preset) {
     const today = new Date();
     let from = new Date(today);
@@ -10204,6 +9602,7 @@ async function showSalesReport() {
       case "last7": from.setDate(from.getDate()-6); break;
       case "last30": from.setDate(from.getDate()-29); break;
       case "thisMonth":
+        // ✅ BABY STEP: 1st of THIS MONTH → TODAY
         from = new Date(today.getFullYear(), today.getMonth(), 1);
         to = new Date(today);
         break;
@@ -10226,7 +9625,7 @@ async function showSalesReport() {
     }
     updateDateFilterText();
   }
-
+  // ========== 2️⃣ UPDATE BUTTON TEXT ==========
   function updateDateFilterText() {
     const from = document.getElementById("srFrom")?.value;
     const to = document.getElementById("srTo")?.value;
@@ -10234,15 +9633,14 @@ async function showSalesReport() {
     if (!textEl) return;
  
     if (from && to && from === to) {
-      textEl.textContent = `📅 ${from}`;
+      textEl.textContent = \`📅 \${from}\`;
     } else if (from && to) {
-      textEl.textContent = `${from} → ${to}`;
+      textEl.textContent = \`\${from} → \${to}\`;
     } else {
       textEl.textContent = "Select Date Range";
     }
   }
-
-  // ========== LOAD LOCATIONS ==========
+  // ========== 3️⃣ LOAD LOCATIONS ==========
   async function loadLocations() {
     try {
       const db = firebase.firestore();
@@ -10253,12 +9651,11 @@ async function showSalesReport() {
         const name = String(doc.data()?.name || "").trim();
         if (!name || seen.has(name)) return;
         seen.add(name);
-        sel.insertAdjacentHTML("beforeend", `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`);
+        sel.insertAdjacentHTML("beforeend", \`<option value="\${escapeHTML(name)}">\${escapeHTML(name)}</option>\`);
       });
     } catch(e) { console.warn("loadLocations failed:", e); }
   }
-
-  // ========== MAIN APPLY FILTERS ==========
+  // ========== 4️⃣ MAIN APPLY FILTERS ==========
   async function applyFilters() {
     const fromVal = document.getElementById("srFrom")?.value || "";
     const toVal = document.getElementById("srTo")?.value || "";
@@ -10269,12 +9666,12 @@ async function showSalesReport() {
     salesState.to = toVal ? new Date(toVal + "T23:59:59") : null;
  
     const container = document.getElementById("srResults");
-    container.innerHTML = `<div class="sr-table-placeholder">🔄 Loading ${modeLabel(salesState.reportMode)}... please wait ♡</div>`;
+    container.innerHTML = \`<div class="sr-table-placeholder">🔄 Loading \${modeLabel(salesState.reportMode)}... please wait ♡</div>\`;
  
     try {
       if (salesState.reportMode === "detailed") {
         await aggregateSalesDetailed();
-        await renderDetailedTable();
+        renderDetailedTable();
       } else if (salesState.reportMode === "byDate") {
         await aggregateSalesByDate();
         renderSalesByDate();
@@ -10290,11 +9687,10 @@ async function showSalesReport() {
       }
     } catch (err) {
       console.error(err);
-      container.innerHTML = `<div class="sr-table-placeholder">❌ Error: ${escapeHTML(err.message)}</div>`;
+      container.innerHTML = \`<div class="sr-table-placeholder">❌ Error: \${escapeHTML(err.message)}</div>\`;
     }
     closeDateMenu();
   }
-
   function modeLabel(mode) {
     const labels = {
       detailed: "Detailed Sales Report",
@@ -10305,8 +9701,7 @@ async function showSalesReport() {
     };
     return labels[mode] || mode;
   }
-
-  // ========== MODE BUTTONS ==========
+  // ========== 5️⃣ MODE BUTTONS ==========
   function setupModeButtons() {
     const modeButtons = document.querySelectorAll(".mode-btn");
     modeButtons.forEach(btn => {
@@ -10336,40 +9731,37 @@ async function showSalesReport() {
       });
     });
   }
-
-  // ========== EXPORT FUNCTIONS ==========
+  // ========== 6️⃣ EXPORTS ==========
   function exportCSV() {
     const rows = salesState.filtered || [];
     if (!rows.length) return alert("No data to export. Run aggregation first.");
     const keys = Object.keys(rows[0]);
     const header = keys.join(",");
-    const data = rows.map(r => keys.map(k => `"${String(r[k] ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const data = rows.map(r => keys.map(k => \`"\${String(r[k] ?? "").replace(/"/g,'""')}"\`).join(",")).join("\n");
     downloadBlob([header, data].join("\n"), "sales-report.csv", "text/csv;charset=utf-8;");
   }
-
   function exportExcel() {
     const rows = salesState.filtered || [];
     if (!rows.length) return alert("No data to export. Run aggregation first.");
     const keys = Object.keys(rows[0]);
-    const head = keys.map(k=>`<th><strong>${escapeHTML(k)}</strong></th>`).join("");
-    const body = rows.map(r => `<tr>${keys.map(k=>`<td>${escapeHTML(String(r[k] ?? ""))}</td>`).join("")}</tr>`).join("");
-    const html = `<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    const head = keys.map(k=>\`<th><strong>\${escapeHTML(k)}</strong></th>\`).join("");
+    const body = rows.map(r => \`<tr>\${keys.map(k=>\`<td>\${escapeHTML(String(r[k] ?? ""))}</td>\`).join("")}</tr>\`).join("");
+    const html = \`<html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>\${head}</tr></thead><tbody>\${body}</tbody></table></body></html>\`;
     downloadBlob(html, "sales-report.xls", "application/vnd.ms-excel");
   }
-
+  // ========== 7️⃣ PDF EXPORT (COMPLETE FROM YOUR DATA) ==========
   async function exportPDF() {
     if (salesState.reportMode !== "detailed" || !salesState.filtered || salesState.filtered.length === 0) {
       alert("Please run the Detailed Sales Report first!");
       return;
     }
-    
     const win = window.open("", "_blank", "width=1300,height=900,scrollbars=yes,resizable=yes");
     if (!win) { alert("Please allow popups!"); return; }
   
     const fromStr = document.getElementById("srFrom")?.value || "Start";
     const toStr = document.getElementById("srTo")?.value || "End";
     const locStr = salesState.location || "All Locations";
-    const period = fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`;
+    const period = fromStr === toStr ? fromStr : \`\${fromStr} to \${toStr}\`;
    
     async function getExpensesForPeriod() {
       const db = firebase.firestore();
@@ -10532,8 +9924,7 @@ async function showSalesReport() {
     win.document.close();
     setTimeout(() => { win.focus(); win.print(); }, 1500);
   }
-
-  // ========== DATE MENU ==========
+  // ========== 8️⃣ DATE MENU ==========
   let dateMenu;
   function openDateMenu() {
     dateMenu.style.display = "block";
@@ -10543,17 +9934,14 @@ async function showSalesReport() {
     dateMenu.style.display = "none";
     dateMenu.setAttribute("aria-hidden", "true");
   }
-
   // Wait for DOM
   await new Promise(resolve => setTimeout(resolve, 100));
   dateMenu = document.getElementById("srDateMenu");
-
-  // ========== ALL EVENT LISTENERS ==========
+  // ========== 9️⃣ ALL EVENT LISTENERS ==========
   document.getElementById("srDateFilterBtn").addEventListener("click", (e) => {
     e.stopPropagation();
     dateMenu.style.display === "block" ? closeDateMenu() : openDateMenu();
   });
-
   document.getElementById("srDatePreset").addEventListener("change", (e) => {
     if (e.target.value === "custom") {
       document.getElementById("srMenuCustomDates").style.display = "block";
@@ -10562,7 +9950,6 @@ async function showSalesReport() {
       setPresetRange(e.target.value);
     }
   });
-
   document.getElementById("srFrom")?.addEventListener("change", updateDateFilterText);
   document.getElementById("srTo")?.addEventListener("change", updateDateFilterText);
   document.getElementById("srApplyFilters").addEventListener("click", applyFilters);
@@ -10570,21 +9957,570 @@ async function showSalesReport() {
   document.getElementById("srExportExcel").addEventListener("click", exportExcel);
   document.getElementById("srExportPdf").addEventListener("click", exportPDF);
   document.getElementById("srCloseMenu")?.addEventListener("click", closeDateMenu);
-
   document.addEventListener("click", (e) => {
     const wrap = document.getElementById("dateFilterWrap");
     if (wrap && dateMenu && !wrap.contains(e.target)) closeDateMenu();
   });
-
-  // ========== INITIALIZATION ==========
+  // ========== 🔟 INITIALIZATION - THIS MONTH DEFAULT ✅ ==========
   await loadLocations();
   setPresetRange("thisMonth"); // ✅ 1st → TODAY
   setupModeButtons();
   updateDateFilterText();
-  
-  // ✅ AUTO-RUN WITH THIS MONTH DEFAULT
+  // Auto-run with THIS MONTH
   setTimeout(() => applyFilters(), 500);
 }
+// ========== 1️⃣1️⃣ AGGREGATION FUNCTIONS (COMPLETE FROM YOUR DATA) ==========
+// DETAILED REPORT
+async function aggregateSalesDetailed() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales").orderBy("saleDate", "desc");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  const spMap = {};
+  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+  for (const doc of snap.docs) {
+    const sd = doc.data();
+    const sp = String(sd.salesperson || sd.salespersonName || "").trim() || "Unknown";
+    const sLoc = String(sd.location || sd.businessLocation || "").trim();
+    if (loc && sLoc !== loc) continue;
+    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
+    if (!Array.isArray(items) || items.length === 0) continue;
+    if (!spMap[sp]) {
+      spMap[sp] = { salesperson: sp, products: {}, totals: { qty: 0, revenue: 0, cost: 0 } };
+    }
+    for (const it of items) {
+      const pname = String(it.prodName || it.productName || it.name || "").trim();
+      if (!pname) continue;
+      const qty = toNum(it.quantity || it.qty || 0);
+      if (qty === 0) continue;
+      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+      const costPrice = toNum(it.costAtSale || 0);
+      if (!spMap[sp].products[pname]) {
+        spMap[sp].products[pname] = {
+          productName: pname,
+          qty: 0,
+          revenue: 0,
+          cost: 0,
+          unitShort: String(it.unit || it.unitShort || "").trim()
+        };
+      }
+      spMap[sp].products[pname].qty += qty;
+      spMap[sp].products[pname].revenue += qty * price;
+      spMap[sp].products[pname].cost += qty * costPrice;
+      spMap[sp].totals.qty += qty;
+      spMap[sp].totals.revenue += qty * price;
+      spMap[sp].totals.cost += qty * costPrice;
+    }
+  }
+  const result = Object.keys(spMap)
+    .sort()
+    .map(spName => {
+      const entry = spMap[spName];
+      const products = Object.values(entry.products)
+        .sort((a, b) => a.productName.localeCompare(b.productName));
+      return { salesperson: entry.salesperson, products, totals: entry.totals };
+    });
+  salesState.rows = result;
+  salesState.filtered = result.slice();
+}
+async function renderDetailedTable() {
+  const container = document.getElementById("srResults");
+  if (!salesState.rows || !salesState.rows.length) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales found for selected filters.</div>`;
+    return;
+  }
+  const db = firebase.firestore();
+  let expQuery = db.collection("expenses")
+    .where("expenseDate", ">=", salesState.from)
+    .where("expenseDate", "<=", salesState.to);
+  if (salesState.location) expQuery = expQuery.where("location", "==", salesState.location);
+  const expSnap = await expQuery.get();
+  const expensesBySalesperson = {};
+  expSnap.forEach(doc => {
+    const e = doc.data();
+    const spName = String(e.salesperson || "Unknown").trim();
+    const category = String(e.category || "Uncategorized").trim();
+    const amount = Number(e.totalAmount || e.paidAmount || 0);
+    if (!expensesBySalesperson[spName]) expensesBySalesperson[spName] = {};
+    if (!expensesBySalesperson[spName][category]) expensesBySalesperson[spName][category] = 0;
+    expensesBySalesperson[spName][category] += amount;
+  });
+  const htmlParts = [];
+  let grandTotalExpenses = 0;
+  salesState.rows.forEach(spEntry => {
+    const spName = escapeHTML(spEntry.salesperson || "Unknown");
+    const grossProfit = Number(spEntry.totals.revenue || 0) - Number(spEntry.totals.cost || 0);
+    const spExpenses = expensesBySalesperson[spName] || {};
+    const totalExpenses = Object.values(spExpenses).reduce((a, b) => a + b, 0);
+    grandTotalExpenses += totalExpenses;
+    const netRevenue = grossProfit - totalExpenses;
+    const expenseLines = Object.keys(spExpenses)
+      .sort()
+      .map(cat => {
+        const amt = Number(spExpenses[cat]).toLocaleString();
+        return `<div style="display:flex;justify-content:space-between;padding:4px 0">
+                  <span>${escapeHTML(cat)}</span>
+                  <strong>${amt}</strong>
+                </div>`;
+      }).join("") || `<div style="color:#999">No expenses recorded</div>`;
+    const prodRows = spEntry.products.map(p => {
+      const qtyText = `${Number(p.qty).toLocaleString()}${p.unitShort ? " " + escapeHTML(p.unitShort) : ""}`;
+      const revenueText = Number(p.revenue || 0).toLocaleString();
+      const costText = Number(p.cost || 0).toLocaleString();
+      const gp = (Number(p.revenue || 0) - Number(p.cost || 0));
+      const gpText = gp.toLocaleString();
+      return `<tr>
+        <td style="padding:8px;border-bottom:1px solid #eee">${escapeHTML(p.productName)}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${qtyText}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${revenueText}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${costText}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;font-weight:600;color:#2e8b57">${gpText}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5" style="padding:20px;color:#999;text-align:center">No sales recorded</td></tr>`;
+    const subQty = Number(spEntry.totals.qty || 0).toLocaleString();
+    const subRev = Number(spEntry.totals.revenue || 0).toLocaleString();
+    const subCost = Number(spEntry.totals.cost || 0).toLocaleString();
+    const subGp = grossProfit.toLocaleString();
+    const expensesBox = `
+      <aside style="width:340px;flex-shrink:0;">
+        <div style="background:#fff;border:1px solid #ddd;border-radius:10px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.05);height:fit-content">
+          <div style="background:#6f2cc1;color:#fff;padding:15px;text-align:center;font-weight:700;font-size:16px">
+            Expenses – ${spName}
+          </div>
+          <div style="padding:20px">
+            <div style="background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:15px">
+              <div style="color:#555;margin-bottom:12px;font-weight:600">Expense Categories</div>
+              <div style="min-height:120px;color:#777">${expenseLines}</div>
+            </div>
+            <div style="border-top:1px solid #eee;padding-top:12px;font-size:15px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="color:#666">Total Expenses</span>
+                <strong style="color:#c0392b">${totalExpenses.toLocaleString()}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding-top:12px;border-top:2px solid #6f2cc1">
+                <span style="font-weight:600">Net Revenue</span>
+                <strong style="color:${netRevenue >= 0 ? '#27ae60' : '#c0392b'};font-size:20px">
+                  ${netRevenue.toLocaleString()}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>`;
+    const block = `
+      <div style="margin-bottom:50px;display:flex;gap:25px;align-items:flex-start">
+        <div style="flex:1;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden">
+          <div style="background:#6f2cc1;color:#fff;padding:10px 15px;font-weight:700;font-size:16px">
+            Salesperson: ${spName}
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead style="background:#f8f9fa">
+              <tr>
+                <th style="text-align:left;padding:10px">Product</th>
+                <th style="text-align:right;padding:10px">Qty Sold</th>
+                <th style="text-align:right;padding:10px">Sales</th>
+                <th style="text-align:right;padding:10px">Cost</th>
+                <th style="text-align:right;padding:10px">Gross Profit</th>
+              </tr>
+            </thead>
+            <tbody>${prodRows}</tbody>
+            <tfoot style="background:#e9ecef;font-weight:700">
+              <tr>
+                <td style="padding:12px">SUBTOTAL</td>
+                <td style="padding:12px;text-align:right">${subQty}</td>
+                <td style="padding:12px;text-align:right">${subRev}</td>
+                <td style="padding:12px;text-align:right">${subCost}</td>
+                <td style="padding:12px;text-align:right;color:#2e8b57">${subGp}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        ${expensesBox}
+      </div>`;
+    htmlParts.push(block);
+  });
+ 
+  const grand = salesState.rows.reduce((a, b) => ({
+    qty: a.qty + Number(b.totals.qty || 0),
+    revenue: a.revenue + Number(b.totals.revenue || 0),
+    cost: a.cost + Number(b.totals.cost || 0)
+  }), { qty: 0, revenue: 0, cost: 0 });
+  const grandGrossProfit = grand.revenue - grand.cost;
+  const grandNetRevenue = grandGrossProfit - grandTotalExpenses;
+ 
+  const overall = `
+    <div style="margin:60px 0;padding:25px;background:#222;color:#fff;border-radius:12px;text-align:center;font-size:22px;font-weight:700">
+      FINAL SUMMARY →
+      Sales: ${grand.revenue.toLocaleString()} |
+      Cost: ${grand.cost.toLocaleString()} |
+      Gross Profit: ${grandGrossProfit.toLocaleString()} |
+      <span style="color:#e74c3c">Expenses: ${grandTotalExpenses.toLocaleString()}</span> |
+      <strong style="color:${grandNetRevenue >= 0 ? '#27ae60' : '#c0392b'}">
+        NET REVENUE: ${grandNetRevenue.toLocaleString()} KES
+      </strong>
+    </div>`;
+   
+  container.innerHTML = `
+    <h2 style="text-align:center;margin:30px 0 40px;color:#333;font-size:28px">
+      Detailed Sales & Expenses Report
+    </h2>
+    ${htmlParts.join("")}
+    ${overall}
+  `;
+}
+// BY DATE
+async function aggregateSalesByDate() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  const dayMap = {};
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    if (!s.saleDate) continue;
+    const dateObj = s.saleDate.toDate ? s.saleDate.toDate() : new Date(s.saleDate);
+    const dateKey = dateObj.toISOString().split("T")[0];
+    if (!dayMap[dateKey]) dayMap[dateKey] = { date: dateKey, qty: 0, sales: 0, cost: 0 };
+    const items = s.items || s.products || [];
+    for (const it of items) {
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      const cost = Number(it.costAtSale || 0);
+      dayMap[dateKey].qty += qty;
+      dayMap[dateKey].sales += qty * price;
+      dayMap[dateKey].cost += qty * cost;
+    }
+  }
+  const rows = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+function renderSalesByDate() {
+  const container = document.getElementById("srResults");
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalCost = 0;
+  salesState.filtered.forEach(r => {
+    const profit = r.sales - r.cost;
+    totalQty += r.qty;
+    totalSales += r.sales;
+    totalCost += r.cost;
+    rowsHtml += `
+      <tr>
+        <td style="padding:14px; font-weight:600; background:#f9f9f9">${new Date(r.date).toLocaleDateString("en-KE", { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
+        <td style="padding:14px; text-align:right">${r.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${r.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right">${r.cost.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
+      </tr>`;
+  });
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📅 Daily Performance</div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Date</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Sales (KES)</th>
+          <th style="padding:16px; text-align:right">Cost</th>
+          <th style="padding:16px; text-align:right">Gross Profit</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">TOTAL (${salesState.filtered.length} days)</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${(totalSales - totalCost).toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+// BY PRODUCT
+async function aggregateSalesByProduct() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  const productMap = {};
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    const items = s.items || s.products || [];
+    for (const it of items) {
+      const name = String(it.prodName || it.productName || it.name || "Unknown").trim();
+      if (!name || name === "Unknown") continue;
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      const cost = Number(it.costAtSale || 0);
+      if (!productMap[name]) productMap[name] = { product: name, qty: 0, sales: 0, cost: 0 };
+      productMap[name].qty += qty;
+      productMap[name].sales += qty * price;
+      productMap[name].cost += qty * cost;
+    }
+  }
+  const rows = Object.values(productMap).sort((a, b) => b.sales - a.sales);
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+function renderSalesByProduct() {
+  const container = document.getElementById("srResults");
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalCost = 0;
+  salesState.filtered.forEach((p, index) => {
+    const profit = p.sales - p.cost;
+    totalQty += p.qty;
+    totalSales += p.sales;
+    totalCost += p.cost;
+    rowsHtml += `
+      <tr style="${index < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
+        <td style="padding:14px">${index + 1}. ${escapeHTML(p.product)}</td>
+        <td style="padding:14px; text-align:right">${p.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${p.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right">${p.cost.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; color:#27ae60; font-weight:600">${profit.toLocaleString()}</td>
+      </tr>`;
+  });
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">📦 Product Analytics (Top Sellers First)</div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Product</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Sales (KES)</th>
+          <th style="padding:16px; text-align:right">Cost</th>
+          <th style="padding:16px; text-align:right">Gross Profit</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">GRAND TOTAL</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalCost.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${(totalSales - totalCost).toLocaleString()}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+// BY CUSTOMER
+async function aggregateSalesByCustomer() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  const customerMap = {};
+  const customerPromises = [];
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    let customerRef = s.customer;
+    let customerName = "Walk-in Customer";
+  
+    if (customerRef) {
+      const ref = typeof customerRef.get === "function" ? customerRef : db.collection("customers").doc(customerRef);
+      customerPromises.push(
+        ref.get().then(custSnap => {
+          if (custSnap.exists) return { id: custSnap.id, name: String(custSnap.data()?.name || "Unknown Customer").trim() };
+          return { id: custSnap.id, name: "Deleted Customer" };
+        }).catch(() => ({ id: "error", name: "Name Not Found" }))
+      );
+    }
+    const items = s.items || s.products || [];
+    const key = customerRef ? (typeof customerRef.get === "function" ? customerRef.path : customerRef) : "walkin";
+  
+    if (!customerMap[key]) {
+      customerMap[key] = { customerRef: key, customerName, qty: 0, sales: 0, invoices: 0 };
+    }
+    customerMap[key].invoices += 1;
+  
+    for (const it of items) {
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      customerMap[key].qty += qty;
+      customerMap[key].sales += qty * price;
+    }
+  }
+  const customerResults = await Promise.all(customerPromises);
+  const nameMap = {};
+  customerResults.forEach(c => { nameMap[c.id] = c.name; });
+  for (const key in customerMap) {
+    if (key === "walkin") {
+      customerMap[key].customerName = "Walk-in Customer";
+    } else if (typeof key === "string" && key.includes("/")) {
+      const id = key.split("/").pop();
+      customerMap[key].customerName = nameMap[id] || "Unknown Customer";
+    } else {
+      customerMap[key].customerName = nameMap[key] || "Unknown Customer";
+    }
+  }
+  const rows = Object.values(customerMap)
+    .map(c => ({ customer: c.customerName, qty: c.qty, sales: c.sales, invoices: c.invoices }))
+    .sort((a, b) => b.sales - a.sales);
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+function renderSalesByCustomer() {
+  const container = document.getElementById("srResults");
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalInvoices = 0;
+  salesState.filtered.forEach((c, i) => {
+    totalQty += c.qty;
+    totalSales += c.sales;
+    totalInvoices += c.invoices;
+    const avgInvoice = c.invoices > 0 ? Math.round(c.sales / c.invoices) : 0;
+    rowsHtml += `
+      <tr style="${i < 3 ? 'background:#fff8e1; font-weight:600' : ''}">
+        <td style="padding:14px">${i + 1}. ${escapeHTML(c.customer)}</td>
+        <td style="padding:14px; text-align:right">${c.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${c.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:center">${c.invoices}</td>
+        <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
+      </tr>`;
+  });
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e50">👥 Customer Insights (Top Spenders)</div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Customer</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Total Sales</th>
+          <th style="padding:16px; text-align:center"># Invoices</th>
+          <th style="padding:16px; text-align:right">Avg Invoice</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">GRAND TOTAL</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:center">${totalInvoices}</td>
+          <td style="padding:18px; text-align:right">${totalInvoices > 0 ? Math.round(totalSales / totalInvoices).toLocaleString() : 0}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+// BY CUSTOMER GROUP
+async function aggregateSalesByCustGroup() {
+  const db = firebase.firestore();
+  const from = salesState.from;
+  const to = salesState.to;
+  const loc = salesState.location;
+  let q = db.collection("sales");
+  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  if (loc) q = q.where("location", "==", loc);
+  const snap = await q.get();
+  const groupMap = {};
+  for (const doc of snap.docs) {
+    const s = doc.data();
+    let group = "Retail";
+  
+    if (s.customer) {
+      const custRef = typeof s.customer.get === "function" ? s.customer : db.collection("customers").doc(s.customer);
+      try {
+        const custSnap = await custRef.get();
+        if (custSnap.exists) group = String(custSnap.data()?.customerGroup || "Retail").trim();
+      } catch (e) {}
+    }
+  
+    if (s.customerGroup) group = String(s.customerGroup).trim();
+    const items = s.items || s.products || [];
+    if (!groupMap[group]) groupMap[group] = { group, qty: 0, sales: 0, invoices: 0 };
+    groupMap[group].invoices += 1;
+  
+    for (const it of items) {
+      const qty = Number(it.quantity || it.qty || 0);
+      const price = Number(it.price || it.unitPrice || it.sellingPrice || 0);
+      groupMap[group].qty += qty;
+      groupMap[group].sales += qty * price;
+    }
+  }
+  const rows = Object.values(groupMap).sort((a, b) => b.sales - a.sales);
+  salesState.rows = rows;
+  salesState.filtered = rows.slice();
+}
+function renderSalesByCustGroup() {
+  const container = document.getElementById("srResults");
+  if (!salesState.filtered || salesState.filtered.length === 0) {
+    container.innerHTML = `<div class="sr-table-placeholder">No sales in this period.</div>`;
+    return;
+  }
+  let rowsHtml = "";
+  let totalQty = 0, totalSales = 0, totalInvoices = 0;
+  salesState.filtered.forEach((g, i) => {
+    totalQty += g.qty;
+    totalSales += g.sales;
+    totalInvoices += g.invoices;
+    const avgInvoice = g.invoices > 0 ? Math.round(g.sales / g.invoices) : 0;
+    rowsHtml += `
+      <tr style="${i < 2 ? 'background:#fff8e1; font-weight:600' : ''}">
+        <td style="padding:14px; font-weight:600">${i + 1}. ${escapeHTML(g.group)}</td>
+        <td style="padding:14px; text-align:right">${g.qty.toLocaleString()}</td>
+        <td style="padding:14px; text-align:right; font-weight:600; color:#2c3e50">${g.sales.toLocaleString()}</td>
+        <td style="padding:14px; text-align:center">${g.invoices}</td>
+        <td style="padding:14px; text-align:right">${avgInvoice.toLocaleString()}</td>
+      </tr>`;
+  });
+  container.innerHTML = `
+    <div style="font-weight:700; font-size:20px; margin-bottom:10px; color:#2c3e80">🏷️ Customer Group Analysis</div>
+    <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 4px 12px rgba(0,0,0,.08); border-radius:10px; overflow:hidden">
+      <thead style="background:#6f2cc1; color:white">
+        <tr>
+          <th style="padding:16px; text-align:left">Customer Group</th>
+          <th style="padding:16px; text-align:right">Qty Sold</th>
+          <th style="padding:16px; text-align:right">Total Sales</th>
+          <th style="padding:16px; text-align:center"># Invoices</th>
+          <th style="padding:16px; text-align:right">Avg Invoice</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr style="background:#222; color:white; font-weight:700; font-size:16px">
+          <td style="padding:18px">GRAND TOTAL</td>
+          <td style="padding:18px; text-align:right">${totalQty.toLocaleString()}</td>
+          <td style="padding:18px; text-align:right">${totalSales.toLocaleString()}</td>
+          <td style="padding:18px; text-align:center">${totalInvoices}</td>
+          <td style="padding:18px; text-align:right">${totalInvoices > 0 ? Math.round(totalSales / totalInvoices).toLocaleString() : 0}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
 
 function showPurchaseReport() {
   saveLastPage("showPurchaseReport");
