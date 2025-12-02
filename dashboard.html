@@ -11741,10 +11741,13 @@ async function showFinancialSummary() {
   // ====================== AGGREGATION FUNCTIONS ======================
   async function generateProfitLoss() {
     let revenue = 0, cost = 0, expenses = 0;
+
+    // SALES + COST OF SALES
     let q = db.collection("sales")
       .where("saleDate", ">=", financialState.from)
       .where("saleDate", "<=", financialState.to);
     if (financialState.location) q = q.where("location", "==", financialState.location);
+
     const salesSnap = await q.get();
     salesSnap.forEach(doc => {
       const items = doc.data().items || doc.data().products || [];
@@ -11756,14 +11759,21 @@ async function showFinancialSummary() {
         cost += qty * costPrice;
       });
     });
+
+    // EXPENSES (only total for now — detailed in render)
     let eq = db.collection("expenses")
       .where("expenseDate", ">=", financialState.from)
       .where("expenseDate", "<=", financialState.to);
     if (financialState.location) eq = eq.where("location", "==", financialState.location);
+
     const expSnap = await eq.get();
-    expSnap.forEach(doc => expenses += Number(doc.data().totalAmount || doc.data().amount || 0));
+    expSnap.forEach(doc => {
+      expenses += Number(doc.data().totalAmount || doc.data().amount || 0);
+    });
+
     const grossProfit = revenue - cost;
     const netProfit = grossProfit - expenses;
+
     financialState.filtered = {
       revenue: Math.round(revenue),
       costOfSales: Math.round(cost),
@@ -11773,16 +11783,54 @@ async function showFinancialSummary() {
     };
   }
 
-  // ====================== PRINT-READY PROFIT & LOSS ======================
-  function renderProfitLoss() {
+  // ====================== REAL DATA PROFIT & LOSS (DYNAMIC EXPENSES) ======================
+  async function renderProfitLoss() {
     const d = financialState.filtered;
-    const fromStr = financialState.from ? financialState.from.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : "";
-    const toStr = financialState.to ? financialState.to.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : "";
-    const company = "PODIDA WINES & SPIRITS";
+
+    // Fetch and group expenses by category
+    let expensesQuery = db.collection("expenses")
+      .where("expenseDate", ">=", financialState.from)
+      .where("expenseDate", "<=", financialState.to);
+    if (financialState.location) expensesQuery = expensesQuery.where("location", "==", financialState.location);
+
+    const expensesSnap = await expensesQuery.get();
+    const expenseMap = {};
+
+    expensesSnap.forEach(doc => {
+      const data = doc.data();
+      const category = (data.category || data.expenseCategory || "Other Expenses").toUpperCase();
+      const amount = Number(data.totalAmount || data.amount || 0);
+      expenseMap[category] = (expenseMap[category] || 0) + amount;
+    });
+
+    const sortedExpenses = Object.entries(expenseMap)
+      .sort(([,a], [,b]) => b - a);
+
+    const fromStr = financialState.from?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+    const toStr = financialState.to?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+
+    const company = "EMBU KIAMBUTHI STORE";
     const address = "P.O BOX 117-60400";
-    const town = "CHUKA";
-    const phones = "0721 726773 / 0743 893392";
-    const logoUrl = "https://via.placeholder.com/140x90?text=PODIDA+LOGO";
+    const town = "EMBU";
+    const phones = "0719360751";
+    const logoUrl = "https://via.placeholder.com/140x90?text=KIAMBUTHI+LOGO";
+
+    let expensesHTML = `
+      <tr>
+        <td style="padding:10px 16px">COS0001</td>
+        <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">COST OF SALES</td>
+        <td style="padding:10px 16px;text-align:right">${d.costOfSales.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td>
+      </tr>`;
+
+    sortedExpenses.forEach(([category, amount], i) => {
+      const code = `EXP${String(10000 + i + 1).slice(-5)}`;
+      expensesHTML += `
+        <tr>
+          <td style="padding:10px 16px">${code}</td>
+          <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">${category}</td>
+          <td style="padding:10px 16px;text-align:right">${amount.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td>
+        </tr>`;
+    });
 
     document.getElementById("fsResults").innerHTML = `
       <div style="max-width:900px;margin:0 auto;background:white;padding:40px;border:1px solid #ddd;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.1);line-height:1.6">
@@ -11793,8 +11841,10 @@ async function showFinancialSummary() {
         </div>
         <h2 style="text-align:center;color:#7c3aed;font-size:26px;margin-bottom:8px">Income & Expenses Statement</h2>
         <div style="text-align:center;color:#475569;margin-bottom:40px;font-size:16px">
-          DATE FROM: <strong>${fromStr}</strong>    DATE TO: <strong>${toStr}</strong>
+          DATE FROM: <strong>${fromStr}</strong>  DATE TO: <strong>${toStr}</strong>
+          ${financialState.location ? `<br><small>Location: <strong>${financialState.location}</strong></small>` : ""}
         </div>
+
         <table style="width:100%;border-collapse:collapse;font-size:15px">
           <thead>
             <tr style="background:#f8fafc">
@@ -11820,41 +11870,7 @@ async function showFinancialSummary() {
             <tr style="background:#fef3c7">
               <td colspan="3" style="padding:16px;font-weight:bold;color:#92400e;font-size:17px">EXPENSES</td>
             </tr>
-            <tr>
-              <td style="padding:10px 16px">COS0001</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">COST OF SALES</td>
-              <td style="padding:10px 16px;text-align:right">${d.costOfSales.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td>
-            </tr>
-            <tr>
-              <td style="padding:10px 16px">EXP10101</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">SALARIES AND WAGES</td>
-              <td style="padding:10px 16px;text-align:right">20,000.00</td>
-            </tr>
-            <tr>
-              <td style="padding:10px 16px">EXP12101</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">RENT</td>
-              <td style="padding:10px 16px;text-align:right">20,000.00</td>
-            </tr>
-            <tr>
-              <td style="padding:10px 16px">EXP13103</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">ELECTRICITY</td>
-              <td style="padding:10px 16px;text-align:right">7,500.00</td>
-            </tr>
-            <tr>
-              <td style="padding:10px 16px">EXP12105</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">SERVICE CHARGES</td>
-              <td style="padding:10px 16px;text-align:right">3,255.00</td>
-            </tr>
-            <tr>
-              <td style="padding:10px 16px">EXP19102</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">SELLING EXPENSES</td>
-              <td style="padding:10px 16px;text-align:right">3,970.00</td>
-            </tr>
-            <tr>
-              <td style="padding:10px 16px">EXP21116</td>
-              <td style="padding:10px 16px;border-bottom:1px dotted #94a3b8">FACTORY WASTAGE & EXPIRED</td>
-              <td style="padding:10px 16px;text-align:right">3,540.00</td>
-            </tr>
+            ${expensesHTML}
             <tr style="border-bottom:3px double #92400e">
               <td colspan="2" style="padding:14px 16px;font-weight:bold;text-align:right">Total Expenses</td>
               <td style="padding:14px 16px;text-align:right;font-weight:bold">${d.expenses.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td>
@@ -11877,12 +11893,13 @@ async function showFinancialSummary() {
     `;
   }
 
-  function renderBalanceSheet() { /* your current beautiful version */ }
-  function renderCashFlow() { /* your current beautiful version */ }
-  function renderVATSummary() { /* your current beautiful version */ }
+  // Placeholder render functions
+  function renderBalanceSheet() { document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Balance Sheet coming soon</div>`; }
+  function renderCashFlow() { document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Cash Flow coming soon</div>`; }
+  function renderVATSummary() { document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">VAT Summary coming soon</div>`; }
 
-  function renderFinancialReport() {
-    if (financialState.reportMode === "profitLoss") renderProfitLoss();
+  async function renderFinancialReport() {
+    if (financialState.reportMode === "profitLoss") await renderProfitLoss();
     else if (financialState.reportMode === "balanceSheet") renderBalanceSheet();
     else if (financialState.reportMode === "cashFlow") renderCashFlow();
     else renderVATSummary();
@@ -11897,14 +11914,17 @@ async function showFinancialSummary() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `Financial_Report_${new Date().toISOString().slice(0,10)}.csv`; a.click();
   }
+
   function exportToExcel() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet([financialState.filtered]);
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     XLSX.writeFile(wb, `Financial_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
   }
+
   function exportToPDF() {
     const element = document.querySelector("#fsResults > div");
+    if (!element) return alert("Nothing to export");
     html2pdf()
       .set({
         margin: [0.5, 0.5, 0.5, 0.5],
@@ -11963,12 +11983,15 @@ async function showFinancialSummary() {
     const fromVal = document.getElementById("fsFrom").value;
     const toVal = document.getElementById("fsTo").value;
     if (!fromVal || !toVal) return alert("Please select both From and To dates");
+
     financialState.from = new Date(fromVal + "T00:00:00");
     financialState.to = new Date(toVal + "T23:59:59");
+
     document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Generating report...</div>`;
+
     try {
       if (financialState.reportMode === "profitLoss") await generateProfitLoss();
-      renderFinancialReport();
+      await renderFinancialReport();
     } catch (err) {
       document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Error: ${err.message}</div>`;
     }
@@ -11980,7 +12003,6 @@ async function showFinancialSummary() {
   const dateBtn = document.getElementById("fsDateFilterBtn");
   const dateMenu = document.getElementById("fsDateMenu");
 
-  // Toggle menus
   locationBtn.onclick = (e) => {
     e.stopPropagation();
     const isVisible = locationMenu.style.display === "block";
@@ -11995,11 +12017,9 @@ async function showFinancialSummary() {
     locationMenu.style.display = "none";
   };
 
-  // Prevent menu from closing when clicking inside
   locationMenu.onclick = (e) => e.stopPropagation();
   dateMenu.onclick = (e) => e.stopPropagation();
 
-  // Close all menus when clicking outside
   document.addEventListener("click", () => {
     locationMenu.style.display = "none";
     dateMenu.style.display = "none";
@@ -12022,7 +12042,6 @@ async function showFinancialSummary() {
 
   document.getElementById("fsApplyFilters").onclick = applyFilters;
 
-  // Mode buttons
   document.querySelectorAll(".mode-btn").forEach(btn => {
     btn.onclick = () => {
       financialState.reportMode = btn.dataset.mode;
