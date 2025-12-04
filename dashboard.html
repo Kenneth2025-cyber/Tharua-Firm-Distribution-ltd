@@ -12249,10 +12249,14 @@ async function showFinancialSummary() {
     };
   });
 
-  // Export buttons
-  document.getElementById("fsExportCsv")?.onclick = exportToCSV;
-  document.getElementById("fsExportExcel")?.onclick = exportToExcel;
-  document.getElementById("fsExportPdf")?.onclick = exportToPDF;
+  // Export buttons — FIXED VERSION (NO ERRORS!)
+  const csvBtn = document.getElementById("fsExportCsv");
+  const excelBtn = document.getElementById("fsExportExcel");
+  const pdfBtn = document.getElementById("fsExportPdf");
+
+  if (csvBtn) csvBtn.onclick = exportToCSV;
+  if (excelBtn) excelBtn.onclick = exportToExcel;
+  if (pdfBtn) pdfBtn.onclick = exportToPDF;
 
   // ====================== INITIALIZE ======================
   await loadLocations();
