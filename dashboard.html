@@ -11655,27 +11655,28 @@ let financialState = {
   reportMode: "profitLoss"
 };
 
-// FULLY FIXED & PERFECT — COPY-PASTE THIS ENTIRE FUNCTION
+// FULLY COMPLETE & PROFESSIONAL FINANCIAL SUMMARY - PERFECT PDF EXPORT
 async function showFinancialSummary() {
   saveLastPage("showFinancialSummary");
 
-  // ====== 1. Get Company Info & Real Logo ======
+  // ====== 1. Get Company Info & Real Logo from Firestore ======
   let companyName = "EMBU KIAMBUTHI STORE";
   let companyAddress = "P.O BOX 117-60400, EMBU";
   let companyPhone = "0719360751";
-  let logoUrl = "https://via.placeholder.com/140x90?text=LOGO";
+  let logoUrl = "https://via.placeholder.com/140x90?text=KIAMBUTHI+LOGO"; // default fallback
 
   try {
-    const doc = await firebase.firestore().collection("businessSettings").doc("main").get();
-    if (doc.exists) {
-      const d = doc.data();
-      companyName = d.companyName || companyName;
-      companyAddress = d.address || companyAddress;
-      companyPhone = d.phone || companyPhone;
-      logoUrl = d.logoUrl || logoUrl;
+    const settingsDoc = await firebase.firestore().collection("businessSettings").doc("main").get();
+    if (settingsDoc.exists) {
+      const data = settingsDoc.data();
+      companyName = data.companyName || companyName;
+      companyAddress = data.address || companyAddress;
+      companyPhone = data.phone || companyPhone;
+      logoUrl = data.logoUrl || logoUrl;
     }
-  } catch (e) { console.log("Using default settings"); }
-
+  } catch (e) {
+    console.log("Could not load business settings, using defaults");
+  }
   const currentLogoUrl = logoUrl;
 
   document.getElementById("content").innerHTML = `
@@ -11684,43 +11685,60 @@ async function showFinancialSummary() {
       .sr-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:16px}
       .sr-head h2{margin:0;font-size:28px;font-weight:700;color:#1e293b}
       .sr-export{display:flex;gap:8px}
-      .btn{border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;color:#fff}
-      .btn-csv{background:#3b82f6}
-      .btn-excel{background:#10b981}
-      .btn-pdf{background:#dc2626}
+      .btn{border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;transition:all .2s;font-size:14px}
+      .btn-csv{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff}
+      .btn-excel{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+      .btn-pdf{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff}
       .mode-bar{display:flex;gap:12px;margin:24px 0;overflow-x:auto;padding-bottom:8px}
-      .mode-btn{padding:14px 20px;border-radius:999px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;font-weight:600;transition:all .3s;min-width:180px;text-align:center}
-      .mode-btn.active{background:#8b5cf6;color:#fff;border-color:#8b5cf6;box-shadow:0 8px 25px rgba(139,92,246,.4)}
-      .filter-btn{background:#8b5cf6;color:#fff;padding:12px 18px;border-radius:12px;border:none;cursor:pointer}
-      .location-btn{background:#10b981}
+      .mode-btn{padding:14px 20px;border-radius:999px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;font-weight:600;transition:all .3s;min-width:200px;text-align:center}
+      .mode-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.1)}
+      .mode-btn.active{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border-color:#7c3aed;box-shadow:0 8px 25px rgba(139,92,246,.4)}
+      .filter-btn{color:#fff;padding:12px 18px;border-radius:12px;border:none;cursor:pointer;display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px}
+      .date-filter-btn{background:linear-gradient(135deg,#8b5cf6,#7c3aed)}
+      .location-btn{background:linear-gradient(135deg,#10b981,#059669)}
       .filter-menu{position:absolute;right:0;top:50px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.12);padding:20px;z-index:9999;min-width:280px;display:none}
-      .apply-filters{background:#3b82f6;color:#fff;padding:12px;border:none;border-radius:8px;width:100%;font-weight:600;cursor:pointer;margin-top:16px}
+      .apply-filters{background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;padding:12px;border:none;border-radius:8px;width:100%;font-weight:600;cursor:pointer;margin-top:16px}
       .sr-table-placeholder{padding:60px 20px;border:2px dashed #e2e8f0;border-radius:12px;text-align:center;color:#64748b;font-size:18px}
-      .pdf-report{font-family:Arial,sans-serif;color:#000;line-height:1.6}
-      .pdf-header{text-align:center;margin-bottom:40px}
-      .pdf-logo{height:100px;margin-bottom:16px;max-width:140px}
-      .pdf-company{font-size:32px;margin:8px 0;color:#1e293b}
-      .pdf-address{font-size:17px;color:#475569}
-      .pdf-title{font-size:28px;color:#7c3aed;text-align:center}
-      .pdf-period{text-align:center;margin-bottom:40px;font-size:16px;color:#475569}
-      .pdf-table{width:100%;border-collapse:collapse;font-size:16px}
-      .pdf-table th{background:#f8fafc;padding:12px;text-align:left}
-      .pdf-table td{padding:10px 16px;border-bottom:1px dotted #94a3b8}
-      .pdf-table .right{text-align:right}
-      .pdf-table .bold{font-weight:bold}
-      .income-row{background:#ecfdf5}
-      .expense-row{background:#fef3c7}
-      .profit-positive{background:#ecfdf5;color:#166534}
-      .profit-negative{background:#fee2e2;color:#991b1b}
-      .pdf-footer{text-align:center;color:#94a3b8;font-size:14px;margin-top:50px}
+
+      /* PERFECT PDF STYLES */
+      @media print {
+        body { margin:0; padding:20px; background:white; }
+        .sr-wrap { box-shadow:none; border:none; padding:0; max-width: none; }
+        .sr-head, .mode-bar, .sr-export, .filter-btn { display:none !important; }
+        #fsResults { padding:40px; page-break-inside: avoid; }
+        img { max-width: 140px !important; height: auto !important; }
+        table { page-break-inside: avoid; }
+      }
+
+      .pdf-report { font-family: Arial, sans-serif; line-height: 1.6; color: #000; max-width: 210mm; margin: 0 auto; }
+      .pdf-header { text-align: center; margin-bottom: 40px; padding: 0 20px; }
+      .pdf-logo { height: 100px; margin-bottom: 16px; border-radius: 8px; object-fit: contain; max-width: 140px; }
+      .pdf-company { margin: 8px 0; font-size: 32px; color: #1e293b; font-weight: bold; }
+      .pdf-address { margin: 4px 0; color: #475569; font-size: 17px; }
+      .pdf-title { text-align: center; color: #7c3aed; font-size: 28px; margin-bottom: 8px; font-weight: bold; }
+      .pdf-period { text-align: center; color: #475569; margin-bottom: 40px; font-size: 16px; }
+      .pdf-table { width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 40px; }
+      .pdf-table th { padding: 12px; text-align: left; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+      .pdf-table td { padding: 10px 16px; border-bottom: 1px dotted #94a3b8; }
+      .pdf-table .right { text-align: right; }
+      .pdf-table .bold { font-weight: bold; }
+      .pdf-table .income-row { background: #ecfdf5; }
+      .pdf-table .expense-row { background: #fef3c7; }
+      .pdf-table .profit-row { font-size: 22px; }
+      .pdf-table .profit-positive { background: #ecfdf5; color: #166534; }
+      .pdf-table .profit-negative { background: #fee2e2; color: #991b1b; }
+      .pdf-footer { text-align: center; color: #94a3b8; font-size: 14px; margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
     </style>
 
     <div class="sr-wrap">
       <div class="sr-head">
         <h2>Financial Summary</h2>
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
           <div style="position:relative">
-            <button id="locationFilterBtn" class="location-btn filter-btn">All Locations</button>
+            <button id="locationFilterBtn" class="location-btn filter-btn">
+              <i class="fas fa-map-marker-alt"></i>
+              <span id="locationFilterText">All Locations</span>
+            </button>
             <div id="locationMenu" class="filter-menu">
               <select id="locationSelect" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd">
                 <option value="">All Locations</option>
@@ -11728,20 +11746,36 @@ async function showFinancialSummary() {
             </div>
           </div>
           <div class="sr-export">
-            <button id="fsExportCsv" class="btn btn-csv">CSV</button>
-            <button id="fsExportExcel" class="btn btn-excel">Excel</button>
-            <button id="fsExportPdf" class="btn btn-pdf">PDF</button>
+            <button id="fsExportCsv" class="btn btn-csv" title="Export to CSV">
+              <i class="fas fa-file-csv"></i> CSV
+            </button>
+            <button id="fsExportExcel" class="btn btn-excel" title="Export to Excel">
+              <i class="fas fa-file-excel"></i> Excel
+            </button>
+            <button id="fsExportPdf" class="btn btn-pdf" title="Export to PDF">
+              <i class="fas fa-file-pdf"></i> PDF
+            </button>
           </div>
           <div style="position:relative">
-            <button id="fsDateFilterBtn" class="filter-btn">This Month</button>
+            <button id="fsDateFilterBtn" class="date-filter-btn filter-btn">
+              <i class="fas fa-calendar-alt"></i>
+              <span id="dateFilterText">Select Date Range</span>
+            </button>
             <div id="fsDateMenu" class="filter-menu">
               <select id="fsDatePreset" style="width:100%;padding:10px;border-radius:8px;margin-bottom:12px">
                 <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last7">Last 7 Days</option>
+                <option value="last30">Last 30 Days</option>
                 <option value="thisMonth" selected>This Month</option>
+                <option value="lastMonth">Last Month</option>
+                <option value="thisYear">This Year</option>
                 <option value="custom">Custom Range</option>
               </select>
-              <div id="fsMenuCustomDates" style="display:none">
+              <div id="fsMenuCustomDates" style="display:none;margin-top:10px">
+                <label style="display:block;margin-bottom:5px;font-size:14px">From:</label>
                 <input id="fsFrom" type="date" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px">
+                <label style="display:block;margin-bottom:5px;font-size:14px">To:</label>
                 <input id="fsTo" type="date" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd">
               </div>
               <button id="fsApplyFilters" class="apply-filters">Generate Report</button>
@@ -11752,26 +11786,29 @@ async function showFinancialSummary() {
 
       <div class="mode-bar">
         <button class="mode-btn active" data-mode="profitLoss">Profit & Loss</button>
+        <button class="mode-btn" data-mode="balanceSheet">Balance Sheet</button>
+        <button class="mode-btn" data-mode="cashFlow">Cash Flow</button>
+        <button class="mode-btn" data-mode="vatSummary">VAT Summary</button>
       </div>
 
       <div id="fsResults" class="sr-table-placeholder">
-        <div style="font-size:24px">Welcome!</div>
-        <div>Report will load in 1 second...</div>
+        <div style="font-size:24px;margin-bottom:12px">Welcome to Financial Reports</div>
+        <div>This Month is pre-selected — click <strong>Generate Report</strong> to begin</div>
       </div>
     </div>
   `;
 
   const db = firebase.firestore();
 
-  // ====== DATA CALCULATION (FIXED!) ======
+  // ====================== AGGREGATION & RENDER ======================
   async function generateProfitLoss() {
     let revenue = 0, cost = 0, expenses = 0;
 
+    // SALES
     let q = db.collection("sales")
       .where("saleDate", ">=", financialState.from)
       .where("saleDate", "<=", financialState.to);
     if (financialState.location) q = q.where("location", "==", financialState.location);
-
     const salesSnap = await q.get();
     salesSnap.forEach(doc => {
       const items = doc.data().items || doc.data().products || [];
@@ -11784,121 +11821,322 @@ async function showFinancialSummary() {
       });
     });
 
+    // EXPENSES
     let eq = db.collection("expenses")
       .where("expenseDate", ">=", financialState.from)
       .where("expenseDate", "<=", financialState.to);
     if (financialState.location) eq = eq.where("location", "==", financialState.location);
-
     const expSnap = await eq.get();
     expSnap.forEach(doc => {
       expenses += Number(doc.data().totalAmount || doc.data().amount || 0);
     });
 
-    const netProfit = revenue - cost - expenses;
+    const grossProfit = revenue - cost;
+    const netProfit = grossProfit - expenses;
 
     financialState.filtered = {
       revenue: Math.round(revenue * 100) / 100,
       costOfSales: Math.round(cost * 100) / 100,
+      grossProfit: Math.round(grossProfit * 100) / 100,
       expenses: Math.round(expenses * 100) / 100,
       netProfit: Math.round(netProfit * 100) / 100
     };
   }
 
-  // ====== RENDER REPORT ======
-  async function renderReport() {
+  async function renderProfitLoss() {
     const d = financialState.filtered;
-    const fromStr = financialState.from.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'});
-    const toStr = financialState.to.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'});
 
-    const html = `
+    // Get detailed expenses by category
+    let expensesQuery = db.collection("expenses")
+      .where("expenseDate", ">=", financialState.from)
+      .where("expenseDate", "<=", financialState.to);
+    if (financialState.location) expensesQuery = expensesQuery.where("location", "==", financialState.location);
+    const expensesSnap = await expensesQuery.get();
+    const expenseMap = {};
+    expensesSnap.forEach(doc => {
+      const data = doc.data();
+      const category = (data.category || data.expenseCategory || "Other Expenses").toUpperCase();
+      const amount = Number(data.totalAmount || data.amount || 0);
+      expenseMap[category] = (expenseMap[category] || 0) + amount;
+    });
+    const sortedExpenses = Object.entries(expenseMap).sort(([,a],[,b]) => b - a);
+
+    const fromStr = financialState.from?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+    const toStr = financialState.to?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+
+    let expensesHTML = `
+      <tr>
+        <td>COS0001</td>
+        <td style="border-bottom:1px dotted #94a3b8">COST OF SALES</td>
+        <td class="right bold">${d.costOfSales.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+      </tr>`;
+
+    sortedExpenses.forEach(([category, amount], i) => {
+      const code = `EXP${String(10000 + i + 1).slice(-5)}`;
+      expensesHTML += `
+        <tr>
+          <td>${code}</td>
+          <td style="border-bottom:1px dotted #94a3b8">${category}</td>
+          <td class="right">${amount.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        </tr>`;
+    });
+
+    const reportHTML = `
       <div class="pdf-report">
         <div class="pdf-header">
-          <img src="${currentLogoUrl}" class="pdf-logo">
+          <img src="${currentLogoUrl}" alt="Company Logo" class="pdf-logo" onerror="this.style.display='none'">
           <h1 class="pdf-company">${companyName}</h1>
           <p class="pdf-address">${companyAddress}<br>${companyPhone}</p>
         </div>
-        <h2 class="pdf-title">Profit & Loss Statement</h2>
-        <div class="pdf-period">Period: <strong>${fromStr} - ${toStr}</strong></div>
+       
+        <h2 class="pdf-title">Income & Expenses Statement</h2>
+        <div class="pdf-period">
+          PERIOD: <strong>${fromStr} - ${toStr}</strong>
+          ${financialState.location ? `<br><small>Location: <strong>${financialState.location}</strong></small>` : ""}
+        </div>
+
         <table class="pdf-table">
-          <thead><tr><th>Description</th><th class="right">Amount (KES)</th></tr></thead>
+          <thead>
+            <tr>
+              <th style="width:120px">Code</th>
+              <th>Description</th>
+              <th class="right" style="width:180px">Amount (KES)</th>
+            </tr>
+          </thead>
           <tbody>
-            <tr class="income-row"><td colspan="2" style="padding:16px;font-weight:bold;color:#166534">INCOME</td></tr>
-            <tr><td>Sales Revenue</td><td class="right bold">${d.revenue.toLocaleString('en-KE', {minimumFractionDigits:2})}</td></tr>
-            <tr><td>Cost of Sales</td><td class="right bold">${d.costOfSales.toLocaleString('en-KE', {minimumFractionDigits:2})}</td></tr>
-            <tr><td><strong>Gross Profit</strong></td><td class="right bold">${(d.revenue - d.costOfSales).toLocaleString('en-KE', {minimumFractionDigits:2})}</td></tr>
-            <tr class="expense-row"><td colspan="2" style="padding:16px;font-weight:bold;color:#92400e">EXPENSES</td></tr>
-            <tr><td>Total Expenses</td><td class="right bold">${d.expenses.toLocaleString('en-KE', {minimumFractionDigits:2})}</td></tr>
-            <tr class="${d.netProfit >= 0 ? 'profit-positive' : 'profit-negative'}" style="font-size:24px">
-              <td style="padding:20px"><strong>${d.netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}</strong></td>
-              <td class="right" style="padding:20px;font-size:28px"><strong>${Math.abs(d.netProfit).toLocaleString('en-KE', {minimumFractionDigits:2})}</strong></td>
+            <tr class="income-row">
+              <td colspan="3" style="padding:16px;font-weight:bold;color:#166534;font-size:18px">INCOME</td>
+            </tr>
+            <tr>
+              <td>INC1001</td>
+              <td style="border-bottom:1px dotted #94a3b8">SALES REVENUE</td>
+              <td class="right bold">${d.revenue.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>
+            <tr style="border-bottom:3px double #166534">
+              <td colspan="2" class="bold" style="text-align:right;padding-right:16px">TOTAL INCOME</td>
+              <td class="right bold">${d.revenue.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>
+
+            <tr class="expense-row">
+              <td colspan="3" style="padding:16px;font-weight:bold;color:#92400e;font-size:18px">EXPENSES</td>
+            </tr>
+            ${expensesHTML}
+            <tr style="border-bottom:3px double #92400e">
+              <td colspan="2" class="bold" style="text-align:right;padding-right:16px">TOTAL EXPENSES</td>
+              <td class="right bold">${(d.costOfSales + d.expenses).toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>
+
+            <tr class="profit-row ${d.netProfit >= 0 ? 'profit-positive' : 'profit-negative'}">
+              <td colspan="2" style="padding:30px 16px;font-weight:800;font-size:20px">
+                ${d.netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}
+              </td>
+              <td class="right" style="padding:30px 16px;font-weight:800;font-size:32px">
+                ${Math.abs(d.netProfit).toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              </td>
             </tr>
           </tbody>
         </table>
-        <div class="pdf-footer">Generated on ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
+
+        <div class="pdf-footer">
+          Page 1 of 1 • Generated on ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}
+          <br><strong>${companyName}</strong> • All figures in Kenyan Shillings (KES)
+        </div>
       </div>`;
 
-    document.getElementById("fsResults").innerHTML = html;
+    document.getElementById("fsResults").innerHTML = reportHTML;
   }
 
-  // ====== PDF EXPORT (100% FIXED) ======
+  function renderBalanceSheet() { document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Balance Sheet coming soon</div>`; }
+  function renderCashFlow() { document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Cash Flow coming soon</div>`; }
+  function renderVATSummary() { document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">VAT Summary coming soon</div>`; }
+
+  async function renderFinancialReport() {
+    if (financialState.reportMode === "profitLoss") await renderProfitLoss();
+    else if (financialState.reportMode === "balanceSheet") renderBalanceSheet();
+    else if (financialState.reportMode === "cashFlow") renderCashFlow();
+    else renderVATSummary();
+  }
+
+  // ====================== EXPORTS ======================
+  function exportToCSV() {
+    const d = financialState.filtered;
+    let csv = "Item,Amount (KES)\nRevenue,${d.revenue}\nCost of Sales,${d.costOfSales}\nGross Profit,${d.grossProfit}\nTotal Expenses,${d.expenses}\nNet Profit/Loss,${d.netProfit}\n";
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Profit_Loss_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportToExcel() {
+    const d = financialState.filtered;
+    const data = [
+      {Item: "Revenue", Amount: d.revenue},
+      {Item: "Cost of Sales", Amount: d.costOfSales},
+      {Item: "Gross Profit", Amount: d.grossProfit},
+      {Item: "Total Expenses", Amount: d.expenses},
+      {Item: "Net Profit/Loss", Amount: d.netProfit}
+    ];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, "Profit & Loss");
+    XLSX.writeFile(wb, `Profit_Loss_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
   function exportToPDF() {
-    const el = document.getElementById("fsResults");
-    if (!el || el.innerHTML.includes("Welcome")) {
-      alert("Please wait for report to load first!");
+    const element = document.querySelector(".pdf-report");
+    if (!element) {
+      alert("Please generate the report first before exporting to PDF");
       return;
     }
 
-    const original = el.innerHTML;
-    el.innerHTML = "<div style='text-align:center;padding:100px'><h2>Creating PDF...</h2></div>";
+    const btn = document.getElementById("fsExportPdf");
+    const original = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+    btn.disabled = true;
 
     setTimeout(() => {
-      const from = financialState.from.toISOString().slice(0,10);
-      const to = financialState.to.toISOString().slice(0,10);
-
       html2pdf()
-        .from(el)
         .set({
-          margin: 15,
-          filename: `Profit_Loss_${from}_to_${to}.pdf`,
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          margin: [10, 15, 10, 15],
+          filename: `Profit_and_Loss_${financialState.from?.toISOString().slice(0,10)}_to_${financialState.to?.toISOString().slice(0,10)}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
         })
+        .from(element)
         .save()
-        .then(() => el.innerHTML = original)
-        .catch(() => { el.innerHTML = original; alert("PDF failed"); });
-    }, 1000);
+        .then(() => {
+          btn.innerHTML = original;
+          btn.disabled = false;
+          showSuccessNotification("PDF exported successfully!");
+        })
+        .catch(err => {
+          console.error(err);
+          btn.innerHTML = original;
+          btn.disabled = false;
+          alert("PDF export failed. Please try again.");
+        });
+    }, 300);
   }
 
-  // ====== FILTERS & INIT ======
-  function setThisMonth() {
+  // ====================== UI & FILTERS ======================
+  async function loadLocations() {
+    try {
+      const snap = await db.collection("businessLocations").get();
+      const sel = document.getElementById("locationSelect");
+      if (!sel) return;
+      const seen = new Set();
+      snap.forEach(doc => {
+        const name = doc.data().name?.trim();
+        if (name && !seen.has(name)) {
+          seen.add(name);
+          sel.innerHTML += `<option value="${name}">${name}</option>`;
+        }
+      });
+    } catch (e) { console.warn("No locations", e); }
+  }
+
+  function setPresetRange(preset) {
     const today = new Date();
-    financialState.from = new Date(today.getFullYear(), today.getMonth(), 1);
-    financialState.to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    document.getElementById("fsFrom").valueAsDate = financialState.from;
-    document.getElementById("fsTo").valueAsDate = financialState.to;
+    let from = new Date(today), to = new Date(today);
+
+    switch(preset) {
+      case "today": break;
+      case "yesterday": from.setDate(from.getDate()-1); to = new Date(from); break;
+      case "last7": from.setDate(from.getDate()-6); break;
+      case "last30": from.setDate(from.getDate()-29); break;
+      case "thisMonth": from = new Date(today.getFullYear(), today.getMonth(), 1); to = new Date(today.getFullYear(), today.getMonth() + 1, 0); break;
+      case "lastMonth": from = new Date(today.getFullYear(), today.getMonth()-1, 1); to = new Date(today.getFullYear(), today.getMonth(), 0); break;
+      case "thisYear": from = new Date(today.getFullYear(), 0, 1); to = new Date(today.getFullYear() + 1, 0, 0); break;
+    }
+
+    const fromInput = document.getElementById फ़("fsFrom");
+    const toInput = document.getElementById("fsTo");
+    if (fromInput) fromInput.valueAsDate = from;
+    if (toInput) toInput.valueAsDate = to;
+    updateDateFilterText();
+  }
+
+  function updateDateFilterText() {
+    const f = document.getElementById("fsFrom")?.value;
+    const t = document.getElementById("fsTo")?.value;
+    const el = document.getElementById("dateFilterText");
+    if (el) el.textContent = f && t ? (f === t ? f : `${f} → ${t}`) : "Select Date Range";
+  }
+
+  function updateLocationFilterText() {
+    const el = document.getElementById("locationFilterText");
+    if (el) el.textContent = financialState.location || "All Locations";
   }
 
   async function applyFilters() {
-    document.getElementById("fsResults").innerHTML = "<div style='text-align:center;padding:80px'><h3>Loading report...</h3></div>";
-    await generateProfitLoss();
-    await renderReport();
+    const fromVal = document.getElementById("fsFrom")?.value;
+    const toVal = document.getElementById("fsTo")?.value;
+    if (!fromVal || !toVal) return alert("Please select both dates");
+
+    financialState.from = new Date(fromVal + "T00:00:00");
+    financialState.to = new Date(toVal + "T23:59:59");
+    financialState.location = document.getElementById("locationSelect")?.value || "";
+
+    document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder"><i class="fas fa-spinner fa-spin"></i> Generating report...</div>`;
+
+    try {
+      if (financialState.reportMode === "profitLoss") await generateProfitLoss();
+      await renderFinancialReport();
+      updateLocationFilterText();
+    } catch (err) {
+      console.error(err);
+      document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder" style="color:#ef4444">Error: ${err.message}</div>`;
+    }
   }
 
-  // Buttons
-  document.getElementById("fsExportPdf").onclick = exportToPDF;
-  document.getElementById("fsApplyFilters").onclick = applyFilters;
-  document.getElementById("fsDatePreset").onchange = (e) => {
-    if (e.target.value === "custom") {
-      document.getElementById("fsMenuCustomDates").style.display = "block";
-    } else {
-      document.getElementById("fsMenuCustomDates").style.display = "none";
-      setThisMonth();
-    }
-  };
+  // ====================== EVENT LISTENERS ======================
+  document.getElementById("locationFilterBtn")?.addEventListener("click", e => { e.stopPropagation(); toggleMenu("locationMenu", "fsDateMenu"); });
+  document.getElementById("fsDateFilterBtn")?.addEventListener("click", e => { e.stopPropagation(); toggleMenu("fsDateMenu", "locationMenu"); });
+  document.getElementById("locationMenu")?.addEventListener("click", e => e.stopPropagation());
+  document.getElementById("fsDateMenu")?.addEventListener("click", e => e.stopPropagation());
+  document.addEventListener("click", () => { hideMenus(["locationMenu", "fsDateMenu"]); });
 
-  // Start
-  setThisMonth();
-  setTimeout(applyFilters, 1200);
+  function toggleMenu(show, hide) {
+    document.getElementById(show).style.display = "block";
+    document.getElementById(hide)?.style.setProperty("display", "none");
+  }
+  function hideMenus(ids) { ids.forEach(id => document.getElementById(id)?.style.setProperty("display", "none")); }
+
+  document.getElementById("locationSelect")?.addEventListener("change", e => {
+    financialState.location = e.target.value;
+    updateLocationFilterText();
+    document.getElementById("locationMenu").style.display = "none";
+  });
+
+  document.getElementById("fsDatePreset")?.addEventListener("change", e => {
+    const custom = document.getElementById("fsMenuCustomDates");
+    if (e.target.value === "custom") custom.style.display = "block";
+    else { custom.style.display = "none"; setPresetRange(e.target.value); }
+  });
+
+  document.getElementById("fsApplyFilters")?.addEventListener("click", applyFilters);
+
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b === btn));
+      financialState.reportMode = btn.dataset.mode;
+      document.getElementById("fsResults").innerHTML = `<div class="sr-table-placeholder">Select date range & click <strong>Generate Report</strong></div>`;
+    });
+  });
+
+  document.getElementById("fsExportCsv")?.addEventListener("click", exportToCSV);
+  document.getElementById("fsExportExcel")?.addEventListener("click", exportToExcel);
+  document.getElementById("fsExportPdf")?.addEventListener("click", exportToPDF);
+
+  // ====================== INIT ======================
+  await loadLocations();
+  setPresetRange("thisMonth");
+  updateDateFilterText();
+  updateLocationFilterText();
+
+  setTimeout(applyFilters, 1000); // Auto-generate on load
 }
 
 function showCustomerReport() {
