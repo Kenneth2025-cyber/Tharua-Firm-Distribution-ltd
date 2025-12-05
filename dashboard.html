@@ -11911,60 +11911,92 @@ async function showFinancialSummary() {
     return;
   }
 
-  // Clone the exact report — keeps all colors, fonts, dotted lines
+  // Clone report (so we don't touch the live DOM)
   const clone = element.cloneNode(true);
 
-  // Remove logo only (you said it's okay)
-  const logo = clone.querySelector("img");
-  if (logo) logo.remove();
+  // Remove interactive/UI elements that shouldn't be in the print (buttons, filters, menus)
+  clone.querySelectorAll("button, .mode-bar, .sr-export, .filter-menu, select, input").forEach(n => n.remove());
+  // Optionally remove the logo for space — comment out if you want to keep it
+  clone.querySelector("img")?.remove();
 
-  // Force PDF-ready size without breaking styles
-  clone.style.cssText = `
-    max-width: 800px !important;
-    margin: 0 auto !important;
-    background: white !important;
-    padding: 30px 25px !important;
-    font-size: 13.5px !important;
-    line-height: 1.4 !important;
+  // Add a clean, print-first stylesheet tailored for A4 one-page output
+  const printStyles = `
+    <style>
+      @page { size: A4; margin: 0; }
+      *{box-sizing:border-box;-webkit-print-color-adjust:exact}
+      body, html { margin:0; padding:0; width:210mm; height:297mm; font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; color:#1f2937; }
+      .__pdf-wrap { width:190mm; margin:12mm auto; background: #ffffff; border-radius:8px; padding:18mm 14mm; box-shadow:none; }
+      h1,h2,h3 { margin:0 0 6px 0; font-weight:700; color:#0f172a; }
+      .company { text-align:center; margin-bottom:6px; }
+      .meta { text-align:center; color:#475569; font-size:12px; margin-bottom:12px; }
+      table{ width:100%; border-collapse:collapse; font-size:12.5px; color:#0f172a; }
+      th{ text-align:left; padding:10px 8px; font-weight:700; background: #f8fafc; border-bottom:2px solid #e6edf3; font-size:13px; }
+      td{ padding:9px 8px; border-bottom:1px dotted #d1d5db; vertical-align:middle; }
+      .income { background:#ecfdf5; color:#065f46; font-weight:700; padding:10px; font-size:13px; }
+      .expenses { background:#fff7ed; color:#92400e; font-weight:700; padding:10px; font-size:13px; }
+      .total { border-top:3px double #cbd5e1; font-weight:800; padding:10px; }
+      .net { font-size:18px; font-weight:900; text-align:center; padding:12px; margin-top:10px; border-radius:6px; }
+      .amount { text-align:right; font-weight:700; }
+      .footer { text-align:center; color:#94a3b8; font-size:11px; margin-top:12px; }
+      /* Prevent page breaks inside the main container and rows */
+      .__pdf-wrap, table, tr, td, th { page-break-inside: avoid; -webkit-column-break-inside: avoid; -webkit-page-break-inside: avoid; }
+    </style>
   `;
 
-  // Critical: reduce row padding so it fits one page
-  const rows = clone.querySelectorAll("tr");
-  rows.forEach(row => {
-    row.style.padding = "4px 0 !important";
-  });
+  // Wrap clone content with pdf wrap and the print styles
+  const wrapper = document.createElement("div");
+  wrapper.className = "__pdf-wrap";
+  wrapper.innerHTML = printStyles + clone.innerHTML;
 
-  // Reduce NET PROFIT padding
-  const netRow = clone.querySelector("tr:last-child");
-  if (netRow) {
-    netRow.style.padding = "16px 0 !important";
-  }
-
-  // Hidden container
+  // Put wrapper into a hidden container for html2pdf to render
   const container = document.createElement("div");
   container.style.position = "absolute";
   container.style.left = "-9999px";
   container.style.top = "0";
-  container.appendChild(clone);
+  container.appendChild(wrapper);
   document.body.appendChild(container);
 
-  // Generate perfect PDF
+  // Use html2pdf to produce a one-page A4 PDF. Increase scale for crispness.
+  const fromDate = financialState.from ? financialState.from.toISOString().slice(0,10) : "start";
+  const toDate = financialState.to ? financialState.to.toISOString().slice(0,10) : "end";
+
   html2pdf()
     .set({
       margin: 0,
-      filename: `Profit_and_Loss_${new Date().toISOString().slice(0,10)}.pdf`,
-      html2canvas: { 
-        scale: 2.3,
+      filename: `Profit_and_Loss_${fromDate}_to_${toDate}.pdf`,
+      html2canvas: {
+        scale: 2.5,        // high-res
         useCORS: true,
+        allowTaint: false,
         letterRendering: true,
         backgroundColor: "#ffffff"
       },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["avoid-all", "css"], before: ".avoid-page-break" }
     })
     .from(container)
+    .toPdf()
+    .get('pdf')
+    .then(pdf => {
+      // Ensure single page by trimming extra pages if any (rare). Keep first page only.
+      // If html2pdf produced multiple pages, this keeps first page and discards others.
+      if (pdf.internal && pdf.internal.pages && pdf.internal.pages.length > 1) {
+        const totalPages = pdf.internal.pages.length;
+        // remove pages after the first
+        for (let i = totalPages; i > 1; i--) pdf.internal.pages.splice(i-1, 1);
+      }
+    })
     .save()
-    .then(() => document.body.removeChild(container));
+    .then(() => {
+      document.body.removeChild(container);
+    })
+    .catch(err => {
+      document.body.removeChild(container);
+      console.error("PDF export error:", err);
+      alert("Failed to export PDF: " + (err && err.message ? err.message : err));
+    });
 }
+
   // ====================== UI & FILTERS ======================
   async function loadLocations() {
     try {
