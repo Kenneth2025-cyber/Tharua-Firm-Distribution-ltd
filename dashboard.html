@@ -11912,34 +11912,38 @@ async function showFinancialSummary() {
   }
 
   const fromStr = financialState.from?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
-  const toStr   = financialState.to?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
-  const d       = financialState.filtered;
-  const isProfit = d.netProfit >= 0;
+  toStr   = financialState.to?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+  d       = financialState.filtered;
+  isProfit = d.netProfit >= 0;
 
-  // Grab only the EXP rows from the real dashboard (preserves your exact styling)
+  // Grab all expense rows exactly as they appear in your dashboard
   const expenseRows = Array.from(element.querySelectorAll("tr"))
-    .filter(tr => tr.textContent.trim().match(/^EXP\d+/))
+    .filter(tr => {
+      const txt = tr.textContent.trim();
+      return txt.match(/^EXP\d+/) || txt.includes("COST OF SALES");
+    })
     .map(tr => tr.outerHTML)
     .join("");
 
-  const pdfHTML = `
-<div style="width:190mm;margin:0 auto;padding:14mm 11mm;font-family:Arial,sans-serif;background:white;color:black;line-height:1.35">
+  // This is the magic — exact replica of your beautiful dashboard
+  const finalHTML = `
+<div style="width:190mm;padding:16mm 13mm;font-family:Arial,sans-serif;background:white">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    h1{font-size:26px;font-weight:bold;text-align:center;margin-bottom:4px}
-    .addr{font-size:12.5px;text-align:center;color:#555;margin:3px 0}
-    .title{font-size:20px;text-align:center;color:#7c3aed;font-weight:bold;margin:16px 0 6px}
-    .dates{font-size:13px;text-align:center;color:#444;margin-bottom:14px}
-    table{width:100%;border-collapse:collapse;font-size:12.4px}
-    th{background:#f8fafc;padding:8px 9px;text-align:left;color:#1e293b;font-weight:600;border-bottom:2px solid #e2e8f0}
-    td{padding:5.5px 9px;border-bottom:1px dotted #94a3b8}
-    .section-income{background:#ecfdf5 !important;color:#166534;font-weight:bold;padding:9px !important;font-size:13.5px}
-    .section-expenses{background:#fff7ed !important;color:#92400e;font-weight:bold;padding:9px !important;font-size:13.5px}
-    .total{border-top:3px double #333 !important;font-weight:bold;background:#f8fafc !important;padding:8px 9px !important}
-    .net{background:${isProfit?'#ecfdf5':'#fee2e2'}!important;color:${isProfit?'#166534':'#991b1b'};font-size:22px;font-weight:900}
-    .net td{padding:16px 9px !important;text-align:center}
-    .amount{text-align:right;font-weight:600;white-space:nowrap}
-    .footer{text-align:center;margin-top:18px;font-size:10.5px;color:#94a3b8}
+    h1{font-size:27px;font-weight:bold;text-align:center;color:#1e293b;margin-bottom:4px}
+    .addr{font-size:13px;text-align:center;color:#475569;margin:3px 0}
+    .title{font-size:21px;text-align:center;color:#7c3aed;font-weight:bold;margin:18px 0 8px}
+    .dates{font-size:13.5px;text-align:center;color:#475569;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#f8fafc;padding:10px 12px;text-align:left;color:#1e293b;font-weight:600;border-bottom:2px solid #e2e8f0}
+    td{padding:7px 12px;border-bottom:1px dotted #94a3b8}
+    .income{background:#ecfdf5 !important;color:#166534;font-weight:bold;padding:11px 12px !important;font-size:14px}
+    .expenses{background:#fff7ed !important;color:#92400e;font-weight:bold;padding:11px 12px !important;font-size:14px}
+    .total{border-top:3px double #333 !important;font-weight:bold;background:#f8fafc !important;padding:10px 12px !important}
+    .net{background:${isProfit?'#ecfdf5':'#fee2e2'}!important;color:${isProfit?'#166534':'#991b1b'};font-size:23px;font-weight:900}
+    .net td{padding:16px 12px !important;text-align:center}
+    .amount{text-align:right;font-weight:600}
+    .footer{text-align:center;margin-top:22px;font-size:11px;color:#94a3b8}
   </style>
 
   <h1>EMBU KIAMBUTHI STORE</h1>
@@ -11953,18 +11957,17 @@ async function showFinancialSummary() {
   <table>
     <thead>
       <tr>
-        <th style="width:78px">Code</th>
+        <th style="width:85px">Code</th>
         <th>Description</th>
-        <th style="width:128px">Amount (KES)</th>
+        <th style="width:135px">Amount (KES)</th>
       </tr>
     </thead>
     <tbody>
-      <tr class="section-income"><td colspan="3">INCOME</td></tr>
+      <tr class="income"><td colspan="3">INCOME</td></tr>
       <tr><td>INC1001</td><td>SALES</td><td class="amount">${d.revenue.toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
       <tr class="total"><td colspan="2">Total Income</td><td class="amount">${d.revenue.toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
 
-      <tr class="section-expenses"><td colspan="3">EXPENSES</td></tr>
-      <tr><td>COS0001</td><td>COST OF SALES</td><td class="amount">${d.costOfSales.toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
+      <tr class="expenses"><td colspan="3">EXPENSES</td></tr>
       ${expenseRows}
       <tr class="total"><td colspan="2">Total Expenses</td><td class="amount">${d.expenses.toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
 
@@ -11978,23 +11981,20 @@ async function showFinancialSummary() {
 </div>
   `;
 
+  // Create hidden container
   const container = document.createElement('div');
-  container.innerHTML = pdfHTML;
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.innerHTML = finalHTML;
   document.body.appendChild(container);
 
+  // Generate PDF
   html2pdf()
     .set({
       margin: 0,
       filename: `Profit_and_Loss_${financialState.from.toISOString().slice(0,10)}_to_${financialState.to.toISOString().slice(0,10)}.pdf`,
-      html2canvas: { 
-        scale: 2.4,           // higher = sharper & forces perfect fit
-        useCORS: true,
-        letterRendering: true,
-        width: 794,
-        height: 1123,
-        windowWidth: 794,
-        windowHeight: 1123
-      },
+      html2canvas: { scale: 2.3, useCORS: true, letterRendering: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     })
     .from(container)
