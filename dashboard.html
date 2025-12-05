@@ -11910,141 +11910,34 @@ async function showFinancialSummary() {
     alert("Nothing to export — please generate the report first");
     return;
   }
-
-  // Dates and data
-  const fromStr = financialState.from ? financialState.from.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : "";
-  const toStr   = financialState.to   ? financialState.to.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : "";
-  const d = financialState.filtered || { revenue:0, costOfSales:0, expenses:0, netProfit:0 };
-  const isProfit = (d.netProfit || 0) >= 0;
-
-  // Extract EXP rows and parse amounts (safe)
-  const rows = Array.from(element.querySelectorAll("tr"));
-  const expRows = rows.filter(tr => {
-    const code = tr.querySelector("td:first-child")?.textContent?.trim() || "";
-    return code.startsWith("EXP");
-  });
-
-  // Build expense HTML but summarise if too long (keeps one-page)
-  const MAX_VISIBLE = 12; // first N expense rows to show
-  let visibleExpenseHTML = "";
-  let otherSum = 0;
-  const parsedExpenseRows = expRows.map(tr => {
-    const code = tr.querySelector("td:first-child")?.textContent?.trim() || "";
-    const desc = tr.querySelector("td:nth-child(2)")?.textContent?.trim() || "";
-    const amtText = tr.querySelector("td:last-child")?.textContent || "";
-    const amt = Number( (amtText || "").replace(/[^0-9\.\-]/g, "") ) || 0;
-    return { code, desc, amt, html: tr.outerHTML };
-  });
-
-  parsedExpenseRows.forEach((r, idx) => {
-    if (idx < MAX_VISIBLE) visibleExpenseHTML += r.html;
-    else otherSum += r.amt;
-  });
-
-  if (otherSum > 0) {
-    // add summarised row
-    visibleExpenseHTML += `<tr><td>EXP...OTH</td><td>Other Expenses (summary)</td><td style="text-align:right;font-weight:600">${otherSum.toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>`;
-  }
-
-  // Build PDF-ready HTML (tightened styling to fit single page)
-  const pdfHTML = `
-  <div style="width:190mm;margin:0 auto;padding:14mm 12mm;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#0f172a;line-height:1.3">
-    <style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      h1{font-size:26px;font-weight:700;text-align:center;color:#1e293b;margin-bottom:6px}
-      .addr{font-size:12.5px;text-align:center;color:#475569;margin:4px 0}
-      .title{font-size:20px;text-align:center;color:#7c3aed;font-weight:700;margin:14px 0 8px}
-      .dates{font-size:12.5px;text-align:center;color:#475569;margin-bottom:12px}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-      th{background:#f8fafc;padding:8px 10px;text-align:left;color:#1e293b;font-weight:700;border-bottom:2px solid #e2e8f0;font-size:12px}
-      td{padding:6px 10px;border-bottom:1px dotted #d1d5db;vertical-align:middle;font-size:11.8px}
-      .section-income{background:#ecfdf5;color:#166534;font-weight:700;padding:10px;font-size:12.2px}
-      .section-expenses{background:#fff7ed;color:#92400e;font-weight:700;padding:10px;font-size:12.2px}
-      .total{border-top:3px double #cbd5e1;font-weight:800;padding:9px;font-size:12px}
-      .net{background:${isProfit ? '#ecfdf5' : '#fee2e2'};color:${isProfit ? '#166534' : '#991b1b'};font-size:18px;font-weight:800;text-align:center;padding:10px;border-radius:6px}
-      .amount{text-align:right;font-weight:700;white-space:nowrap}
-      .footer{text-align:center;margin-top:10px;font-size:10.5px;color:#94a3b8}
-      /* avoid page breaks inside the main container */
-      .__pdf_wrap, table, tr, td, th { page-break-inside: avoid; -webkit-page-break-inside: avoid; }
-    </style>
-
-    <h1>EMBU KIAMBUTHI STORE</h1>
-    <div class="addr">P.O BOX 117-60400 · EMBU · 0719360751</div>
-    <div class="title">Income & Expenses Statement</div>
-    <div class="dates">DATE FROM: <strong>${fromStr}</strong> &nbsp;&nbsp;&nbsp; DATE TO: <strong>${toStr}</strong>${financialState.location ? `<br>Location: <strong>${financialState.location}</strong>` : ""}</div>
-
-    <table>
-      <thead>
-        <tr><th style="width:85px">Code</th><th>Description</th><th style="width:120px;text-align:right">Amount (KES)</th></tr>
-      </thead>
-      <tbody>
-        <tr class="section-income"><td colspan="3">INCOME</td></tr>
-        <tr><td>INC1001</td><td>SALES</td><td class="amount">${(d.revenue||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-        <tr class="total"><td colspan="2">Total Income</td><td class="amount">${(d.revenue||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-
-        <tr style="height:10px"></tr>
-
-        <tr class="section-expenses"><td colspan="3">EXPENSES</td></tr>
-        <tr><td>COS0001</td><td>COST OF SALES</td><td class="amount">${(d.costOfSales||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-
-        ${visibleExpenseHTML}
-
-        <tr class="total"><td colspan="2">Total Expenses</td><td class="amount">${(d.expenses||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-
-        <tr class="net"><td colspan="3">${isProfit ? 'NET PROFIT' : 'NET LOSS'} ${Math.abs(d.netProfit||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-      </tbody>
-    </table>
-
-    <div class="footer">Page 1 of 1 • Generated on ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
-  </div>
-  `;
-
-  // Create container in-viewport but invisible so html2canvas can render it
+  const fromStr = financialState.from?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+  const toStr = financialState.to?.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) || "";
+  const d = financialState.filtered;
+  const isProfit = d.netProfit >= 0;
+  // Extract only the EXP rows from the current dashboard
+  const expenseRows = Array.from(element.querySelectorAll("tr"))
+    .filter(tr => {
+      const code = tr.querySelector("td:first-child")?.textContent.trim();
+      return code?.startsWith("EXP");
+    })
+    .map(tr => tr.outerHTML)
+    .join("");
+  const pdfHTML = &nbsp;&nbsp;&nbsp;&nbsp;<div style="width:190mm;margin:0 auto;padding:18mm 14mm;font-family:Arial,sans-serif;background:white;color:#000;line-height:1.42"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<style> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*{margin:0;padding:0;box-sizing:border-box} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;h1{font-size:29px;font-weight:bold;text-align:center;margin-bottom:6px;color:#1e293b} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.addr{font-size:13.5px;text-align:center;color:#475569;margin:4px 0} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.title{font-size:23px;text-align:center;color:#7c3aed;font-weight:bold;margin:22px 0 10px} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.dates{font-size:14px;text-align:center;color:#475569;margin-bottom:20px} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;table{width:100%;border-collapse:collapse;font-size:13.2px;margin-top:10px} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;th{background:#f8fafc;padding:11px 12px;text-align:left;color:#1e293b;font-weight:600;border-bottom:2px solid #e2e8f0} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;td{padding:8px 12px;border-bottom:1px dotted #94a3b8} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.section-income{background:#ecfdf5 !important;color:#166534;font-weight:bold;padding:13px 12px !important;font-size:14.5px} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.section-expenses{background:#fff7ed !important;color:#92400e;font-weight:bold;padding:13px 12px !important;font-size:14.5px} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.total{border-top:3px double #333 !important;font-weight:bold;background:#f8fafc !important;padding:11px 12px !important} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.net{background:$$ {isProfit ? '#ecfdf5' : '#fee2e2'} !important;color: $${isProfit ? '#166534' : '#991b1b'};font-size:24px;font-weight:800} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.net td{padding:20px 12px !important;text-align:center} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.amount{text-align:right;font-weight:600;white-space:nowrap} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.footer{text-align:center;margin-top:28px;font-size:11.5px;color:#94a3b8} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</style> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<h1>EMBU KIAMBUTHI STORE</h1> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<div class="addr"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;P.O BOX 117-60400<br>EMBU<br>0719360751 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<div class="title">Income & Expenses Statement</div> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<div class="dates"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DATE FROM: <strong>$$ {fromStr}</strong>  DATE TO: <strong> $${toStr}</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${financialState.location ?
+Location: <strong>${financialState.location}</strong> : ""} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<table> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<thead> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<th style="width:90px">Code</th> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<th>Description</th> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<th style="width:140px">Amount (KES)</th> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</thead> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tbody> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr class="section-income"><td colspan="3">INCOME</td></tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td>INC1001</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td>SALES</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td class="amount">${d.revenue.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr class="total"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td colspan="2">Total Income</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td class="amount">${d.revenue.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr class="section-expenses"><td colspan="3">EXPENSES</td></tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td>COS0001</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td>COST OF SALES</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td class="amount">${d.costOfSales.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${expenseRows} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr class="total"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td colspan="2">Total Expenses</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td class="amount">${d.expenses.toLocaleString('en-KE', {minimumFractionDigits: 2})}</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<tr class="net"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<td colspan="3">${isProfit ? 'NET PROFIT' : 'NET LOSS'}  ${Math.abs(d.netProfit).toLocaleString('en-KE', {minimumFractionDigits: 2})}</td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tr> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tbody> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</table> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<div class="footer"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Page 1 of 1 • Generated on ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div> &nbsp;&nbsp;&nbsp;&nbsp;</div> &nbsp;&nbsp;;
   const container = document.createElement('div');
-  container.id = "__pdf_export_temp";
-  container.style.position = "fixed";
-  container.style.left = "0";
-  container.style.top = "0";
-  container.style.width = "210mm";
-  container.style.height = "297mm";
-  container.style.zIndex = "99999";
-  container.style.opacity = "0"; // invisible but renderable
-  container.style.pointerEvents = "none";
   container.innerHTML = pdfHTML;
   document.body.appendChild(container);
-
-  // Filename fallback protection
-  const fromIso = financialState.from ? financialState.from.toISOString().slice(0,10) : "start";
-  const toIso = financialState.to ? financialState.to.toISOString().slice(0,10) : "end";
-  const filename = `Profit_and_Loss_${fromIso}_to_${toIso}.pdf`;
-
   html2pdf()
     .set({
       margin: 0,
-      filename,
-      html2canvas: { scale: 2.15, useCORS: true, letterRendering: true, backgroundColor: "#ffffff" },
+      filename: Profit_and_Loss_${financialState.from.toISOString().slice(0,10)}_to_${financialState.to.toISOString().slice(0,10)}.pdf,
+      html2canvas: { scale: 2.15, useCORS: true, letterRendering: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     })
     .from(container)
-    .toPdf()
-    .get('pdf')
-    .then(pdf => {
-      // If multiple pages were produced, keep only first page
-      if (pdf.internal && Array.isArray(pdf.internal.pages) && pdf.internal.pages.length > 1) {
-        const total = pdf.internal.pages.length;
-        for (let i = total; i > 1; i--) pdf.internal.pages.splice(i-1, 1);
-      }
-      return pdf;
-    })
-    .then(pdf => pdf.save(filename))
-    .then(() => { try { document.body.removeChild(container); } catch(e){} })
-    .catch(err => {
-      try { document.body.removeChild(container); } catch(e) {}
-      console.error("PDF export error:", err);
-      alert("Failed to export PDF. See console for details.");
-    });
+    .save()
+    .then(() => document.body.removeChild(container));
 }
-
   // ====================== UI & FILTERS ======================
   async function loadLocations() {
     try {
