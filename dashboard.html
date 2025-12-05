@@ -12017,7 +12017,7 @@ function exportToPDF() {
       margin: 0,
       filename: `Profit_and_Loss_${financialState.from?.toISOString().slice(0,10)}_to_${financialState.to?.toISOString().slice(0,10)}.pdf`,
       html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: 'a3', orientation: 'portrait' }
     })
     .from(pdfContent)
     .save();
