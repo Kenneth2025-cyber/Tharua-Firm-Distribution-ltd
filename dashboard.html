@@ -11905,144 +11905,70 @@ async function showFinancialSummary() {
 
   // ONLY THIS FUNCTION FIXED — NOW WORKS PERFECTLY
 function exportToPDF() {
-  const element = document.querySelector("#fsResults > div") || document.querySelector("#fsResults");
-  if (!element) {
-    alert("Nothing to export — please generate the report first");
+  const card = document.querySelector("#fsResults > div");
+  if (!card) {
+    alert("Nothing to export — generate the report first.");
     return;
   }
 
-  // Fixed business details (exactly as you gave)
-  const companyName = "EMBU KIAMBUTHI STORE";
-  const addressText = "P.O BOX 117-60400<br>EMBU<br>0719360751";
-  const titleText = "Income & Expenses";
+  // Clone the rendered financial report card exactly as it appears
+  const clone = card.cloneNode(true);
 
-  // Clone the report so we can safely read rows without touching live DOM
-  const clone = element.cloneNode(true);
+  // Remove the logo if you do not want it — keep this or delete this line
+  // clone.querySelector("img")?.remove();
 
-  // Collect rows (INC, COS, EXP) from the clone for exact visual parity
-  const allRows = Array.from(clone.querySelectorAll("tr"));
-  const incomeRows = allRows.filter(tr => (tr.querySelector("td:first-child")?.textContent?.trim() || "").startsWith("INC"));
-  const costRows   = allRows.filter(tr => (tr.querySelector("td:first-child")?.textContent?.trim() || "").startsWith("COS"));
-  const expRows    = allRows.filter(tr => (tr.querySelector("td:first-child")?.textContent?.trim() || "").startsWith("EXP"));
+  // Tighten padding slightly so it fits A4 one-page
+  clone.style.padding = "25px 25px";
 
-  function rowHTMLFrom(tr) {
-    const tds = Array.from(tr.querySelectorAll("td")).map(td => `<td>${td.innerHTML.trim()}</td>`).join("");
-    return `<tr>${tds}</tr>`;
+  // Reduce padding in table for one-page fit
+  clone.querySelectorAll("td, th").forEach(cell => {
+    cell.style.padding = "6px 8px";
+    cell.style.fontSize = "12px";
+  });
+
+  // Control the NET PROFIT row size
+  const netRow = clone.querySelector("tr:last-child");
+  if (netRow) {
+    netRow.style.fontSize = "18px";
+    netRow.style.padding = "10px 0";
   }
 
-  const incomeHTML = incomeRows.map(rowHTMLFrom).join("");
-  const costHTML   = costRows.map(rowHTMLFrom).join("");
-  const expensesHTML = expRows.map(rowHTMLFrom).join("");
-
-  // Totals (safe fallbacks)
-  const d = financialState.filtered || { revenue:0, costOfSales:0, expenses:0, netProfit:0 };
-  const isProfit = (d.netProfit || 0) >= 0;
-
-  // Build the PDF HTML using your exact header details
-  const pdfHTML = `
-  <div style="width:190mm;margin:0 auto;padding:12mm 10mm;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000;line-height:1.28">
-    <style>
-      *{margin:0;padding:0;box-sizing:border-box}
-      .top { text-align:center; font-size:11px; margin-bottom:6px; color:#111 }
-      h1{font-size:22px;font-weight:800;text-align:center;margin-bottom:6px;color:#111}
-      .addr{font-size:11.5px;text-align:center;color:#333;margin-bottom:6px}
-      .title{font-size:15px;text-align:center;color:#222;font-weight:700;margin:8px 0}
-      .dates{font-size:11.5px;text-align:center;color:#333;margin-bottom:10px}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-      th{background:#fff;padding:6px 6px;text-align:left;color:#111;font-weight:700;border-bottom:1px solid #ddd;font-size:12px}
-      td{padding:6px 6px;border-bottom:1px dotted #cfcfcf;vertical-align:middle;font-size:11.5px}
-      .section{background:transparent;font-weight:700;padding:8px 6px;font-size:12px}
-      .section-income{background:#ecfdf5;color:#065f46}
-      .section-expenses{background:#fff7ed;color:#92400e}
-      .total{border-top:2px double #bbb;font-weight:800;padding-top:8px}
-      .net{font-size:16px;font-weight:800;text-align:center;padding:8px;margin-top:6px;background:${isProfit? '#ecfdf5' : '#fee2e2'};color:${isProfit? '#166534' : '#991b1b'}}
-      .amount{ text-align:right; font-weight:700; white-space:nowrap; }
-      .footer{ text-align:center;margin-top:8px;font-size:10.5px;color:#666 }
-      /* ensure no page breaks inside main block */
-      .__pdf_wrap, table, tr, td, th { page-break-inside: avoid; -webkit-page-break-inside: avoid; }
-    </style>
-
-    <div class="top"><div class="addr">${addressText}</div></div>
-    <h1>${companyName}</h1>
-    <div class="title">${titleText}</div>
-    <div class="dates">DATE FROM: ${financialState.from ? financialState.from.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : "–"} &nbsp;&nbsp; DATE TO: ${financialState.to ? financialState.to.toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : "–"}</div>
-
-    <table>
-      <thead>
-        <tr>
-          <th style="width:90px">Code</th>
-          <th>Description</th>
-          <th style="width:120px;text-align:right">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="section section-income"><td colspan="3">INCOME</td></tr>
-
-        ${incomeHTML || `<tr><td>INC1001</td><td>SALES</td><td class="amount">${(d.revenue||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>`}
-        <tr class="total"><td colspan="2">Total</td><td class="amount">${(d.revenue||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-
-        <tr style="height:6px"></tr>
-
-        <tr class="section section-expenses"><td colspan="3">EXPENSES</td></tr>
-
-        ${costHTML || `<tr><td>COS0001</td><td>COST OF SALES</td><td class="amount">${(d.costOfSales||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>`}
-
-        ${expensesHTML}
-
-        <tr class="total"><td colspan="2">Total</td><td class="amount">${(d.expenses||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</td></tr>
-
-      </tbody>
-    </table>
-
-    <div class="net">Profit/Loss &nbsp;&nbsp; ${Math.abs(d.netProfit||0).toLocaleString('en-KE',{minimumFractionDigits:2})}</div>
-
-    <div class="footer">Page 1 of 1 • Generated on ${new Date().toLocaleDateString('en-GB')} at ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
-  </div>
-  `;
-
-  // Place the content into an in-viewport but invisible container (html2canvas works better)
-  const container = document.createElement('div');
-  container.id = "__pdf_export_container";
+  // Wrap inside an invisible on-screen container (html2canvas requirement)
+  const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.left = "0";
   container.style.top = "0";
   container.style.width = "210mm";
-  container.style.height = "297mm";
+  container.style.background = "white";
   container.style.zIndex = "99999";
-  container.style.opacity = "0"; // invisible but renderable
-  container.style.pointerEvents = "none";
-  container.innerHTML = pdfHTML;
+  container.style.opacity = "0"; // invisible but still renderable
+  container.appendChild(clone);
   document.body.appendChild(container);
 
-  // Small delay lets fonts/images (if any) settle — keeps html2canvas from producing blank
+  // Delay avoids blank PDF issues
   setTimeout(() => {
-    const filename = `Profit_and_Loss_${(financialState.from ? financialState.from.toISOString().slice(0,10) : "start")}_to_${(financialState.to ? financialState.to.toISOString().slice(0,10) : "end")}.pdf`;
+    const filename = `Profit_and_Loss_${new Date().toISOString().slice(0,10)}.pdf`;
+
     html2pdf()
       .set({
         margin: 0,
         filename,
-        html2canvas: { scale: 2.4, useCORS: true, letterRendering: true, backgroundColor: "#ffffff" },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        html2canvas: {
+          scale: 2.6,
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: "#ffffff"
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait"
+        }
       })
       .from(container)
-      .toPdf()
-      .get('pdf')
-      .then(pdf => {
-        // if html2pdf produced >1 pages, keep first only
-        if (pdf.internal && Array.isArray(pdf.internal.pages) && pdf.internal.pages.length > 1) {
-          const total = pdf.internal.pages.length;
-          for (let i = total; i > 1; i--) pdf.internal.pages.splice(i-1, 1);
-        }
-        return pdf;
-      })
-      .then(pdf => pdf.save(filename))
-      .then(() => { try { document.body.removeChild(container); } catch(e){} })
-      .catch(err => {
-        try { document.body.removeChild(container); } catch(e){}
-        console.error("PDF export error:", err);
-        alert("Failed to export PDF. See console for details.");
-      });
-  }, 220);
+      .save()
+      .then(() => container.remove());
+  }, 200);
 }
  
   // ====================== UI & FILTERS ======================
