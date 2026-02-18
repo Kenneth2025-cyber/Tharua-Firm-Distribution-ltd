@@ -8063,7 +8063,7 @@ async function updatePaidColumnForSale(saleId, refreshSummary = false) {
 }
 
 /* -------------------------------
-   🔹 Export to Excel as Statement - Professional & Clean
+   🔹 Export to Excel as Statement
 -------------------------------- */
 async function exportSalesToExcel() {
   const filters = {
@@ -8080,17 +8080,20 @@ async function exportSalesToExcel() {
     return;
   }
 
-  // Determine title name (salesperson preferred over customer)
+  // Determine title name (salesperson has priority even if customer is also filtered)
   let titleName = filters.salesperson || "";
   if (!filters.salesperson && filters.customer) {
     try {
       const custDoc = await firebase.firestore().collection("customers").doc(filters.customer).get();
-      titleName = custDoc.exists ? (custDoc.data().name || filters.customer) : filters.customer;
+      titleName = custDoc.exists ? custDoc.data().name || filters.customer : filters.customer;
     } catch (err) {
       console.error("Error fetching customer name:", err);
       titleName = filters.customer;
     }
   }
+
+  // Make title UPPERCASE
+  titleName = titleName.toUpperCase().trim();
 
   const branch = filters.location || "All Branches";
   const period = filters.startDate && filters.endDate
@@ -8098,13 +8101,13 @@ async function exportSalesToExcel() {
     : (filters.startDate ? `From ${filters.startDate}`
       : (filters.endDate ? `Up to ${filters.endDate}` : "All Dates"));
 
-  const startDateObj = filters.startDate ? new Date(filters.startDate) : null;
-  const endDateObj = filters.endDate ? new Date(filters.endDate) : null;
-  if (endDateObj) endDateObj.setHours(23, 59, 59, 999);
+  const startDate = filters.startDate ? new Date(filters.startDate) : null;
+  const endDate = filters.endDate ? new Date(filters.endDate) : null;
+  if (endDate) endDate.setHours(23, 59, 59, 999);
 
   const searchTerm = (filters.search || "").toLowerCase();
 
-  // Fetch all relevant sales
+  // Build query for sales
   let query = firebase.firestore().collection("sales");
   if (filters.location) query = query.where("location", "==", filters.location);
   if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
@@ -8118,11 +8121,11 @@ async function exportSalesToExcel() {
 
   const allSales = allSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Fetch all payments for these sales
+  // Fetch all payments
   const allPayments = [];
   await Promise.all(allSales.map(async sale => {
     const paymentsSnap = await firebase.firestore().collection("sales").doc(sale.id).collection("payments").get();
-    paymentsSnap.forEach(pDoc => {
+    paymentsSnap.docs.forEach(pDoc => {
       const p = pDoc.data();
       allPayments.push({
         ...p,
@@ -8133,58 +8136,58 @@ async function exportSalesToExcel() {
     });
   }));
 
-  // Opening balance (everything before start date)
+  // Calculate opening balance
   let opening = 0;
-  if (startDateObj) {
+  if (startDate) {
     const beforeSales = allSales.filter(s => {
       const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
-      return sDate < startDateObj;
+      return sDate < startDate;
     });
     const beforeInvoices = beforeSales.reduce((sum, s) => sum + getNetAmount(s), 0);
-
-    const beforePayments = allPayments.filter(p => p.date < startDateObj);
+    const beforePayments = allPayments.filter(p => p.date < startDate);
     const beforePaymentsTotal = beforePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
     opening = beforeInvoices - beforePaymentsTotal;
   }
 
-  // Collect transactions in the selected period
+  // Get transactions within the period
   const transactions = [];
-
-  // Invoices
   const periodSales = allSales.filter(s => {
     const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
-    const inPeriod = (!startDateObj || sDate >= startDateObj) && (!endDateObj || sDate <= endDateObj);
+    const inPeriod = (!startDate || sDate >= startDate) && (!endDate || sDate <= endDate);
     const note = s.note || "";
     return inPeriod && (!searchTerm || note.toLowerCase().includes(searchTerm));
   });
 
   periodSales.forEach(s => {
-    const amount = getNetAmount(s);
-    transactions.push({ type: "Invoice", date: s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0), amount });
+    transactions.push({
+      type: "Invoice",
+      date: s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0),
+      amount: getNetAmount(s)
+    });
   });
 
-  // Payments (positive amount → shown in brackets)
   const periodPayments = allPayments.filter(p => {
-    return (!startDateObj || p.date >= startDateObj) && (!endDateObj || p.date <= endDateObj);
+    return (!startDate || p.date >= startDate) && (!endDate || p.date <= endDate);
   });
 
   periodPayments.forEach(p => {
-    const amount = Number(p.amount) || 0;
-    transactions.push({ type: "Payment", date: p.date, amount: -amount }); // negative for calculation
+    transactions.push({
+      type: "Payment",
+      date: p.date,
+      amount: -(Number(p.amount) || 0)
+    });
   });
 
-  // Sort chronologically (oldest first)
   transactions.sort((a, b) => a.date - b.date);
 
-  // Build data array matching template layout
+  // Build Excel rows
   const data = [
-    [`SALES PERSON / CUSTOMER STATEMENT`],                              // Row 1 - bold title
-    [`Period:`, period, `Branch:`, branch],                             // Row 2
-    [],                                                                 // Row 3 empty
-    [],                                                                 // Row 4 empty
-    [``, `Type`, `Date`, `Amount (KES)`, `Balance (KES)`],              // Row 5 - headers
-    [``, `Opening Balance`, ``, opening, opening]                       // Row 6
+    [`${titleName} STATEMENT`],                                         // Row 1 - will be merged A1:E1
+    ["Period:", period, "Branch:", branch, ""],
+    ["", "", "", "", ""],
+    ["", "", "", "", ""],
+    ["", "Type", "Date", "Amount (KES)", "Balance (KES)"],
+    ["", "Opening Balance", "", opening, opening]
   ];
 
   let runningBalance = opening;
@@ -8193,60 +8196,60 @@ async function exportSalesToExcel() {
 
   transactions.forEach(t => {
     runningBalance += t.amount;
-
-    const displayAmount = t.type === "Payment" ? `(${Math.abs(t.amount).toLocaleString('en-KE')})` : t.amount.toLocaleString('en-KE');
-    const dateStr = t.date.toLocaleDateString('en-KE');
-
-    data.push([``, t.type, dateStr, displayAmount, runningBalance.toLocaleString('en-KE')]);
-
+    const dateStr = t.date.toLocaleDateString("en-KE");
+    data.push(["", t.type, dateStr, t.amount, runningBalance]);
     if (t.type === "Invoice") totalInvoices += t.amount;
-    if (t.type === "Payment") totalPayments += Math.abs(t.amount);
+    else totalPayments += Math.abs(t.amount);
   });
 
-  // Fill empty rows up to row 26 (like template) - carry balance forward
   while (data.length < 26) {
-    data.push([``, ``, ``, ``, runningBalance.toLocaleString('en-KE')]);
+    data.push(["", "", "", "", runningBalance]);
   }
 
-  // Empty rows 27-28
-  data.push([``, ``, ``, ``, ``]);
-  data.push([``, ``, ``, ``, ``]);
-
-  // Summary rows (29-31)
-  data.push([``, ``, `Total Invoices:`, totalInvoices.toLocaleString('en-KE'), ``]);
-  data.push([``, ``, `Total Payments:`, totalPayments.toLocaleString('en-KE'), ``]);
-  data.push([``, ``, `Closing Balance:`, runningBalance.toLocaleString('en-KE'), ``]);
+  data.push(["", "", "", "", ""]);
+  data.push(["", "", "", "", ""]);
+  data.push(["", "", "Total Invoices:", totalInvoices, ""]);
+  data.push(["", "", "Total Payments:", totalPayments, ""]);
+  data.push(["", "", "Closing Balance:", runningBalance, ""]);
 
   // Create worksheet
   const ws = XLSX.utils.aoa_to_sheet(data);
 
-  // Set column widths to look neat
-  ws['!cols'] = [
-    { wch: 4 },     // A - empty
-    { wch: 18 },    // B - Type
-    { wch: 14 },    // C - Date
-    { wch: 16 },    // D - Amount
-    { wch: 16 }     // E - Balance
+  // Column widths
+  ws["!cols"] = [
+    { wch: 5 },
+    { wch: 20 },
+    { wch: 15 },
+    { wch: 18 },
+    { wch: 18 }
   ];
 
-  // Basic styling (bold title, headers, totals)
-  const boldStyle = { font: { bold: true } };
-  ws['A1'].s = { ...boldStyle, alignment: { horizontal: 'center' } };
-  ['B5','C5','D5','E5'].forEach(cell => { if (ws[cell]) ws[cell].s = boldStyle; });
-  ['D29','D30','D31'].forEach(cell => { if (ws[cell]) ws[cell].s = boldStyle; });
-  ['C29','C30','C31'].forEach(cell => { if (ws[cell]) ws[cell].s = boldStyle; });
+  // Merge title cell A1:E1
+  ws["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }   // A1 to E1
+  ];
+
+  // Bold styling
+  const bold = { font: { bold: true } };
+
+  // Bold the title (A1)
+  if (ws["A1"]) ws["A1"].s = { ...bold, alignment: { horizontal: "center" } };
+
+  // Bold headers (B5:E5)
+  ["B5", "C5", "D5", "E5"].forEach(cell => {
+    if (ws[cell]) ws[cell].s = bold;
+  });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Statement");
 
-  const safeName = titleName.replace(/[^a-zA-Z0-9]/g, "_");
-  const filename = `${safeName}_Statement.xlsx`;
-
+  const filename = `${titleName.replace(/[^a-zA-Z0-9]/g, "_")}_Statement.xlsx`;
   XLSX.writeFile(wb, filename);
-  showSuccessNotification("Professional statement exported!");
+
+  showSuccessNotification("Statement exported successfully!");
 }
 
-// Helper remains the same
+// Helper function (unchanged)
 function getNetAmount(sale) {
   let total = 0;
   if (Array.isArray(sale.saleItems)) {
