@@ -8063,7 +8063,7 @@ async function updatePaidColumnForSale(saleId, refreshSummary = false) {
 }
 
 /* -------------------------------
-   🔹 Export to Excel as Statement
+   🔹 Export to Excel as Statement - Auto Length
 -------------------------------- */
 async function exportSalesToExcel() {
   const filters = {
@@ -8080,7 +8080,7 @@ async function exportSalesToExcel() {
     return;
   }
 
-  // Determine title name (salesperson has priority even if customer is also filtered)
+  // Determine title name (salesperson has priority)
   let titleName = filters.salesperson || "";
   if (!filters.salesperson && filters.customer) {
     try {
@@ -8091,8 +8091,6 @@ async function exportSalesToExcel() {
       titleName = filters.customer;
     }
   }
-
-  // Make title UPPERCASE
   titleName = titleName.toUpperCase().trim();
 
   const branch = filters.location || "All Branches";
@@ -8107,7 +8105,6 @@ async function exportSalesToExcel() {
 
   const searchTerm = (filters.search || "").toLowerCase();
 
-  // Build query for sales
   let query = firebase.firestore().collection("sales");
   if (filters.location) query = query.where("location", "==", filters.location);
   if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
@@ -8121,7 +8118,6 @@ async function exportSalesToExcel() {
 
   const allSales = allSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Fetch all payments
   const allPayments = [];
   await Promise.all(allSales.map(async sale => {
     const paymentsSnap = await firebase.firestore().collection("sales").doc(sale.id).collection("payments").get();
@@ -8136,7 +8132,6 @@ async function exportSalesToExcel() {
     });
   }));
 
-  // Calculate opening balance
   let opening = 0;
   if (startDate) {
     const beforeSales = allSales.filter(s => {
@@ -8149,8 +8144,8 @@ async function exportSalesToExcel() {
     opening = beforeInvoices - beforePaymentsTotal;
   }
 
-  // Get transactions within the period
   const transactions = [];
+
   const periodSales = allSales.filter(s => {
     const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
     const inPeriod = (!startDate || sDate >= startDate) && (!endDate || sDate <= endDate);
@@ -8180,9 +8175,9 @@ async function exportSalesToExcel() {
 
   transactions.sort((a, b) => a.date - b.date);
 
-  // Build Excel rows
+  // Build Excel rows - no forced empty rows
   const data = [
-    [`${titleName} STATEMENT`],                                         // Row 1 - will be merged A1:E1
+    [`${titleName} STATEMENT`],
     ["Period:", period, "Branch:", branch, ""],
     ["", "", "", "", ""],
     ["", "", "", "", ""],
@@ -8202,20 +8197,18 @@ async function exportSalesToExcel() {
     else totalPayments += Math.abs(t.amount);
   });
 
-  while (data.length < 26) {
-    data.push(["", "", "", "", runningBalance]);
-  }
+  // Only add two empty rows before summary (like your original template style)
+  data.push(["", "", "", "", ""]);
+  data.push(["", "", "", "", ""]);
 
-  data.push(["", "", "", "", ""]);
-  data.push(["", "", "", "", ""]);
+  // Summary
   data.push(["", "", "Total Invoices:", totalInvoices, ""]);
   data.push(["", "", "Total Payments:", totalPayments, ""]);
   data.push(["", "", "Closing Balance:", runningBalance, ""]);
 
-  // Create worksheet
+  // Create sheet
   const ws = XLSX.utils.aoa_to_sheet(data);
 
-  // Column widths
   ws["!cols"] = [
     { wch: 5 },
     { wch: 20 },
@@ -8224,18 +8217,14 @@ async function exportSalesToExcel() {
     { wch: 18 }
   ];
 
-  // Merge title cell A1:E1
+  // Merge title A1:E1
   ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }   // A1 to E1
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }
   ];
 
-  // Bold styling
+  // Bold title and headers
   const bold = { font: { bold: true } };
-
-  // Bold the title (A1)
   if (ws["A1"]) ws["A1"].s = { ...bold, alignment: { horizontal: "center" } };
-
-  // Bold headers (B5:E5)
   ["B5", "C5", "D5", "E5"].forEach(cell => {
     if (ws[cell]) ws[cell].s = bold;
   });
@@ -8249,7 +8238,7 @@ async function exportSalesToExcel() {
   showSuccessNotification("Statement exported successfully!");
 }
 
-// Helper function (unchanged)
+// Helper function unchanged
 function getNetAmount(sale) {
   let total = 0;
   if (Array.isArray(sale.saleItems)) {
