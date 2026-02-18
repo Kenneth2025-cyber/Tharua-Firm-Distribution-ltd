@@ -8063,6 +8063,193 @@ async function updatePaidColumnForSale(saleId, refreshSummary = false) {
 }
 
 /* -------------------------------
+   🔹 Export to Excel as Statement
+-------------------------------- */
+async function exportSalesToExcel() {
+  const filters = {
+    location: document.getElementById("locationFilter").value,
+    salesperson: document.getElementById("salespersonFilter").value,
+    customer: document.getElementById("customerFilter").value,
+    startDate: document.getElementById("startDateFilter").value,
+    endDate: document.getElementById("endDateFilter").value,
+    search: document.getElementById("searchNotes").value
+  };
+
+  if (!filters.salesperson && !filters.customer) {
+    alert("Please filter by Salesperson or Customer to generate a statement.");
+    return;
+  }
+
+  // Determine title name
+  let titleName = filters.salesperson || "";
+  if (!filters.salesperson && filters.customer) {
+    // Fetch customer name if it's an ID
+    try {
+      const custDoc = await firebase.firestore().collection("customers").doc(filters.customer).get();
+      titleName = custDoc.exists ? custDoc.data().name || filters.customer : filters.customer;
+    } catch (err) {
+      console.error("Error fetching customer name:", err);
+      titleName = filters.customer;
+    }
+  }
+
+  const branch = filters.location || "All Branches";
+  const period = filters.startDate && filters.endDate 
+    ? `From ${filters.startDate} to ${filters.endDate}` 
+    : (filters.startDate ? `From ${filters.startDate}` 
+    : (filters.endDate ? `Up to ${filters.endDate}` : "All Dates"));
+
+  const startDate = filters.startDate ? new Date(filters.startDate) : null;
+  const endDate = filters.endDate ? new Date(filters.endDate) : null;
+  if (endDate) endDate.setHours(23, 59, 59, 999);
+
+  const searchTerm = (filters.search || "").toLowerCase();
+
+  // Build query for sales
+  let query = firebase.firestore().collection("sales");
+  if (filters.location) query = query.where("location", "==", filters.location);
+  if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
+  if (filters.customer) query = query.where("customer", "==", filters.customer);
+
+  const allSnapshot = await query.get();
+  if (allSnapshot.empty) {
+    alert("No sales found for the selected filters.");
+    return;
+  }
+
+  const allSales = allSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  // Fetch all payments
+  const allPayments = [];
+  await Promise.all(allSales.map(async sale => {
+    const paymentsSnap = await firebase.firestore().collection("sales").doc(sale.id).collection("payments").get();
+    paymentsSnap.docs.forEach(pDoc => {
+      const p = pDoc.data();
+      allPayments.push({
+        ...p,
+        id: pDoc.id,
+        saleId: sale.id,
+        date: p.date?.toDate ? p.date.toDate() : new Date(p.date || 0)
+      });
+    });
+  }));
+
+  // Calculate opening balance (before start date)
+  let opening = 0;
+  if (startDate) {
+    const beforeSales = allSales.filter(s => {
+      const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
+      return sDate < startDate;
+    });
+    const beforeInvoices = beforeSales.reduce((sum, s) => sum + getNetAmount(s), 0);
+
+    const beforePayments = allPayments.filter(p => p.date < startDate);
+    const beforePaymentsTotal = beforePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    opening = beforeInvoices - beforePaymentsTotal;
+  }
+
+  // Get transactions within the period
+  const transactions = [];
+
+  // Invoices in period
+  const periodSales = allSales.filter(s => {
+    const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
+    const inPeriod = (!startDate || sDate >= startDate) && (!endDate || sDate <= endDate);
+    const note = s.note || "";
+    return inPeriod && (!searchTerm || note.toLowerCase().includes(searchTerm));
+  });
+
+  periodSales.forEach(s => {
+    transactions.push({
+      type: "Invoice",
+      date: s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0),
+      amount: getNetAmount(s)
+    });
+  });
+
+  // Payments in period
+  const periodPayments = allPayments.filter(p => {
+    return (!startDate || p.date >= startDate) && (!endDate || p.date <= endDate);
+  });
+
+  periodPayments.forEach(p => {
+    transactions.push({
+      type: "Payment",
+      date: p.date,
+      amount: -(Number(p.amount) || 0)
+    });
+  });
+
+  // Sort by date (oldest first)
+  transactions.sort((a, b) => a.date - b.date);
+
+  // Build Excel rows
+  const data = [
+    [`${titleName} STATEMENT`, "", "", "", ""],
+    ["Period:", period, "Branch:", branch, ""],
+    ["", "", "", "", ""],
+    ["", "", "", "", ""],
+    ["", "Type", "Date", "Amount (KES)", "Balance (KES)"],
+    ["", "Opening Balance", "", opening, opening]
+  ];
+
+  let runningBalance = opening;
+  let totalInvoices = 0;
+  let totalPayments = 0;
+
+  transactions.forEach(t => {
+    runningBalance += t.amount;
+    const dateStr = t.date.toLocaleDateString("en-KE");
+    data.push(["", t.type, dateStr, t.amount, runningBalance]);
+
+    if (t.type === "Invoice") totalInvoices += t.amount;
+    else totalPayments += Math.abs(t.amount);
+  });
+
+  // Fill empty rows to match template (up to row 26)
+  while (data.length < 26) {
+    data.push(["", "", "", "", runningBalance]);
+  }
+
+  // Summary rows
+  data.push(["", "", "", "", ""]);
+  data.push(["", "", "", "", ""]);
+  data.push(["", "", "Total Invoices:", totalInvoices, ""]);
+  data.push(["", "", "Total Payments:", totalPayments, ""]);
+  data.push(["", "", "Closing Balance:", runningBalance, ""]);
+
+  // Create sheet
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = [
+    { wch: 5 },      // empty
+    { wch: 20 },     // Type
+    { wch: 15 },     // Date
+    { wch: 18 },     // Amount
+    { wch: 18 }      // Balance
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Statement");
+
+  const filename = `${titleName.replace(/[^a-zA-Z0-9]/g, "_")}_Statement.xlsx`;
+  XLSX.writeFile(wb, filename);
+
+  showSuccessNotification("Statement exported successfully!");
+}
+
+// Helper function
+function getNetAmount(sale) {
+  let total = 0;
+  if (Array.isArray(sale.saleItems)) {
+    total = sale.saleItems.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
+  }
+  total = total || Number(sale.totalSales) || Number(sale.totalAmount) || Number(sale.total) || 0;
+  const expense = Number(sale.expensesTotal) || 0;
+  return total - expense;
+}
+
+/* -------------------------------
    🔹 View & Manage Field Expenses Modal (Auto Refresh + Synced with 'expenses')
 -------------------------------- */
 async function viewExpenses(saleId) {
