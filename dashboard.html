@@ -8250,6 +8250,231 @@ function getNetAmount(sale) {
 }
 
 /* -------------------------------
+   🔹 Export to PDF as Customer/Salesperson Statement
+-------------------------------- */
+async function exportSalesToPDF() {
+  const filters = {
+    location: document.getElementById("locationFilter").value,
+    salesperson: document.getElementById("salespersonFilter").value,
+    customer: document.getElementById("customerFilter").value,
+    startDate: document.getElementById("startDateFilter").value,
+    endDate: document.getElementById("endDateFilter").value,
+    search: document.getElementById("searchNotes").value
+  };
+
+  if (!filters.salesperson && !filters.customer) {
+    alert("Please filter by Salesperson or Customer to generate a statement.");
+    return;
+  }
+
+  // Determine name (salesperson has priority)
+  let titleName = filters.salesperson || "";
+  if (!filters.salesperson && filters.customer) {
+    try {
+      const custDoc = await firebase.firestore().collection("customers").doc(filters.customer).get();
+      titleName = custDoc.exists ? custDoc.data().name || filters.customer : filters.customer;
+    } catch (err) {
+      console.error("Error fetching customer name:", err);
+      titleName = filters.customer;
+    }
+  }
+  titleName = titleName.toUpperCase().trim();
+
+  const branch = (filters.location || "All Branches").toUpperCase();
+  const periodText = filters.startDate && filters.endDate
+    ? `FROM ${filters.startDate} TO ${filters.endDate}`
+    : (filters.startDate ? `FROM ${filters.startDate}`
+      : (filters.endDate ? `UP TO ${filters.endDate}` : "ALL DATES"));
+
+  const startDateObj = filters.startDate ? new Date(filters.startDate) : null;
+  const endDateObj = filters.endDate ? new Date(filters.endDate) : null;
+  if (endDateObj) endDateObj.setHours(23, 59, 59, 999);
+
+  const searchTerm = (filters.search || "").toLowerCase();
+
+  // Fetch data (same as Excel)
+  let query = firebase.firestore().collection("sales");
+  if (filters.location) query = query.where("location", "==", filters.location);
+  if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
+  if (filters.customer) query = query.where("customer", "==", filters.customer);
+
+  const allSnapshot = await query.get();
+  if (allSnapshot.empty) {
+    alert("No records found for the selected filters.");
+    return;
+  }
+
+  const allSales = allSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  const allPayments = [];
+  await Promise.all(allSales.map(async sale => {
+    const paymentsSnap = await firebase.firestore().collection("sales").doc(sale.id).collection("payments").get();
+    paymentsSnap.forEach(pDoc => {
+      const p = pDoc.data();
+      allPayments.push({
+        ...p,
+        id: pDoc.id,
+        saleId: sale.id,
+        date: p.date?.toDate ? p.date.toDate() : new Date(p.date || 0)
+      });
+    });
+  }));
+
+  // Opening balance
+  let opening = 0;
+  if (startDateObj) {
+    const beforeSales = allSales.filter(s => {
+      const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
+      return sDate < startDateObj;
+    });
+    const beforeInvoices = beforeSales.reduce((sum, s) => sum + getNetAmount(s), 0);
+    const beforePaymentsTotal = allPayments
+      .filter(p => p.date < startDateObj)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    opening = beforeInvoices - beforePaymentsTotal;
+  }
+
+  // Transactions in period
+  const transactions = [];
+
+  const periodSales = allSales.filter(s => {
+    const sDate = s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0);
+    const inPeriod = (!startDateObj || sDate >= startDateObj) && (!endDateObj || sDate <= endDateObj);
+    const note = s.note || "";
+    return inPeriod && (!searchTerm || note.toLowerCase().includes(searchTerm));
+  });
+
+  periodSales.forEach(s => {
+    transactions.push({
+      type: "Invoice",
+      date: s.saleDate?.toDate ? s.saleDate.toDate() : new Date(0),
+      amount: getNetAmount(s)
+    });
+  });
+
+  const periodPayments = allPayments.filter(p => {
+    return (!startDateObj || p.date >= startDateObj) && (!endDateObj || p.date <= endDateObj);
+  });
+
+  periodPayments.forEach(p => {
+    transactions.push({
+      type: "Payment",
+      date: p.date,
+      amount: -(Number(p.amount) || 0)
+    });
+  });
+
+  transactions.sort((a, b) => a.date - b.date);
+
+  // Calculate totals
+  let runningBalance = opening;
+  let totalInvoices = 0;
+  let totalPayments = 0;
+
+  const transactionRows = transactions.map(t => {
+    runningBalance += t.amount;
+    const dateStr = t.date.toLocaleDateString("en-KE");
+    const amountDisplay = t.type === "Payment" ? `(${Math.abs(t.amount).toLocaleString('en-KE')})` : t.amount.toLocaleString('en-KE');
+    if (t.type === "Invoice") totalInvoices += t.amount;
+    if (t.type === "Payment") totalPayments += Math.abs(t.amount);
+    return { type: t.type, date: dateStr, amount: amountDisplay, balance: runningBalance.toLocaleString('en-KE') };
+  });
+
+  // Build HTML content for PDF (A4 portrait, clean layout)
+  const currentDate = new Date().toLocaleString('en-KE', {
+    day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+  }) + " EAT";
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; width: 210mm; margin: 0 auto; padding: 15mm 10mm; box-sizing: border-box; font-size: 11pt; line-height: 1.4;">
+      <!-- Header -->
+      <div style="text-align: center; margin-bottom: 8mm;">
+        <h2 style="margin: 0; font-size: 16pt; color: #000;">${branch}</h2>
+        <h3 style="margin: 6px 0 0; font-size: 14pt; color: #333;">
+          Customer Statement – ${titleName}
+        </h3>
+      </div>
+
+      <!-- Dates -->
+      <div style="text-align: center; margin-bottom: 10mm; font-weight: bold;">
+        DATE FROM: ${filters.startDate || "—"} &nbsp;&nbsp;&nbsp; 
+        DATE TO: ${filters.endDate || "—"}
+      </div>
+
+      <!-- Table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 8mm;">
+        <thead>
+          <tr style="background: #f0f0f0;">
+            <th style="border: 1px solid #000; padding: 6px; text-align: left;">Type</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align: left;">Date</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align: right;">Amount (KES)</th>
+            <th style="border: 1px solid #000; padding: 6px; text-align: right;">Balance (KES)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border: 1px solid #000; padding: 6px;">Opening Balance</td>
+            <td style="border: 1px solid #000; padding: 6px;"></td>
+            <td style="border: 1px solid #000; padding: 6px; text-align: right;">0.00</td>
+            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${opening.toLocaleString('en-KE')}</td>
+          </tr>
+          ${transactionRows.map(row => `
+            <tr>
+              <td style="border: 1px solid #000; padding: 6px;">${row.type}</td>
+              <td style="border: 1px solid #000; padding: 6px;">${row.date}</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">${row.amount}</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">${row.balance}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <!-- Summary -->
+      <div style="margin-top: 10mm;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="width: 70%;"></td>
+            <td style="border-bottom: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">
+              Total Invoices: ${totalInvoices.toLocaleString('en-KE')}
+            </td>
+          </tr>
+          <tr>
+            <td></td>
+            <td style="border-bottom: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">
+              Total Payments: ${totalPayments.toLocaleString('en-KE')}
+            </td>
+          </tr>
+          <tr>
+            <td></td>
+            <td style="padding: 6px 4px 0; text-align: right; font-weight: bold; font-size: 12pt;">
+              Closing Balance: ${runningBalance.toLocaleString('en-KE')}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Footer -->
+      <div style="margin-top: 15mm; text-align: center; font-size: 9pt; color: #555;">
+        Generated on ${currentDate}
+      </div>
+    </div>
+  `;
+
+  // Generate PDF using html2pdf (already included in your dashboard)
+  html2pdf()
+    .from(htmlContent)
+    .set({
+      margin: 0,
+      filename: `${titleName.replace(/[^a-zA-Z0-9]/g, "_")}_Statement.pdf`,
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    })
+    .save();
+
+  showSuccessNotification("Customer/Salesperson statement exported to PDF!");
+}
+
+/* -------------------------------
    🔹 View & Manage Field Expenses Modal (Auto Refresh + Synced with 'expenses')
 -------------------------------- */
 async function viewExpenses(saleId) {
