@@ -10622,55 +10622,93 @@ async function aggregateSalesByProduct() {
   salesState.filtered = result.slice();
 }
 
-// ✅ COMPLETE CUSTOMER AGGREGATION (LOCATION FILTERED)
+// ✅ COMPLETE CUSTOMER AGGREGATION (LOCATION FILTERED + FIXED NAMES)
 async function aggregateSalesByCustomer() {
   const db = firebase.firestore();
   const from = salesState.from;
   const to = salesState.to;
   const loc = salesState.location;
+
+  // 🔥 STEP 1: Load all customers (ID → Name map)
+  const customersSnap = await db.collection("customers").get();
+  const customersMap = {};
+
+  customersSnap.forEach(doc => {
+    const data = doc.data();
+    customersMap[doc.id] = data.name || "Unknown Customer";
+  });
+
+  // 🔥 STEP 2: Query sales
   let q = db.collection("sales").orderBy("saleDate", "desc");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
+
+  if (from && to) {
+    q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
+  }
+
+  if (loc) {
+    q = q.where("location", "==", loc);
+  }
+
   const snap = await q.get();
-  
+
   const customerMap = {};
   const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
-  
+
+  // 🔥 STEP 3: Process sales
   for (const doc of snap.docs) {
     const sd = doc.data();
+
     const sLoc = String(sd.location || sd.businessLocation || "").trim();
     if (loc && sLoc !== loc) continue;
-    const customer = String(sd.customerName || sd.customer || "Walk-in").trim();
+
+    // ✅ FIXED CUSTOMER NAME LOGIC
+    let customer = "Walk-in";
+
+    if (sd.customerName && sd.customerName.trim() !== "") {
+      customer = sd.customerName.trim();
+    } else if (sd.customerId) {
+      customer = customersMap[sd.customerId] || "Unknown Customer";
+    }
+
     const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
     if (!Array.isArray(items) || items.length === 0) continue;
-    
+
     let totalRevenue = 0;
     let totalQty = 0;
-    
+
     for (const it of items) {
       const qty = toNum(it.quantity || it.qty || 0);
       if (qty === 0) continue;
+
       const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+
       totalRevenue += qty * price;
       totalQty += qty;
     }
-    
+
     if (!customerMap[customer]) {
-      customerMap[customer] = { customerName: customer, orders: 0, revenue: 0, qty: 0 };
+      customerMap[customer] = {
+        customerName: customer,
+        orders: 0,
+        revenue: 0,
+        qty: 0
+      };
     }
-    
+
     customerMap[customer].orders += 1;
     customerMap[customer].revenue += totalRevenue;
     customerMap[customer].qty += totalQty;
   }
-  
+
+  // 🔥 STEP 4: Format result
   const result = Object.values(customerMap)
     .map(c => ({
       ...c,
       avgOrder: c.orders > 0 ? (c.revenue / c.orders).toFixed(0) : 0
     }))
     .sort((a, b) => b.revenue - a.revenue);
-    
+
+  // 🔥 STEP 5: Save to state
   salesState.rows = result;
   salesState.filtered = result.slice();
 }
