@@ -10622,57 +10622,119 @@ async function aggregateSalesByProduct() {
   salesState.filtered = result.slice();
 }
 
-// ✅ COMPLETE CUSTOMER AGGREGATION (LOCATION FILTERED)
+// ✅ UPDATED CUSTOMER AGGREGATION - Shows Real Customer Name from customers collection
 async function aggregateSalesByCustomer() {
   const db = firebase.firestore();
-  const from = salesState.from;
-  const to = salesState.to;
-  const loc = salesState.location;
-  let q = db.collection("sales").orderBy("saleDate", "desc");
-  if (from && to) q = q.where("saleDate", ">=", from).where("saleDate", "<=", to);
-  if (loc) q = q.where("location", "==", loc);
-  const snap = await q.get();
-  
-  const customerMap = {};
-  const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
-  
-  for (const doc of snap.docs) {
-    const sd = doc.data();
-    const sLoc = String(sd.location || sd.businessLocation || "").trim();
-    if (loc && sLoc !== loc) continue;
-    const customer = String(sd.customerName || sd.customer || "Walk-in").trim();
-    const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
-    if (!Array.isArray(items) || items.length === 0) continue;
-    
-    let totalRevenue = 0;
-    let totalQty = 0;
-    
-    for (const it of items) {
-      const qty = toNum(it.quantity || it.qty || 0);
-      if (qty === 0) continue;
-      const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
-      totalRevenue += qty * price;
-      totalQty += qty;
-    }
-    
-    if (!customerMap[customer]) {
-      customerMap[customer] = { customerName: customer, orders: 0, revenue: 0, qty: 0 };
-    }
-    
-    customerMap[customer].orders += 1;
-    customerMap[customer].revenue += totalRevenue;
-    customerMap[customer].qty += totalQty;
+  const { from, to, location: loc } = salesState;
+
+  let query = db.collection("sales");
+
+  // Date filtering (proper end of day)
+  if (from && to) {
+    const startDate = new Date(from);
+    const endDate = new Date(to);
+    endDate.setHours(23, 59, 59, 999);
+
+    query = query
+      .where("saleDate", ">=", startDate)
+      .where("saleDate", "<=", endDate);
   }
-  
-  const result = Object.values(customerMap)
-    .map(c => ({
-      ...c,
-      avgOrder: c.orders > 0 ? (c.revenue / c.orders).toFixed(0) : 0
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
-    
-  salesState.rows = result;
-  salesState.filtered = result.slice();
+
+  if (loc && loc !== "all") {
+    query = query.where("location", "==", loc);
+  }
+
+  query = query.orderBy("saleDate", "desc");
+
+  try {
+    const snap = await query.get();
+
+    // Step 1: Collect all unique customer IDs from sales
+    const customerIds = new Set();
+    snap.docs.forEach(doc => {
+      const data = doc.data();
+      const custId = String(data.customer || data.customerName || "").trim();
+      if (custId && custId !== "Walk-in") {
+        customerIds.add(custId);
+      }
+    });
+
+    // Step 2: Fetch real customer names from "customers" collection
+    const customerNameMap = new Map(); // customerId → name
+    if (customerIds.size > 0) {
+      const customersSnap = await db.collection("customers")
+        .where(firebase.firestore.FieldPath.documentId(), "in", Array.from(customerIds))
+        .get();
+
+      customersSnap.forEach(doc => {
+        const cdata = doc.data();
+        customerNameMap.set(doc.id, String(cdata.name || "").trim() || "Unknown Customer");
+      });
+    }
+
+    // Step 3: Process sales and use real names
+    const customerMap = {};
+    const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
+
+    for (const doc of snap.docs) {
+      const sd = doc.data();
+      const sLoc = String(sd.location || sd.businessLocation || "").trim();
+      if (loc && loc !== "all" && sLoc !== loc) continue;
+
+      // Get real customer name or fallback
+      let custId = String(sd.customer || sd.customerName || "").trim();
+      let customerName = "Walk-in";
+
+      if (custId && custId !== "Walk-in") {
+        customerName = customerNameMap.get(custId) || custId; // fallback to ID if name not found
+      }
+
+      const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
+      if (!Array.isArray(items) || items.length === 0) continue;
+
+      let totalRevenue = 0;
+      let totalQty = 0;
+
+      for (const it of items) {
+        const qty = toNum(it.quantity || it.qty || 0);
+        if (qty === 0) continue;
+        const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+        totalRevenue += qty * price;
+        totalQty += qty;
+      }
+
+      if (!customerMap[customerName]) {
+        customerMap[customerName] = {
+          customerName: customerName,
+          orders: 0,
+          revenue: 0,
+          qty: 0
+        };
+      }
+
+      customerMap[customerName].orders += 1;
+      customerMap[customerName].revenue += totalRevenue;
+      customerMap[customerName].qty += totalQty;
+    }
+
+    // Final result
+    const result = Object.values(customerMap)
+      .map(c => ({
+        ...c,
+        avgOrder: c.orders > 0 ? Math.round(c.revenue / c.orders) : 0   // clean integer
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    salesState.rows = result;
+    salesState.filtered = [...result];
+
+    console.log(`✅ Customer report loaded with real names: ${result.length} customers`);
+
+  } catch (error) {
+    console.error("❌ Error in aggregateSalesByCustomer:", error);
+    salesState.rows = [];
+    salesState.filtered = [];
+  }
 }
 
 // ✅ COMPLETE CUSTOMER GROUP AGGREGATION (LOCATION FILTERED)
