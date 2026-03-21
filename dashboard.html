@@ -10737,7 +10737,7 @@ async function aggregateSalesByCustomer() {
   }
 }
 
-// ✅ IMPROVED CUSTOMER GROUP AGGREGATION – Uses real customerGroups & customers data
+// ✅ IMPROVED CUSTOMER GROUP AGGREGATION – with REAL PROFIT from costATSale
 async function aggregateSalesByCustGroup() {
   const db = firebase.firestore();
   const { from, to, location: loc } = salesState;
@@ -10748,7 +10748,6 @@ async function aggregateSalesByCustGroup() {
     const start = new Date(from);
     const end = new Date(to);
     end.setHours(23, 59, 59, 999);
-
     salesQuery = salesQuery
       .where("saleDate", ">=", start)
       .where("saleDate", "<=", end);
@@ -10761,68 +10760,59 @@ async function aggregateSalesByCustGroup() {
   try {
     const salesSnap = await salesQuery.get();
 
-    // 1. Collect all unique customer IDs from relevant sales
+    // 1. Collect unique customer IDs
     const customerIds = new Set();
     salesSnap.docs.forEach(doc => {
       const data = doc.data();
       const cust = String(data.customer || data.customerName || "").trim();
-      if (cust && cust !== "Walk-in" && cust.length > 5) {  // rough filter for IDs
+      if (cust && cust !== "Walk-in" && cust.length > 5) {
         customerIds.add(cust);
       }
     });
 
-    // 2. Fetch customer documents (to get groupId/groupName)
+    // 2. Fetch customers → group mapping (same as before)
     const customerGroupMap = new Map(); // customerId → groupName
-
     if (customerIds.size > 0) {
-      // Firestore "in" query max 30 items → batch if needed
       const batches = [];
       const idsArray = Array.from(customerIds);
       for (let i = 0; i < idsArray.length; i += 30) {
         const batchIds = idsArray.slice(i, i + 30);
-        const batchPromise = db.collection("customers")
-          .where(firebase.firestore.FieldPath.documentId(), "in", batchIds)
-          .get();
-        batches.push(batchPromise);
+        batches.push(
+          db.collection("customers")
+            .where(firebase.firestore.FieldPath.documentId(), "in", batchIds)
+            .get()
+        );
       }
-
       const customerSnaps = await Promise.all(batches);
-
       customerSnaps.forEach(snap => {
         snap.forEach(doc => {
           const cdata = doc.data();
-          let groupName = "Walk-in"; // default
-
+          let groupName = "Walk-in";
           if (cdata.groupName) {
             groupName = String(cdata.groupName).trim();
           } else if (cdata.groupId) {
-            // If only groupId exists, we can fetch group name later (step 3)
-            groupName = cdata.groupId; // temporary – improve below
+            groupName = cdata.groupId; // temporary
           }
-
           customerGroupMap.set(doc.id, groupName);
         });
       });
     }
 
-    // 3. (Optional but better) Fetch all customerGroups to map groupId → real name
-    // This avoids groupId showing up if groupName not stored in customer doc
+    // 3. Map groupId → group name
     const groupsSnap = await db.collection("customerGroups").get();
     const groupIdToName = new Map();
     groupsSnap.forEach(doc => {
       const gdata = doc.data();
-      const name = String(gdata.name || "Unknown").trim();
-      groupIdToName.set(doc.id, name);
+      groupIdToName.set(doc.id, String(gdata.name || "Unknown").trim());
     });
 
-    // Now update map with real group names if we have groupId
-    customerGroupMap.forEach((val, custId) => {
-      if (groupIdToName.has(val)) { // val was groupId
-        customerGroupMap.set(custId, groupIdToName.get(val));
+    customerGroupMap.forEach((val, key) => {
+      if (groupIdToName.has(val)) {
+        customerGroupMap.set(key, groupIdToName.get(val));
       }
     });
 
-    // 4. Aggregate by group
+    // 4. Aggregate by group + calculate profit
     const groupMap = {};
 
     for (const doc of salesSnap.docs) {
@@ -10832,13 +10822,12 @@ async function aggregateSalesByCustGroup() {
 
       let groupName = "Walk-in";
       const custId = String(sd.customer || sd.customerName || "").trim();
-
       if (custId && custId !== "Walk-in") {
         groupName = customerGroupMap.get(custId) || "Other/Unclassified";
       }
 
       if (!groupMap[groupName]) {
-        groupMap[groupName] = { revenue: 0, qty: 0, orders: 0 };
+        groupMap[groupName] = { revenue: 0, qty: 0, orders: 0, profit: 0 };
       }
 
       const items = sd.items || sd.products || sd.saleItems || sd.lineItems || [];
@@ -10846,23 +10835,29 @@ async function aggregateSalesByCustGroup() {
 
       let totalRevenue = 0;
       let totalQty = 0;
+      let totalProfit = 0;
 
       const toNum = v => (typeof v === "number" ? v : Number(v) || 0);
 
       for (const it of items) {
-        const qty = toNum(it.quantity || it.qty || 0);
+        const qty = toNum(it.qty || it.quantity || 0);
         if (qty <= 0) continue;
-        const price = toNum(it.price || it.unitPrice || it.sellingPrice || 0);
+
+        const price = toNum(it.price || it.sellingPrice || 0);
+        const cost  = toNum(it.costATSale || 0);   // ← your actual field name
+
         totalRevenue += qty * price;
-        totalQty += qty;
+        totalQty     += qty;
+        totalProfit  += qty * (price - cost);
       }
 
       groupMap[groupName].revenue += totalRevenue;
-      groupMap[groupName].qty += totalQty;
-      groupMap[groupName].orders += 1;
+      groupMap[groupName].qty     += totalQty;
+      groupMap[groupName].orders  += 1;
+      groupMap[groupName].profit  += totalProfit;
     }
 
-    // 5. Format result exactly like before
+    // 5. Format output (same structure + profit)
     const totalOverallRevenue = Object.values(groupMap).reduce((sum, g) => sum + g.revenue, 0);
 
     const result = Object.entries(groupMap)
@@ -10876,17 +10871,17 @@ async function aggregateSalesByCustGroup() {
           orders: data.orders,
           qty: data.qty,
           revenue: data.revenue,
+          profit: data.profit,   // ← now real value
           avgOrder: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
           revenueShare: Number(revShare)
         };
       })
-      // Optional: sort by revenue descending
       .sort((a, b) => b.revenue - a.revenue);
 
     salesState.rows = result;
     salesState.filtered = [...result];
 
-    console.log(`✅ Group analysis complete: ${result.length} groups loaded`);
+    console.log(`✅ Group analysis complete: ${result.length} groups (with real profit)`);
 
   } catch (err) {
     console.error("❌ aggregateSalesByCustGroup error:", err);
@@ -11317,7 +11312,6 @@ function renderSalesByCustGroup() {
     return;
   }
 
-  // Safe calculations with defaults
   const totalRevenue = salesState.filtered.reduce((sum, g) => sum + (Number(g.revenue) || 0), 0);
   const totalOrders  = salesState.filtered.reduce((sum, g) => sum + (Number(g.orders)  || 0), 0);
   const totalQty     = salesState.filtered.reduce((sum, g) => sum + (Number(g.qty)     || 0), 0);
@@ -11332,31 +11326,26 @@ function renderSalesByCustGroup() {
     </div>
   `;
 
-  // Group Cards – same design, safer escaping & formatting
   html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-bottom:32px">`;
 
   salesState.filtered.forEach(group => {
-    const rev = Number(group.revenue)   || 0;
-    const revShare = Number(group.revenueShare) || 0;
+    const rev       = Number(group.revenue)   || 0;
+    const profit    = Number(group.profit)    || 0;
+    const revShare  = Number(group.revenueShare) || 0;
     const shareColor = revShare > 50 ? '#10b981' : revShare > 30 ? '#f59e0b' : '#ef4444';
 
-    // Color logic per group name (kept exactly as you have)
+    const profitColor = profit >= 0 ? '#059669' : '#dc2626';   // green or red
+
     let cardColorStart, cardColorEnd, borderColor;
     switch (String(group.groupName || '').trim()) {
       case 'Wholesale':
-        cardColorStart = '#667eea';
-        cardColorEnd   = '#764ba2';
-        borderColor    = '#3b82f6';
+        cardColorStart = '#667eea'; cardColorEnd = '#764ba2'; borderColor = '#3b82f6';
         break;
       case 'Retail':
-        cardColorStart = '#4facfe';
-        cardColorEnd   = '#00f2fe';
-        borderColor    = '#10b981';
+        cardColorStart = '#4facfe'; cardColorEnd = '#00f2fe'; borderColor = '#10b981';
         break;
-      default: // Walk-in + others
-        cardColorStart = '#f093fb';
-        cardColorEnd   = '#f5576c';
-        borderColor    = '#f59e0b';
+      default:
+        cardColorStart = '#f093fb'; cardColorEnd = '#f5576c'; borderColor = '#f59e0b';
     }
 
     html += `
@@ -11382,6 +11371,8 @@ function renderSalesByCustGroup() {
             <div>
               <div style="color:#64748b;font-size:13px;font-weight:600;margin-bottom:8px">💰 Average Order</div>
               <div style="font-size:18px;font-weight:700;color:#10b981">${Number(group.avgOrder || 0).toLocaleString()}</div>
+              <div style="color:#64748b;font-size:13px;font-weight:600;margin-top:12px">Profit</div>
+              <div style="font-size:18px;font-weight:700;color:${profitColor}">${profit.toLocaleString()}</div>
             </div>
           </div>
           <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:12px;text-align:center">
@@ -11394,7 +11385,7 @@ function renderSalesByCustGroup() {
 
   html += `</div>`;
 
-  // Summary Table – same structure
+  // Summary Table with Profit column
   html += `
     <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08)">
       <div style="background:linear-gradient(135deg,#1e3a8a 0%,#3730a3 100%);color:white;padding:20px">
@@ -11412,6 +11403,7 @@ function renderSalesByCustGroup() {
                 <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Orders</th>
                 <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Items Sold</th>
                 <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Revenue</th>
+                <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Profit</th>
                 <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Avg Order</th>
                 <th style="padding:16px 12px;text-align:right;border-bottom:3px solid #e2e8f0">Revenue Share</th>
               </tr>
@@ -11419,9 +11411,11 @@ function renderSalesByCustGroup() {
             <tbody>`;
 
   salesState.filtered.forEach(group => {
-    const rev = Number(group.revenue) || 0;
-    const revShare = Number(group.revenueShare) || 0;
+    const rev       = Number(group.revenue) || 0;
+    const profit    = Number(group.profit)  || 0;
+    const revShare  = Number(group.revenueShare) || 0;
     const shareColor = revShare > 50 ? '#10b981' : revShare > 30 ? '#f59e0b' : '#ef4444';
+    const profitColor = profit >= 0 ? '#059669' : '#dc2626';
 
     let groupColor;
     switch (String(group.groupName || '').trim()) {
@@ -11438,6 +11432,7 @@ function renderSalesByCustGroup() {
                 <td style="padding:16px 12px;text-align:right;font-weight:600">${Number(group.orders || 0).toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right">${Number(group.qty || 0).toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right;font-weight:700;color:#1f2937">${rev.toLocaleString()}</td>
+                <td style="padding:16px 12px;text-align:right;font-weight:700;color:${profitColor}">${profit.toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right;color:#10b981;font-weight:600">${Number(group.avgOrder || 0).toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right">
                   <span style="color:${shareColor};font-weight:700;font-size:15px">${revShare.toFixed(1)}%</span>
@@ -11453,7 +11448,8 @@ function renderSalesByCustGroup() {
                 <td style="padding:16px 12px;text-align:right;font-size:15px">${totalOrders.toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px">${totalQty.toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px;color:#1f2937">${totalRevenue.toLocaleString()}</td>
-                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">-</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#059669">–</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">–</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">100%</td>
               </tr>
             </tfoot>
