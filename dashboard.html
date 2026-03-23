@@ -10737,7 +10737,7 @@ async function aggregateSalesByCustomer() {
   }
 }
 
-// ✅ FIXED CUSTOMER GROUP AGGREGATION – correct cost field name + better fallback + debug
+// ✅ IMPROVED + GRAND TOTAL PROFIT STORED for render
 async function aggregateSalesByCustGroup() {
   const db = firebase.firestore();
   const { from, to, location: loc } = salesState;
@@ -10844,11 +10844,7 @@ async function aggregateSalesByCustGroup() {
         if (qty <= 0) continue;
 
         const price = toNum(it.price || it.sellingPrice || it.unitPrice || 0);
-
-        // ────────────────────────────────────────────────
-        // FIXED: using correct field name from your screenshot
-        const cost = toNum(it.costAtSale || it.costATSale || it.cost || 0);
-        // ────────────────────────────────────────────────
+        const cost  = toNum(it.costAtSale || it.costATSale || it.cost || 0);
 
         totalRevenue += qty * price;
         totalQty += qty;
@@ -10861,8 +10857,9 @@ async function aggregateSalesByCustGroup() {
       groupMap[groupName].profit += totalProfit;
     }
 
-    // 5. Format result
+    // 5. Format result + store grand total profit
     const totalOverallRevenue = Object.values(groupMap).reduce((sum, g) => sum + g.revenue, 0);
+    const totalOverallProfit  = Object.values(groupMap).reduce((sum, g) => sum + g.profit,  0);
 
     const result = Object.entries(groupMap)
       .map(([groupName, data]) => {
@@ -10875,7 +10872,7 @@ async function aggregateSalesByCustGroup() {
           orders: data.orders,
           qty: data.qty,
           revenue: data.revenue,
-          profit: Math.round(data.profit),  // round to avoid decimals
+          profit: Math.round(data.profit),
           avgOrder: data.orders > 0 ? Math.round(data.revenue / data.orders) : 0,
           revenueShare: Number(revShare)
         };
@@ -10884,14 +10881,16 @@ async function aggregateSalesByCustGroup() {
 
     salesState.rows = result;
     salesState.filtered = [...result];
+    salesState.totalProfit = Math.round(totalOverallProfit);  // ← stored for render function
 
     console.log(`✅ Group analysis complete: ${result.length} groups`);
-    console.log("Sample group data:", result[0] || "no data");
+    console.log("Grand total profit:", salesState.totalProfit);
 
   } catch (err) {
     console.error("❌ aggregateSalesByCustGroup error:", err);
     salesState.rows = [];
     salesState.filtered = [];
+    salesState.totalProfit = 0;
   }
 }
 
@@ -11453,7 +11452,9 @@ function renderSalesByCustGroup() {
                 <td style="padding:16px 12px;text-align:right;font-size:15px">${totalOrders.toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px">${totalQty.toLocaleString()}</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px;color:#1f2937">${totalRevenue.toLocaleString()}</td>
-                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#059669">–</td>
+                <td style="padding:16px 12px;text-align:right;font-size:15px;color:#059669;font-weight:700">
+  ${(salesState.totalProfit || 0).toLocaleString()}
+</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">–</td>
                 <td style="padding:16px 12px;text-align:right;font-size:15px;color:#10b981">100%</td>
               </tr>
