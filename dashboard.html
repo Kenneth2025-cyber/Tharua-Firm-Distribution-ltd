@@ -7533,45 +7533,39 @@ async function showListSales() {
     </div>
   `;
 
-  // === AUTO SET CURRENT MONTH DATES (Fixed) ===
+  // Set dates FIRST
   setCurrentMonthFilters();
 
   // Populate filters in background
   populateSalesFilters().catch(err => console.error("Filter load error:", err));
 
-  // Load data immediately
+  // Load data
   loadSalesData();
 }
 
 /* -------------------------------
-   🔹 Set Default Filter to Current Month (Fixed Version)
+   🔹 FIXED: Set Current Month Dates (Timezone Safe)
 -------------------------------- */
 function setCurrentMonthFilters() {
   const now = new Date();
   
-  // Force local date calculation to avoid timezone issues
   const year = now.getFullYear();
-  const month = now.getMonth(); // 0-based
+  const month = now.getMonth(); // 0 = January
 
-  // First day of current month
-  const firstDay = new Date(year, month, 1);
+  // First day of current month at midnight local time
+  const firstDayStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
   
   // Last day of current month
-  const lastDay = new Date(year, month + 1, 0);
+  const lastDayDate = new Date(year, month + 1, 0);
+  const lastDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
 
   const startInput = document.getElementById("startDateFilter");
   const endInput = document.getElementById("endDateFilter");
 
-  if (startInput) {
-    // Use YYYY-MM-DD format safely
-    const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-    startInput.value = startStr;
-  }
+  if (startInput) startInput.value = firstDayStr;
+  if (endInput) endInput.value = lastDayStr;
 
-  if (endInput) {
-    const endStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
-    endInput.value = endStr;
-  }
+  console.log("✅ Date filters set to:", firstDayStr, "→", lastDayStr); // For debugging
 }
 /* -------------------------------
    🔹 Load unique filter values
