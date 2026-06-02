@@ -7451,159 +7451,114 @@ async function saveSale() {
 
 async function showListSales() {
   saveLastPage("showListSales");
- 
   document.getElementById("content").innerHTML = `
     <h2 style="margin-bottom:20px;">List of Sales</h2>
+
     <!-- Filter Section -->
-    <div class="filter-section" style="display:flex; flex-wrap:wrap; gap:10px; background:#f8f9fa; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+    <div class="filter-section"
+         style="display:flex; flex-wrap:wrap; gap:10px; background:#f8f9fa; padding:15px; border-radius:10px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
       <div class="filter-group">
         <label>Location:</label>
         <select id="locationFilter" class="form-select">
           <option value="">All Locations</option>
         </select>
       </div>
+
       <div class="filter-group">
         <label>Salesperson:</label>
         <input list="salespersonList" id="salespersonFilter" class="form-control" placeholder="All Salespersons">
         <datalist id="salespersonList"></datalist>
       </div>
+
       <div class="filter-group">
         <label>Customer:</label>
         <input list="customerList" id="customerFilter" class="form-control" placeholder="All Customers">
         <datalist id="customerList"></datalist>
       </div>
+
       <div class="filter-group">
         <label>Date From:</label>
         <input type="date" id="startDateFilter" class="form-control">
       </div>
+
       <div class="filter-group">
         <label>Date To:</label>
         <input type="date" id="endDateFilter" class="form-control">
       </div>
+
       <div class="filter-group" style="flex:1;">
         <label>Search:</label>
         <input type="text" id="searchNotes" placeholder="Notes / Reference..." class="form-control">
       </div>
+
       <div class="filter-buttons" style="display:flex; align-items:end; gap:10px;">
         <button class="btn" style="background:#007bff; color:white;" onclick="applySalesFilters()">Apply</button>
         <button class="btn" style="background:#198754; color:white;" onclick="exportSalesToExcel()">Export to Excel</button>
         <button class="btn" style="background:#dc3545; color:white;" onclick="exportSalesToPDF()">Export to PDF</button>
       </div>
     </div>
-    <!-- Summary Cards -->
-    <div class="summary-cards" style="display:flex; gap:15px; flex-wrap:wrap; justify-content:space-between; margin-top:20px;">
-      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #007bff;">
+
+    <!-- Summary Cards (Reordered + Updated Labels) -->
+    <div class="summary-cards"
+         style="display:flex; gap:15px; flex-wrap:wrap; justify-content:space-between; margin-top:20px;">
+      
+      <!-- 1. Total Sales -->
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #007bff;">
         <h4 style="color:#007bff; font-size:16px;">Total Sales</h4>
         <p id="totalSales" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
-      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #dc3545;">
+
+      <!-- 2. Total Field Expense -->
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #dc3545;">
         <h4 style="color:#dc3545; font-size:16px;">Total Field Expense</h4>
         <p id="totalExpense" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
-      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #198754;">
+
+      <!-- 3. Total Paid -->
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #198754;">
         <h4 style="color:#198754; font-size:16px;">Total Paid</h4>
         <p id="totalPaid" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
-      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #ffc107;">
+
+      <!-- 4. Total Due -->
+      <div class="summary-card" style="flex:1; min-width:180px; background:white; padding:15px; border-radius:8px;
+           box-shadow:0 2px 4px rgba(0,0,0,0.1); text-align:center; border-top:3px solid #ffc107;">
         <h4 style="color:#ffc107; font-size:16px;">Total Due</h4>
         <p id="totalDue" style="font-size:16px; font-weight:bold;">KES 0</p>
       </div>
     </div>
+
     <!-- Sales Table -->
     <div class="table-container" style="margin-top:20px;">
       <table class="table table-bordered table-striped" style="width:100%; border-collapse:collapse; border:1px solid #dee2e6;">
-        <thead style="background:#007bff; color:white;">
-          <tr>
-            <th>Date</th>
-            <th>Location</th>
-            <th>Salesperson</th>
-            <th>Customer</th>
-            <th>Total Sales (KES)</th>
-            <th>Field Expenses (KES)</th>
-            <th>Paid (KES)</th>
-            <th>Due (KES)</th>
-            <th>Note</th>
-            <th style="text-align:center;">Actions</th>
-          </tr>
-        </thead>
+ <thead style="background:#007bff; color:white;">
+  <tr>
+    <th>Date</th>
+    <th>Location</th>
+    <th>Salesperson</th>
+    <th>Customer</th>
+    <th>Total Sales (KES)</th>
+    <th>Field Expenses (KES)</th> <!-- ✅ Added here -->
+    <th>Paid (KES)</th>
+    <th>Due (KES)</th>
+    <th>Note</th>
+    <th style="text-align:center;">Actions</th>
+  </tr>
+</thead>
+
+
         <tbody id="salesTableBody">
-          <tr><td colspan="10" style="text-align:center;">Loading current month sales...</td></tr>
+          <tr><td colspan="9" style="text-align:center;">Loading sales...</td></tr>
         </tbody>
       </table>
     </div>
   `;
 
-  // === OPTIMIZED LOADING SEQUENCE ===
-  setCurrentMonthFilters();                    // Set dates immediately
-
-  // Populate filters in background (non-blocking)
-  populateSalesFilters().catch(err => console.error("Filter load error:", err));
-
-  // Load data immediately (this is the main bottleneck - make sure you use the optimized version)
+  await populateSalesFilters();
   loadSalesData();
-}
-
-/* -------------------------------
-   🔹 Set Default Filter to Current Month (1st to Last Day)
--------------------------------- */
-function setCurrentMonthFilters() {
-  const now = new Date();
- 
-  // First day of current month
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
- 
-  // Last day of current month
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  const startInput = document.getElementById("startDateFilter");
-  const endInput = document.getElementById("endDateFilter");
-
-  if (startInput) {
-    startInput.value = firstDay.toISOString().split('T')[0];
-  }
-  if (endInput) {
-    endInput.value = lastDay.toISOString().split('T')[0];
-  }
-}
-/* -------------------------------
-   🔹 Set Default Filter to Current Month (1st to Last Day)
--------------------------------- */
-function setCurrentMonthFilters() {
-  const now = new Date();
-  
-  // First day of current month
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  
-  // Last day of current month
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const startInput = document.getElementById("startDateFilter");
-  const endInput = document.getElementById("endDateFilter");
-
-  if (startInput) {
-    startInput.value = firstDay.toISOString().split('T')[0];
-  }
-  if (endInput) {
-    endInput.value = lastDay.toISOString().split('T')[0];
-  }
-}
-/* -------------------------------
-   🔹 Set Default Filter to Current Month
--------------------------------- */
-function setCurrentMonthFilters() {
-  const now = new Date();
-  
-  // First day of current month
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  
-  // Last day of current month
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const startDateInput = document.getElementById("startDateFilter");
-  const endDateInput = document.getElementById("endDateFilter");
-
-  if (startDateInput) startDateInput.value = firstDay.toISOString().split('T')[0];
-  if (endDateInput) endDateInput.value = lastDay.toISOString().split('T')[0];
 }
 
 /* -------------------------------
@@ -7653,13 +7608,12 @@ async function populateSalesFilters() {
 }
 
 /* -------------------------------
-   🔹 Load Sales Data (Highly Optimized for Speed)
-   🔹 Defaults to Current Month + Fast HTML Building
+   🔹 Load Sales Data (Optimized + Parallel Payments Fetch)
    🔹 Formula: Due = Total Sales − Field Expenses − Paid
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
-  tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Loading current month sales...</td></tr>`;
+  tbody.innerHTML = "";
 
   let totalSales = 0,
     totalPaid = 0,
@@ -7674,13 +7628,8 @@ async function loadSalesData(filters = {}) {
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
 
-    // ✅ Date range filters + Default to Current Month
+    // ✅ Date range filters
     let hasDateFilter = false;
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    lastDay.setHours(23, 59, 59, 999);
-
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
@@ -7696,16 +7645,11 @@ async function loadSalesData(filters = {}) {
       end.setHours(23, 59, 59, 999);
       query = query.where("saleDate", "<=", end);
       hasDateFilter = true;
-    } else {
-      // DEFAULT: Current Month for fast loading
-      query = query.where("saleDate", ">=", firstDay)
-                   .where("saleDate", "<=", lastDay);
-      hasDateFilter = true;
     }
 
-    // ✅ Only order if no other filters (to prevent Firestore index errors)
+    // ✅ Only order if no filters (to prevent Firestore index errors)
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
-    if (!hasOtherFilters && hasDateFilter) {
+    if (!hasOtherFilters && !hasDateFilter) {
       query = query.orderBy("saleDate", "desc");
     }
 
@@ -7767,17 +7711,14 @@ async function loadSalesData(filters = {}) {
       })
     );
 
-    // ✅ Build all rows as single string (MUCH FASTER than repeated innerHTML +=)
-    let rowsHTML = "";
-
+    // ✅ Render rows
     for (const sale of salesDocs) {
       const note = sale.note || "-";
       if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
 
       const saleDate = sale.saleDate
-        ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString('en-KE') : sale.saleDate)
+        ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString() : sale.saleDate)
         : "N/A";
-
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
       const customer = customerCache[sale.customer] || sale.customer || "-";
@@ -7795,6 +7736,7 @@ async function loadSalesData(filters = {}) {
 
       const expense = Number(sale.expensesTotal) || 0;
       const paid = paymentsMap[sale.id] || 0;
+
       const due = total - expense - paid;
 
       totalSales += total;
@@ -7802,7 +7744,7 @@ async function loadSalesData(filters = {}) {
       totalDue += due;
       totalExpense += expense;
 
-      rowsHTML += `
+      tbody.innerHTML += `
         <tr>
           <td>${saleDate}</td>
           <td>${location}</td>
@@ -7810,9 +7752,14 @@ async function loadSalesData(filters = {}) {
           <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
           <td>
-            KES ${expense.toLocaleString()}
-            <span title="Manage Field Expenses" style="cursor:pointer; color:#dc3545; margin-left:6px;" onclick="viewExpenses('${sale.id}')">💸</span>
-          </td>
+  KES ${expense.toLocaleString()}
+  <span 
+    title="Manage Field Expenses" 
+    style="cursor:pointer; color:#dc3545; margin-left:6px;" 
+    onclick="viewExpenses('${sale.id}')"
+  >💸</span>
+</td>
+
           <td>
             KES ${paid.toLocaleString()}
             <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${sale.id}')">💰</span>
@@ -7827,8 +7774,6 @@ async function loadSalesData(filters = {}) {
       `;
     }
 
-    tbody.innerHTML = rowsHTML;
-
     // ✅ Sticky totals
     const table = tbody.closest("table");
     let tfoot = table.querySelector("tfoot");
@@ -7836,6 +7781,7 @@ async function loadSalesData(filters = {}) {
       tfoot = document.createElement("tfoot");
       table.appendChild(tfoot);
     }
+
     tfoot.innerHTML = `
       <tr style="
         position: sticky;
@@ -7866,6 +7812,7 @@ async function loadSalesData(filters = {}) {
     `;
   }
 }
+
 
 /* -------------------------------
    🔹 Apply Filters from UI
