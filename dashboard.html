@@ -7651,7 +7651,6 @@ async function populateSalesFilters() {
     console.error("Error loading filter options:", error);
   }
 }
-
 /* -------------------------------
    🔹 Load Sales Data (Highly Optimized for Speed)
    🔹 Defaults to Current Month + Fast HTML Building
@@ -7670,20 +7669,17 @@ async function loadSalesData(filters = {}) {
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
-
-    // ✅ IMPROVED Date Handling for UTC-3 vs EAT (UTC+3) mismatch
-    let hasDateFilter = false;
     
+    // ✅ Date range filters + Default to Current Month (Original Style)
+    let hasDateFilter = false;
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
       query = query.where("saleDate", ">=", start).where("saleDate", "<=", end);
       hasDateFilter = true;
     } else if (filters.startDate) {
       const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
       query = query.where("saleDate", ">=", start);
       hasDateFilter = true;
     } else if (filters.endDate) {
@@ -7692,30 +7688,27 @@ async function loadSalesData(filters = {}) {
       query = query.where("saleDate", "<=", end);
       hasDateFilter = true;
     } else {
-      // DEFAULT: Current Month - Adjusted for timezone issues
+      // DEFAULT: Current Month (kept simple like original)
       const now = new Date();
-      
-      // Create start and end of current month in local time
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      firstDay.setHours(0, 0, 0, 0);
-      
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       lastDay.setHours(23, 59, 59, 999);
-
+      
       query = query.where("saleDate", ">=", firstDay)
                    .where("saleDate", "<=", lastDay);
       hasDateFilter = true;
     }
 
-    // ✅ Only order if no other filters
+    // ✅ Only order if no other filters (to prevent Firestore index errors)
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
     if (!hasOtherFilters && hasDateFilter) {
       query = query.orderBy("saleDate", "desc");
     }
 
+    // 🔥 SAFETY: Prevent loading too many documents
     query = query.limit(500);
-    const snapshot = await query.get();
 
+    const snapshot = await query.get();
     if (snapshot.empty) {
       tbody.innerHTML = `
         <tr><td colspan="10" style="text-align:center;">No sales records found.</td></tr>
@@ -7723,10 +7716,9 @@ async function loadSalesData(filters = {}) {
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
-
     const searchTerm = (filters.search || "").toLowerCase();
-
-    // Customer cache (unchanged)
+    
+    // ✅ Preload customer names - OPTIMIZED (Batched 'IN' queries)
     const customerIds = new Set();
     snapshot.forEach(doc => {
       const sale = doc.data();
@@ -7760,7 +7752,7 @@ async function loadSalesData(filters = {}) {
       return bDate - aDate;
     });
 
-    // Payments (unchanged)
+    // ✅ Fetch all payments in parallel
     const paymentsMap = {};
     await Promise.all(
       salesDocs.map(async sale => {
@@ -7779,22 +7771,15 @@ async function loadSalesData(filters = {}) {
       })
     );
 
-    // ✅ Build rows with ROBUST DATE DISPLAY
+    // ✅ Build all rows (Date display kept simple like original)
     let rowsHTML = "";
     for (const sale of salesDocs) {
       const note = sale.note || "-";
       if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
-
-      // 🔥 Better Date Display - Convert to local EAT time
-      let saleDateStr = "N/A";
-      if (sale.saleDate) {
-        const dateObj = sale.saleDate.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
-        saleDateStr = dateObj.toLocaleDateString('en-KE', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-      }
+      
+      const saleDate = sale.saleDate
+        ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString('en-KE') : sale.saleDate)
+        : "N/A";
 
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
@@ -7809,6 +7794,7 @@ async function loadSalesData(filters = {}) {
         }, 0);
       }
       total = total || Number(sale.totalSales) || Number(sale.totalAmount) || Number(sale.total) || 0;
+      
       const expense = Number(sale.expensesTotal) || 0;
       const paid = paymentsMap[sale.id] || 0;
       const due = total - expense - paid;
@@ -7820,7 +7806,7 @@ async function loadSalesData(filters = {}) {
 
       rowsHTML += `
         <tr>
-          <td>${saleDateStr}</td>
+          <td>${saleDate}</td>
           <td>${location}</td>
           <td>${salesperson}</td>
           <td>${customer}</td>
@@ -7845,6 +7831,7 @@ async function loadSalesData(filters = {}) {
 
     tbody.innerHTML = rowsHTML;
 
+    // Sticky totals and summary (unchanged)
     const table = tbody.closest("table");
     let tfoot = table.querySelector("tfoot");
     if (!tfoot) {
