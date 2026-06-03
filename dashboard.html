@@ -7670,12 +7670,10 @@ async function loadSalesData(filters = {}) {
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
-    // ✅ Date range filters + Default to Current Month
+
+    // ✅ FIXED: Better Current Month handling for EAT timezone
     let hasDateFilter = false;
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    lastDay.setHours(23, 59, 59, 999);
+    
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
@@ -7692,11 +7690,21 @@ async function loadSalesData(filters = {}) {
       query = query.where("saleDate", "<=", end);
       hasDateFilter = true;
     } else {
-      // DEFAULT: Current Month for fast loading
+      // DEFAULT: Current Month - FIXED for timezone
+      const now = new Date();
+      
+      // Force local timezone (EAT) start and end of month
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      firstDay.setHours(0, 0, 0, 0);
+      
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
+
       query = query.where("saleDate", ">=", firstDay)
                    .where("saleDate", "<=", lastDay);
       hasDateFilter = true;
     }
+
     // ✅ Only order if no other filters (to prevent Firestore index errors)
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
     if (!hasOtherFilters && hasDateFilter) {
@@ -7705,8 +7713,8 @@ async function loadSalesData(filters = {}) {
 
     // 🔥 SAFETY: Prevent loading too many documents
     query = query.limit(500);
-
     const snapshot = await query.get();
+
     if (snapshot.empty) {
       tbody.innerHTML = `
         <tr><td colspan="10" style="text-align:center;">No sales records found.</td></tr>
@@ -7722,7 +7730,7 @@ async function loadSalesData(filters = {}) {
       if (sale.customer) customerIds.add(sale.customer);
     });
     const customerCache = {};
-    
+   
     if (customerIds.size > 0) {
       const customerArray = Array.from(customerIds);
       const chunkSize = 30; // Firestore 'in' limit
@@ -7732,7 +7740,7 @@ async function loadSalesData(filters = {}) {
           const custSnap = await firebase.firestore().collection("customers")
             .where(firebase.firestore.FieldPath.documentId(), "in", chunk)
             .get();
-          
+         
           custSnap.forEach(doc => {
             customerCache[doc.id] = doc.data().name || doc.id;
           });
@@ -7742,7 +7750,6 @@ async function loadSalesData(filters = {}) {
         }
       }
     }
-
     // ✅ Convert to array & sort
     let salesDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     salesDocs.sort((a, b) => {
