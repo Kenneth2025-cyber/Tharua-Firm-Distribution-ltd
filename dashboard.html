@@ -7671,17 +7671,19 @@ async function loadSalesData(filters = {}) {
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
 
-    // ✅ FIXED: Better Current Month handling for EAT timezone
+    // ✅ IMPROVED Date Handling for UTC-3 vs EAT (UTC+3) mismatch
     let hasDateFilter = false;
     
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
+      start.setHours(0, 0, 0, 0);
       const end = new Date(filters.endDate);
       end.setHours(23, 59, 59, 999);
       query = query.where("saleDate", ">=", start).where("saleDate", "<=", end);
       hasDateFilter = true;
     } else if (filters.startDate) {
       const start = new Date(filters.startDate);
+      start.setHours(0, 0, 0, 0);
       query = query.where("saleDate", ">=", start);
       hasDateFilter = true;
     } else if (filters.endDate) {
@@ -7690,10 +7692,10 @@ async function loadSalesData(filters = {}) {
       query = query.where("saleDate", "<=", end);
       hasDateFilter = true;
     } else {
-      // DEFAULT: Current Month - FIXED for timezone
+      // DEFAULT: Current Month - Adjusted for timezone issues
       const now = new Date();
       
-      // Force local timezone (EAT) start and end of month
+      // Create start and end of current month in local time
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       firstDay.setHours(0, 0, 0, 0);
       
@@ -7705,13 +7707,12 @@ async function loadSalesData(filters = {}) {
       hasDateFilter = true;
     }
 
-    // ✅ Only order if no other filters (to prevent Firestore index errors)
+    // ✅ Only order if no other filters
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
     if (!hasOtherFilters && hasDateFilter) {
       query = query.orderBy("saleDate", "desc");
     }
 
-    // 🔥 SAFETY: Prevent loading too many documents
     query = query.limit(500);
     const snapshot = await query.get();
 
@@ -7722,8 +7723,10 @@ async function loadSalesData(filters = {}) {
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
+
     const searchTerm = (filters.search || "").toLowerCase();
-    // ✅ Preload customer names - OPTIMIZED (Batched 'IN' queries)
+
+    // Customer cache (unchanged)
     const customerIds = new Set();
     snapshot.forEach(doc => {
       const sale = doc.data();
@@ -7733,23 +7736,22 @@ async function loadSalesData(filters = {}) {
    
     if (customerIds.size > 0) {
       const customerArray = Array.from(customerIds);
-      const chunkSize = 30; // Firestore 'in' limit
+      const chunkSize = 30;
       for (let i = 0; i < customerArray.length; i += chunkSize) {
         const chunk = customerArray.slice(i, i + chunkSize);
         try {
           const custSnap = await firebase.firestore().collection("customers")
             .where(firebase.firestore.FieldPath.documentId(), "in", chunk)
             .get();
-         
           custSnap.forEach(doc => {
             customerCache[doc.id] = doc.data().name || doc.id;
           });
         } catch (e) {
-          // Fallback for any failed chunk
           chunk.forEach(id => customerCache[id] = id);
         }
       }
     }
+
     // ✅ Convert to array & sort
     let salesDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     salesDocs.sort((a, b) => {
@@ -7757,7 +7759,8 @@ async function loadSalesData(filters = {}) {
       const bDate = b.saleDate?.toDate ? b.saleDate.toDate() : new Date(b.saleDate || 0);
       return bDate - aDate;
     });
-    // ✅ Fetch all payments in parallel (still N+1 but left as-is per your request)
+
+    // Payments (unchanged)
     const paymentsMap = {};
     await Promise.all(
       salesDocs.map(async sale => {
@@ -7775,18 +7778,28 @@ async function loadSalesData(filters = {}) {
         }
       })
     );
-    // ✅ Build all rows as single string (MUCH FASTER than repeated innerHTML +=)
+
+    // ✅ Build rows with ROBUST DATE DISPLAY
     let rowsHTML = "";
     for (const sale of salesDocs) {
       const note = sale.note || "-";
       if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
-      const saleDate = sale.saleDate
-        ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString('en-KE') : sale.saleDate)
-        : "N/A";
+
+      // 🔥 Better Date Display - Convert to local EAT time
+      let saleDateStr = "N/A";
+      if (sale.saleDate) {
+        const dateObj = sale.saleDate.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
+        saleDateStr = dateObj.toLocaleDateString('en-KE', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        });
+      }
+
       const location = sale.location || "N/A";
       const salesperson = sale.salesperson || "-";
       const customer = customerCache[sale.customer] || sale.customer || "-";
-      // ✅ Compute totals
+
       let total = 0;
       if (Array.isArray(sale.saleItems)) {
         total = sale.saleItems.reduce((sum, item) => {
@@ -7799,13 +7812,15 @@ async function loadSalesData(filters = {}) {
       const expense = Number(sale.expensesTotal) || 0;
       const paid = paymentsMap[sale.id] || 0;
       const due = total - expense - paid;
+
       totalSales += total;
       totalPaid += paid;
       totalDue += due;
       totalExpense += expense;
+
       rowsHTML += `
         <tr>
-          <td>${saleDate}</td>
+          <td>${saleDateStr}</td>
           <td>${location}</td>
           <td>${salesperson}</td>
           <td>${customer}</td>
@@ -7827,8 +7842,9 @@ async function loadSalesData(filters = {}) {
         </tr>
       `;
     }
+
     tbody.innerHTML = rowsHTML;
-    // ✅ Sticky totals
+
     const table = tbody.closest("table");
     let tfoot = table.querySelector("tfoot");
     if (!tfoot) {
@@ -7836,14 +7852,7 @@ async function loadSalesData(filters = {}) {
       table.appendChild(tfoot);
     }
     tfoot.innerHTML = `
-      <tr style="
-        position: sticky;
-        bottom: 0;
-        background: #f8f9fa;
-        font-weight: bold;
-        border-top: 3px solid #000;
-        box-shadow: 0 -2px 5px rgba(0,0,0,0.15);
-      ">
+      <tr style="position: sticky; bottom: 0; background: #f8f9fa; font-weight: bold; border-top: 3px solid #000; box-shadow: 0 -2px 5px rgba(0,0,0,0.15);">
         <td colspan="4" style="text-align:right;">Totals:</td>
         <td style="color:#007bff;">KES ${totalSales.toLocaleString()}</td>
         <td style="color:#dc3545;">KES ${totalExpense.toLocaleString()}</td>
@@ -7852,8 +7861,9 @@ async function loadSalesData(filters = {}) {
         <td colspan="2"></td>
       </tr>
     `;
-    // ✅ Update summary
+
     updateSalesSummary(totalSales, totalPaid, totalDue, totalExpense);
+
   } catch (error) {
     console.error("Error loading sales:", error);
     tbody.innerHTML = `
