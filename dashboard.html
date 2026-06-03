@@ -7654,23 +7654,21 @@ async function populateSalesFilters() {
 /* -------------------------------
    🔹 Load Sales Data (Highly Optimized for Speed)
    🔹 Defaults to Current Month + Fast HTML Building
-   🔹 Formula: Due = Total Sales − Field Expenses − Paid
 -------------------------------- */
 async function loadSalesData(filters = {}) {
   const tbody = document.getElementById("salesTableBody");
   tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Loading current month sales...</td></tr>`;
-  let totalSales = 0,
-    totalPaid = 0,
-    totalDue = 0,
-    totalExpense = 0;
+  
+  let totalSales = 0, totalPaid = 0, totalDue = 0, totalExpense = 0;
+
   try {
     let query = firebase.firestore().collection("sales");
-    // ✅ Apply filters safely
+
     if (filters.location) query = query.where("location", "==", filters.location);
     if (filters.salesperson) query = query.where("salesperson", "==", filters.salesperson);
     if (filters.customer) query = query.where("customer", "==", filters.customer);
-    
-    // ✅ Date range filters + Default to Current Month (Original Style)
+
+    // Date handling - Simple & Close to Original
     let hasDateFilter = false;
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
@@ -7688,44 +7686,40 @@ async function loadSalesData(filters = {}) {
       query = query.where("saleDate", "<=", end);
       hasDateFilter = true;
     } else {
-      // DEFAULT: Current Month (kept simple like original)
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       lastDay.setHours(23, 59, 59, 999);
-      
+
       query = query.where("saleDate", ">=", firstDay)
                    .where("saleDate", "<=", lastDay);
       hasDateFilter = true;
     }
 
-    // ✅ Only order if no other filters (to prevent Firestore index errors)
     const hasOtherFilters = filters.location || filters.salesperson || filters.customer;
     if (!hasOtherFilters && hasDateFilter) {
       query = query.orderBy("saleDate", "desc");
     }
 
-    // 🔥 SAFETY: Prevent loading too many documents
-    query = query.limit(500);
+    query = query.limit(400);   // ← Reduced limit to control reads
 
     const snapshot = await query.get();
+
     if (snapshot.empty) {
-      tbody.innerHTML = `
-        <tr><td colspan="10" style="text-align:center;">No sales records found.</td></tr>
-      `;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">No sales records found.</td></tr>`;
       updateSalesSummary(0, 0, 0, 0);
       return;
     }
+
     const searchTerm = (filters.search || "").toLowerCase();
-    
-    // ✅ Preload customer names - OPTIMIZED (Batched 'IN' queries)
+
+    // Optimized Customer Cache
     const customerIds = new Set();
     snapshot.forEach(doc => {
-      const sale = doc.data();
-      if (sale.customer) customerIds.add(sale.customer);
+      if (doc.data().customer) customerIds.add(doc.data().customer);
     });
+
     const customerCache = {};
-   
     if (customerIds.size > 0) {
       const customerArray = Array.from(customerIds);
       const chunkSize = 30;
@@ -7744,7 +7738,7 @@ async function loadSalesData(filters = {}) {
       }
     }
 
-    // ✅ Convert to array & sort
+    // Convert to array
     let salesDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     salesDocs.sort((a, b) => {
       const aDate = a.saleDate?.toDate ? a.saleDate.toDate() : new Date(a.saleDate || 0);
@@ -7752,31 +7746,33 @@ async function loadSalesData(filters = {}) {
       return bDate - aDate;
     });
 
-    // ✅ Fetch all payments in parallel
+    // 🔥 CRITICAL OPTIMIZATION: Payments
     const paymentsMap = {};
-    await Promise.all(
-      salesDocs.map(async sale => {
-        try {
-          const paymentsSnap = await firebase.firestore()
-            .collection("sales")
-            .doc(sale.id)
-            .collection("payments")
-            .get();
-          let totalPaidForSale = 0;
-          paymentsSnap.forEach(p => totalPaidForSale += Number(p.data().amount) || 0);
-          paymentsMap[sale.id] = totalPaidForSale;
-        } catch {
-          paymentsMap[sale.id] = 0;
-        }
-      })
-    );
+    // Batch payments fetching in smaller groups to reduce memory pressure
+    const batchSize = 30;
+    for (let i = 0; i < salesDocs.length; i += batchSize) {
+      const batch = salesDocs.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async (sale) => {
+          try {
+            const paymentsSnap = await firebase.firestore()
+              .collection("sales").doc(sale.id).collection("payments").get();
+            let totalPaidForSale = 0;
+            paymentsSnap.forEach(p => totalPaidForSale += Number(p.data().amount) || 0);
+            paymentsMap[sale.id] = totalPaidForSale;
+          } catch {
+            paymentsMap[sale.id] = 0;
+          }
+        })
+      );
+    }
 
-    // ✅ Build all rows (Date display kept simple like original)
+    // Build HTML
     let rowsHTML = "";
     for (const sale of salesDocs) {
       const note = sale.note || "-";
       if (searchTerm && !note.toLowerCase().includes(searchTerm)) continue;
-      
+
       const saleDate = sale.saleDate
         ? (sale.saleDate.toDate ? sale.saleDate.toDate().toLocaleDateString('en-KE') : sale.saleDate)
         : "N/A";
@@ -7787,14 +7783,10 @@ async function loadSalesData(filters = {}) {
 
       let total = 0;
       if (Array.isArray(sale.saleItems)) {
-        total = sale.saleItems.reduce((sum, item) => {
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          return sum + qty * price;
-        }, 0);
+        total = sale.saleItems.reduce((sum, item) => sum + (Number(item.quantity)||0) * (Number(item.price)||0), 0);
       }
       total = total || Number(sale.totalSales) || Number(sale.totalAmount) || Number(sale.total) || 0;
-      
+
       const expense = Number(sale.expensesTotal) || 0;
       const paid = paymentsMap[sale.id] || 0;
       const due = total - expense - paid;
@@ -7811,19 +7803,13 @@ async function loadSalesData(filters = {}) {
           <td>${salesperson}</td>
           <td>${customer}</td>
           <td>KES ${total.toLocaleString()}</td>
-          <td>
-            KES ${expense.toLocaleString()}
-            <span title="Manage Field Expenses" style="cursor:pointer; color:#dc3545; margin-left:6px;" onclick="viewExpenses('${sale.id}')">💸</span>
-          </td>
-          <td>
-            KES ${paid.toLocaleString()}
-            <span title="View Payments" style="cursor:pointer; color:#007bff; margin-left:6px;" onclick="viewPayments('${sale.id}')">💰</span>
-          </td>
+          <td>KES ${expense.toLocaleString()} <span title="Manage Field Expenses" style="cursor:pointer;color:#dc3545;margin-left:6px" onclick="viewExpenses('${sale.id}')">💸</span></td>
+          <td>KES ${paid.toLocaleString()} <span title="View Payments" style="cursor:pointer;color:#007bff;margin-left:6px" onclick="viewPayments('${sale.id}')">💰</span></td>
           <td style="font-weight:bold;">KES ${due.toLocaleString()}</td>
           <td>${note}</td>
           <td style="text-align:center;">
-            <span title="View" style="cursor:pointer; color:green;" onclick="viewSale('${sale.id}')">👁</span>
-            <span title="Delete" style="cursor:pointer; color:red; margin-left:8px;" onclick="deleteSale('${sale.id}')">🗑</span>
+            <span title="View" style="cursor:pointer;color:green" onclick="viewSale('${sale.id}')">👁</span>
+            <span title="Delete" style="cursor:pointer;color:red;margin-left:8px" onclick="deleteSale('${sale.id}')">🗑</span>
           </td>
         </tr>
       `;
@@ -7831,7 +7817,7 @@ async function loadSalesData(filters = {}) {
 
     tbody.innerHTML = rowsHTML;
 
-    // Sticky totals and summary (unchanged)
+    // Totals row
     const table = tbody.closest("table");
     let tfoot = table.querySelector("tfoot");
     if (!tfoot) {
@@ -7839,7 +7825,7 @@ async function loadSalesData(filters = {}) {
       table.appendChild(tfoot);
     }
     tfoot.innerHTML = `
-      <tr style="position: sticky; bottom: 0; background: #f8f9fa; font-weight: bold; border-top: 3px solid #000; box-shadow: 0 -2px 5px rgba(0,0,0,0.15);">
+      <tr style="position:sticky;bottom:0;background:#f8f9fa;font-weight:bold;border-top:3px solid #000;box-shadow:0 -2px 5px rgba(0,0,0,0.15)">
         <td colspan="4" style="text-align:right;">Totals:</td>
         <td style="color:#007bff;">KES ${totalSales.toLocaleString()}</td>
         <td style="color:#dc3545;">KES ${totalExpense.toLocaleString()}</td>
@@ -7853,11 +7839,7 @@ async function loadSalesData(filters = {}) {
 
   } catch (error) {
     console.error("Error loading sales:", error);
-    tbody.innerHTML = `
-      <tr><td colspan="10" style="text-align:center; color:red;">
-        Error loading sales: ${error.message}
-      </td></tr>
-    `;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:red;text-align:center;">Error: ${error.message}</td></tr>`;
   }
 }
 /* -------------------------------
